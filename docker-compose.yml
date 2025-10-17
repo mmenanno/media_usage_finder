@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  media-finder:
+    build: .
+    image: ghcr.io/mmenanno/media-usage-finder:latest
+    container_name: media-finder
+    ports:
+      - "8080:8080"
+    volumes:
+      # Config and database
+      - ./config:/config
+      - ./data:/data
+
+      # Media paths (adjust these to match your Unraid setup)
+      - /mnt/user/data/media:/media:ro
+      - /mnt/user/data/downloads/torrents:/downloads:ro
+    environment:
+      - TZ=America/New_York
+    restart: unless-stopped
+    networks:
+      - media-net
+
+networks:
+  media-net:
+    driver: bridge
+

@@ -1,0 +1,53 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+node_modules/
+
+# Build artifacts
+dist/
+build/
+
+# Data and config
+data/
+config/config.yaml
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CSS output
+web/static/css/styles.css
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Package files
+package-lock.json
+

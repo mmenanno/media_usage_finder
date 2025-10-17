@@ -1,0 +1,324 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<div class="space-y-8">
+    <h2 class="text-3xl font-bold">Statistics</h2>
+
+    <!-- Overview Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="text-gray-400 text-sm font-medium">Total Files</div>
+            <div class="text-3xl font-bold mt-2">{{.Stats.TotalFiles}}</div>
+            <div class="text-gray-500 text-sm mt-1">{{formatSize .Stats.TotalSize}}</div>
+        </div>
+
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="text-gray-400 text-sm font-medium">Orphaned Files</div>
+            <div class="text-3xl font-bold mt-2 text-yellow-400">{{.Stats.OrphanedFiles}}</div>
+            <div class="text-gray-500 text-sm mt-1">{{formatSize .Stats.OrphanedSize}}</div>
+            <div class="mt-2 text-xs text-gray-500">
+                {{if gt .Stats.TotalFiles 0}}
+                    {{printf "%.1f%%" (div (mul .Stats.OrphanedFiles 100.0) .Stats.TotalFiles)}} of total
+                {{end}}
+            </div>
+        </div>
+
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="text-gray-400 text-sm font-medium">Hardlink Groups</div>
+            <div class="text-3xl font-bold mt-2 text-blue-400">{{.Stats.HardlinkGroups}}</div>
+            <div class="text-gray-500 text-sm mt-1">Saving {{formatSize .Stats.HardlinkSavings}}</div>
+        </div>
+
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="text-gray-400 text-sm font-medium">Space Efficiency</div>
+            <div class="text-3xl font-bold mt-2 text-green-400">
+                {{if gt .Stats.TotalSize 0}}
+                    {{printf "%.1f%%" (div (mul .Stats.HardlinkSavings 100.0) .Stats.TotalSize)}}
+                {{else}}
+                    0%
+                {{end}}
+            </div>
+            <div class="text-gray-500 text-sm mt-1">Via hardlinks</div>
+        </div>
+    </div>
+
+    <!-- Service Usage -->
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-xl font-semibold mb-6">Service Usage</h3>
+
+        <!-- Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="text-sm font-medium text-gray-400 mb-4 text-center">Files by Service</h4>
+                <canvas id="filesChart" class="max-h-64"></canvas>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="text-sm font-medium text-gray-400 mb-4 text-center">Storage by Service</h4>
+                <canvas id="storageChart" class="max-h-64"></canvas>
+            </div>
+        </div>
+
+        <!-- Detailed Breakdown -->
+        <div class="space-y-4">
+            {{range $service, $stats := .Stats.ServiceBreakdown}}
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-lg font-medium capitalize">{{$service}}</span>
+                    <span class="text-gray-400">{{$stats.FileCount}} files</span>
+                </div>
+                <div class="w-full bg-gray-600 rounded-full h-2 mb-2">
+                    <div class="bg-blue-500 h-2 rounded-full" style="width: {{if gt $.Stats.TotalFiles 0}}{{div (mul $stats.FileCount 100.0) $.Stats.TotalFiles}}{{else}}0{{end}}%"></div>
+                </div>
+                <div class="flex justify-between text-sm text-gray-500">
+                    <span>{{formatSize $stats.TotalSize}}</span>
+                    <span>{{if gt $.Stats.TotalFiles 0}}{{printf "%.1f%%" (div (mul $stats.FileCount 100.0) $.Stats.TotalFiles)}}{{else}}0%{{end}} of total files</span>
+                </div>
+            </div>
+            {{else}}
+            <div class="text-center text-gray-500 py-8">
+                No service data available
+            </div>
+            {{end}}
+        </div>
+    </div>
+
+    <!-- Space Distribution -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Files by Status -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h3 class="text-xl font-semibold mb-4">Files by Status</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center p-3 bg-gray-700 rounded">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span>In Use</span>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold">{{sub .Stats.TotalFiles .Stats.OrphanedFiles}}</div>
+                        <div class="text-sm text-gray-400">{{formatSize (sub .Stats.TotalSize .Stats.OrphanedSize)}}</div>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-700 rounded">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <span>Orphaned</span>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold">{{.Stats.OrphanedFiles}}</div>
+                        <div class="text-sm text-gray-400">{{formatSize .Stats.OrphanedSize}}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Storage Efficiency -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h3 class="text-xl font-semibold mb-4">Storage Efficiency</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center p-3 bg-gray-700 rounded">
+                    <div>
+                        <div class="font-medium">Actual Storage</div>
+                        <div class="text-sm text-gray-400">Physical disk usage</div>
+                    </div>
+                    <div class="text-right font-semibold">
+                        {{formatSize (sub .Stats.TotalSize .Stats.HardlinkSavings)}}
+                    </div>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-gray-700 rounded">
+                    <div>
+                        <div class="font-medium">Apparent Size</div>
+                        <div class="text-sm text-gray-400">If all files were unique</div>
+                    </div>
+                    <div class="text-right font-semibold">
+                        {{formatSize .Stats.TotalSize}}
+                    </div>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-green-700 rounded">
+                    <div>
+                        <div class="font-medium">Space Saved</div>
+                        <div class="text-sm text-gray-300">Via hardlinks</div>
+                    </div>
+                    <div class="text-right font-semibold">
+                        {{formatSize .Stats.HardlinkSavings}}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recommendations -->
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-xl font-semibold mb-4">Recommendations</h3>
+        <div class="space-y-3">
+            {{if gt .Stats.OrphanedFiles 0}}
+            <div class="p-4 bg-yellow-900/30 border border-yellow-700 rounded">
+                <div class="flex items-start space-x-3">
+                    <svg class="w-6 h-6 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    <div class="flex-1">
+                        <div class="font-medium text-yellow-400">Orphaned Files Detected</div>
+                        <div class="text-sm text-gray-300 mt-1">
+                            You have {{.Stats.OrphanedFiles}} orphaned files taking up {{formatSize .Stats.OrphanedSize}}.
+                            Consider reviewing and removing these files to free up space.
+                        </div>
+                        <a href="/files?orphaned=true" class="inline-block mt-2 text-sm text-yellow-400 hover:text-yellow-300">
+                            View orphaned files →
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+
+            {{if gt .Stats.HardlinkGroups 0}}
+            <div class="p-4 bg-blue-900/30 border border-blue-700 rounded">
+                <div class="flex items-start space-x-3">
+                    <svg class="w-6 h-6 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <div class="flex-1">
+                        <div class="font-medium text-blue-400">Efficient Storage Usage</div>
+                        <div class="text-sm text-gray-300 mt-1">
+                            Great! You're saving {{formatSize .Stats.HardlinkSavings}} through {{.Stats.HardlinkGroups}} hardlink groups.
+                            Continue using hardlinks for cross-seeding to maximize efficiency.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+
+            {{if eq .Stats.TotalFiles 0}}
+            <div class="p-4 bg-gray-700 border border-gray-600 rounded">
+                <div class="flex items-start space-x-3">
+                    <svg class="w-6 h-6 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="flex-1">
+                        <div class="font-medium text-gray-400">No Data Available</div>
+                        <div class="text-sm text-gray-400 mt-1">
+                            Run a scan to start tracking your media files.
+                        </div>
+                        <a href="/" class="inline-block mt-2 text-sm text-blue-400 hover:text-blue-300">
+                            Go to dashboard →
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+</div>
+
+<script>
+// Chart.js configuration
+Chart.defaults.color = '#9CA3AF';
+Chart.defaults.borderColor = '#374151';
+
+// Files by Service Chart
+const filesCtx = document.getElementById('filesChart');
+if (filesCtx) {
+    new Chart(filesCtx, {
+        type: 'doughnut',
+        data: {
+            labels: [{{range $service, $stats := .Stats.ServiceBreakdown}}'{{$service}}',{{end}}],
+            datasets: [{
+                data: [{{range $service, $stats := .Stats.ServiceBreakdown}}{{$stats.FileCount}},{{end}}],
+                backgroundColor: [
+                    '#3B82F6', // blue
+                    '#10B981', // green
+                    '#F59E0B', // amber
+                    '#EF4444', // red
+                ],
+                borderWidth: 2,
+                borderColor: '#1F2937'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = ((value / total) * 100).toFixed(1);
+                            return label + ': ' + value + ' files (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Storage by Service Chart
+const storageCtx = document.getElementById('storageChart');
+if (storageCtx) {
+    new Chart(storageCtx, {
+        type: 'bar',
+        data: {
+            labels: [{{range $service, $stats := .Stats.ServiceBreakdown}}'{{$service}}',{{end}}],
+            datasets: [{
+                label: 'Storage (GB)',
+                data: [{{range $service, $stats := .Stats.ServiceBreakdown}}{{div $stats.TotalSize 1073741824.0}},{{end}}],
+                backgroundColor: [
+                    '#3B82F6', // blue
+                    '#10B981', // green
+                    '#F59E0B', // amber
+                    '#EF4444', // red
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: '#374151'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toFixed(1) + ' GB';
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.parsed.y.toFixed(2) + ' GB';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+{{end}}
+

@@ -1,0 +1,53 @@
+database_path: /data/media-finder.db
+scan_workers: 10
+api_timeout: 30s
+server_port: 8080
+
+# Media-finder's own container-to-host mappings
+local_path_mappings:
+  - container: /media
+    host: /mnt/user/data/media
+  - container: /downloads
+    host: /mnt/user/data/downloads/torrents
+
+# Each service's container-to-host mappings
+service_path_mappings:
+  plex:
+    - container: /media
+      host: /mnt/user/data/media
+  sonarr:
+    - container: /tv
+      host: /mnt/user/data/media/tv
+    - container: /downloads
+      host: /mnt/user/data/downloads/torrents
+  radarr:
+    - container: /movies
+      host: /mnt/user/data/media/movies
+    - container: /downloads
+      host: /mnt/user/data/downloads/torrents
+  qbittorrent:
+    - container: /downloads
+      host: /mnt/user/data/downloads/torrents
+
+services:
+  plex:
+    url: http://plex:32400
+    token: YOUR_PLEX_TOKEN_HERE
+  sonarr:
+    url: http://sonarr:8989
+    api_key: YOUR_SONARR_API_KEY_HERE
+  radarr:
+    url: http://radarr:7878
+    api_key: YOUR_RADARR_API_KEY_HERE
+  qbittorrent:
+    url: http://qbittorrent:8080
+    username: admin
+    password: adminpass
+    # Optional: Use qui proxy instead of direct connection
+    # qui_proxy_url: http://qui:7476/proxy/YOUR_PROXY_KEY_HERE
+
+# Paths to scan (as seen by media-finder container)
+scan_paths:
+  - /media
+  - /downloads
+

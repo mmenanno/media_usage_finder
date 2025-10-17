@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Media Usage Finder</title>
+    <link href="/static/css/styles.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-gray-800 border-b border-gray-700">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-8">
+                    <h1 class="text-xl font-bold text-blue-400">Media Usage Finder</h1>
+                    <div class="flex space-x-4">
+                        <a href="/" class="px-3 py-2 rounded hover:bg-gray-700 transition">Dashboard</a>
+                        <a href="/files" class="px-3 py-2 rounded hover:bg-gray-700 transition">Files</a>
+                        <a href="/stats" class="px-3 py-2 rounded hover:bg-gray-700 transition">Statistics</a>
+                        <a href="/config" class="px-3 py-2 rounded hover:bg-gray-700 transition">Configuration</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        {{block "content" .}}{{end}}
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-auto py-6 text-center text-gray-500 text-sm">
+        <p>Media Usage Finder &copy; 2025</p>
+    </footer>
+</body>
+</html>
+

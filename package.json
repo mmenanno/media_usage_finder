@@ -1,0 +1,12 @@
+{
+  "name": "media-usage-finder",
+  "version": "0.1.0",
+  "description": "Track and manage media files across services",
+  "scripts": {
+    "build:css": "tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}
+

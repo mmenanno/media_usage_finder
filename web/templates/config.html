@@ -1,0 +1,199 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<div class="space-y-6">
+    <h2 class="text-3xl font-bold">Configuration</h2>
+
+    <form hx-post="/api/config/save" hx-swap="none" class="space-y-6">
+        <!-- General Settings -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h3 class="text-xl font-semibold mb-4">General Settings</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Database Path</label>
+                    <input
+                        type="text"
+                        name="database_path"
+                        value="{{.Config.DatabasePath}}"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Scan Workers</label>
+                        <input
+                            type="number"
+                            name="scan_workers"
+                            value="{{.Config.ScanWorkers}}"
+                            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Server Port</label>
+                        <input
+                            type="number"
+                            name="server_port"
+                            value="{{.Config.ServerPort}}"
+                            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plex Configuration -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Plex</h3>
+                <button
+                    type="button"
+                    hx-get="/api/config/test?service=plex"
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
+                    Test Connection
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">URL</label>
+                    <input
+                        type="text"
+                        name="plex_url"
+                        value="{{.Config.Services.Plex.URL}}"
+                        placeholder="http://plex:32400"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Token</label>
+                    <input
+                        type="password"
+                        name="plex_token"
+                        value="{{.Config.Services.Plex.Token}}"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Sonarr Configuration -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Sonarr</h3>
+                <button
+                    type="button"
+                    hx-get="/api/config/test?service=sonarr"
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
+                    Test Connection
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">URL</label>
+                    <input
+                        type="text"
+                        name="sonarr_url"
+                        value="{{.Config.Services.Sonarr.URL}}"
+                        placeholder="http://sonarr:8989"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">API Key</label>
+                    <input
+                        type="password"
+                        name="sonarr_api_key"
+                        value="{{.Config.Services.Sonarr.APIKey}}"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Radarr Configuration -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Radarr</h3>
+                <button
+                    type="button"
+                    hx-get="/api/config/test?service=radarr"
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
+                    Test Connection
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">URL</label>
+                    <input
+                        type="text"
+                        name="radarr_url"
+                        value="{{.Config.Services.Radarr.URL}}"
+                        placeholder="http://radarr:7878"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">API Key</label>
+                    <input
+                        type="password"
+                        name="radarr_api_key"
+                        value="{{.Config.Services.Radarr.APIKey}}"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- qBittorrent Configuration -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">qBittorrent</h3>
+                <button
+                    type="button"
+                    hx-get="/api/config/test?service=qbittorrent"
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
+                    Test Connection
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">URL</label>
+                    <input
+                        type="text"
+                        name="qbittorrent_url"
+                        value="{{.Config.Services.QBittorrent.URL}}"
+                        placeholder="http://qbittorrent:8080"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Username</label>
+                        <input
+                            type="text"
+                            name="qbittorrent_username"
+                            value="{{.Config.Services.QBittorrent.Username}}"
+                            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Password</label>
+                        <input
+                            type="password"
+                            name="qbittorrent_password"
+                            value="{{.Config.Services.QBittorrent.Password}}"
+                            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Qui Proxy URL (Optional)</label>
+                    <input
+                        type="text"
+                        name="qbittorrent_qui_proxy_url"
+                        value="{{.Config.Services.QBittorrent.QuiProxyURL}}"
+                        placeholder="http://qui:7476/proxy/xxx"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Button -->
+        <div class="flex justify-end space-x-4">
+            <button
+                type="submit"
+                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
+                Save Configuration
+            </button>
+        </div>
+    </form>
+</div>
+{{end}}
+

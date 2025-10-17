@@ -1,0 +1,260 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h2 class="text-3xl font-bold">Files</h2>
+        <div class="text-gray-400">
+            Total: {{.Total}} files
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="bg-gray-800 rounded-lg p-6">
+        <form hx-get="/files" hx-target="#files-table" hx-push-url="true" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Search -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Search Files</label>
+                    <input
+                        type="text"
+                        name="search"
+                        value="{{.Search}}"
+                        placeholder="Search by path..."
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+
+                <!-- Service Filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Service</label>
+                    <select
+                        name="service"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                        <option value="">All Services</option>
+                        <option value="plex" {{if eq .Service "plex"}}selected{{end}}>Plex</option>
+                        <option value="sonarr" {{if eq .Service "sonarr"}}selected{{end}}>Sonarr</option>
+                        <option value="radarr" {{if eq .Service "radarr"}}selected{{end}}>Radarr</option>
+                        <option value="qbittorrent" {{if eq .Service "qbittorrent"}}selected{{end}}>qBittorrent</option>
+                    </select>
+                </div>
+
+                <!-- Orphaned Filter -->
+                <div class="flex items-end">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            name="orphaned"
+                            value="true"
+                            {{if .Orphaned}}checked{{end}}
+                            class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                        <span class="text-sm text-gray-400">Show only orphaned files</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center">
+                <div class="flex space-x-2">
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
+                        Apply Filters
+                    </button>
+                    <a href="/files" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition">
+                        Clear
+                    </a>
+                </div>
+
+                <!-- Page Size -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <label class="text-sm text-gray-400">Per page:</label>
+                        <select
+                            name="limit"
+                            class="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-sm"
+                            onchange="this.form.submit()">
+                            <option value="25" {{if eq .Limit 25}}selected{{end}}>25</option>
+                            <option value="50" {{if eq .Limit 50}}selected{{end}}>50</option>
+                            <option value="100" {{if eq .Limit 100}}selected{{end}}>100</option>
+                            <option value="500" {{if eq .Limit 500}}selected{{end}}>500</option>
+                        </select>
+                    </div>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            name="infinite_scroll"
+                            id="infinite-scroll-toggle"
+                            value="true"
+                            class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                        <span class="text-sm text-gray-400">Infinite Scroll</span>
+                    </label>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Files Table -->
+    <div id="files-table" class="bg-gray-800 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Path</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Size</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Services</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                    {{range .Files}}
+                    <tr class="hover:bg-gray-750 transition">
+                        <td class="px-6 py-4 text-sm text-gray-300 font-mono">
+                            {{.File.Path}}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-400 whitespace-nowrap">
+                            {{formatSize .File.Size}}
+                        </td>
+                        <td class="px-6 py-4 text-sm">
+                            {{if .Usage}}
+                                <div class="flex flex-wrap gap-1">
+                                    {{range .Usage}}
+                                    <span class="px-2 py-1 bg-gray-600 rounded text-xs capitalize">{{.Service}}</span>
+                                    {{end}}
+                                </div>
+                            {{else}}
+                                <span class="text-gray-500">None</span>
+                            {{end}}
+                        </td>
+                        <td class="px-6 py-4 text-sm whitespace-nowrap">
+                            {{if .File.IsOrphaned}}
+                                <span class="px-2 py-1 bg-yellow-600 rounded text-xs">Orphaned</span>
+                            {{else}}
+                                <span class="px-2 py-1 bg-green-600 rounded text-xs">In Use</span>
+                            {{end}}
+                        </td>
+                        <td class="px-6 py-4 text-sm whitespace-nowrap">
+                            <button
+                                hx-delete="/api/files/delete?id={{.File.ID}}"
+                                hx-confirm="Are you sure you want to delete this file? This action cannot be undone."
+                                hx-target="closest tr"
+                                hx-swap="outerHTML"
+                                class="text-red-400 hover:text-red-300 mr-2">
+                                Delete
+                            </button>
+                            <button
+                                hx-post="/api/files/mark-rescan?filter=id={{.File.ID}}"
+                                class="text-blue-400 hover:text-blue-300">
+                                Mark for Rescan
+                            </button>
+                        </td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                            No files found
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination / Infinite Scroll Trigger -->
+        {{if gt .TotalPages 1}}
+        <div id="pagination-container" class="bg-gray-700 px-6 py-4 flex items-center justify-between">
+            <div class="text-sm text-gray-400">
+                Page {{.Page}} of {{.TotalPages}}
+            </div>
+            <div class="flex space-x-2">
+                {{if gt .Page 1}}
+                <a href="/files?page={{sub .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                   class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
+                    Previous
+                </a>
+                {{end}}
+
+                {{if lt .Page .TotalPages}}
+                <a id="next-page-btn"
+                   href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                   class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition"
+                   hx-get="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                   hx-trigger="revealed"
+                   hx-target="#files-table tbody"
+                   hx-swap="beforeend"
+                   hx-select="tbody tr"
+                   hx-disabled>
+                    Next
+                </a>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+
+    <script>
+    // Infinite scroll toggle
+    const infiniteScrollToggle = document.getElementById('infinite-scroll-toggle');
+    const nextPageBtn = document.getElementById('next-page-btn');
+
+    if (infiniteScrollToggle && nextPageBtn) {
+        infiniteScrollToggle.addEventListener('change', function() {
+            if (this.checked) {
+                // Enable infinite scroll
+                nextPageBtn.removeAttribute('hx-disabled');
+                nextPageBtn.classList.add('hidden');
+                document.getElementById('pagination-container').classList.add('border-t-2', 'border-blue-500');
+            } else {
+                // Disable infinite scroll
+                nextPageBtn.setAttribute('hx-disabled', '');
+                nextPageBtn.classList.remove('hidden');
+                document.getElementById('pagination-container').classList.remove('border-t-2', 'border-blue-500');
+            }
+        });
+    }
+    </script>
+
+    <!-- Export and Bulk Actions -->
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-lg font-semibold mb-4">Actions</h3>
+
+        <div class="space-y-4">
+            <!-- Export -->
+            <div>
+                <h4 class="text-sm font-medium text-gray-400 mb-2">Export</h4>
+                <div class="flex space-x-4">
+                    <a href="/api/export?format=json{{if .Orphaned}}&orphaned=true{{end}}"
+                       class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
+                       download>
+                        Export as JSON
+                    </a>
+                    <a href="/api/export?format=csv{{if .Orphaned}}&orphaned=true{{end}}"
+                       class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition"
+                       download>
+                        Export as CSV
+                    </a>
+                </div>
+            </div>
+
+            <!-- Bulk Actions -->
+            {{if .Orphaned}}
+            <div>
+                <h4 class="text-sm font-medium text-gray-400 mb-2">Bulk Actions on Orphaned Files</h4>
+                <div class="flex space-x-4">
+                    <button
+                        hx-post="/api/files/mark-rescan?orphaned=true"
+                        hx-confirm="Mark all {{.Total}} orphaned files for rescan?"
+                        class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded transition">
+                        Mark All for Rescan
+                    </button>
+                    <button
+                        hx-delete="/api/files/delete?orphaned=true"
+                        hx-confirm="Are you ABSOLUTELY SURE you want to delete ALL {{.Total}} orphaned files? This CANNOT be undone!"
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition">
+                        Delete All Orphaned
+                    </button>
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}
+
