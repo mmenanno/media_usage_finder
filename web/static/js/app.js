@@ -3,7 +3,6 @@
 // Handle HTMX events
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     // Custom animations or processing after HTMX swaps
-    console.log('HTMX swap completed');
 });
 
 // Handle scan start confirmation
@@ -45,8 +44,32 @@ function stopProgressMonitoring() {
     }
 }
 
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Media Usage Finder initialized');
+// Global network error handler
+window.addEventListener('unhandledrejection', (event) => {
+    // Handle unhandled promise rejections (often network errors)
+    const error = event.reason;
+
+    if (error && error.name === 'TypeError' && error.message.includes('fetch')) {
+        event.preventDefault(); // Prevent default console error
+
+        // Check if online
+        if (!navigator.onLine) {
+            window.showToast && window.showToast('No internet connection. Please check your network.', 'error');
+        } else {
+            window.showToast && window.showToast('Network error occurred. Please try again.', 'error');
+        }
+    }
 });
+
+// Monitor online/offline status
+window.addEventListener('offline', () => {
+    window.showToast && window.showToast('You are now offline. Some features may not work.', 'warning');
+});
+
+window.addEventListener('online', () => {
+    window.showToast && window.showToast('You are back online.', 'success');
+});
+
+// Application initialization is handled by individual modules
+// (modal.js, notifications.js, batch-selection.js, etc.)
 

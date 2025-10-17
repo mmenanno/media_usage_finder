@@ -2,12 +2,17 @@ package server
 
 import (
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 )
 
 // ValidateFilter validates a SQL WHERE clause filter to prevent injection
-// Only allows safe patterns for file filtering
+// NOTE: This function is currently unused as all filters use predefined allowlists
+// in the database package (see MarkFilesForRescan). Kept for potential future use
+// but all current implementations should use the safer allowlist approach.
+//
+// DEPRECATED: Use database.MarkFilesForRescan with predefined filter types instead
 func ValidateFilter(filter string) error {
 	if filter == "" {
 		return fmt.Errorf("filter cannot be empty")
@@ -72,4 +77,62 @@ func ValidatePage(page int) int {
 		return 1
 	}
 	return page
+}
+
+// ValidateURL validates a URL for service configuration
+func ValidateURL(urlStr string) error {
+	if urlStr == "" {
+		return nil // Empty is okay - service might not be configured
+	}
+
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return fmt.Errorf("invalid URL format: %w", err)
+	}
+
+	// Must have a scheme
+	if parsedURL.Scheme == "" {
+		return fmt.Errorf("URL must include a scheme (http:// or https://)")
+	}
+
+	// Only allow http and https
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return fmt.Errorf("URL scheme must be http or https")
+	}
+
+	// Must have a host
+	if parsedURL.Host == "" {
+		return fmt.Errorf("URL must include a host")
+	}
+
+	return nil
+}
+
+// ValidateAPIKey validates an API key format (basic validation)
+func ValidateAPIKey(apiKey string) error {
+	if apiKey == "" {
+		return nil // Empty is okay - service might not be configured
+	}
+
+	// API keys should be alphanumeric (possibly with some special chars)
+	// This is a basic check - adjust based on actual API key formats
+	matched, err := regexp.MatchString(`^[a-zA-Z0-9\-_+=/.]+$`, apiKey)
+	if err != nil {
+		return err
+	}
+
+	if !matched {
+		return fmt.Errorf("API key contains invalid characters")
+	}
+
+	// Reasonable length check (most API keys are 20-64 chars)
+	if len(apiKey) < 10 {
+		return fmt.Errorf("API key is too short (minimum 10 characters)")
+	}
+
+	if len(apiKey) > 256 {
+		return fmt.Errorf("API key is too long (maximum 256 characters)")
+	}
+
+	return nil
 }

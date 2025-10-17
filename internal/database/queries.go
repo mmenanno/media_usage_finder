@@ -103,7 +103,11 @@ func (db *DB) UpsertFile(file *File) error {
 		file.IsOrphaned,
 	).Scan(&file.ID)
 
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to upsert file %s (scan_id=%d): %w", file.Path, file.ScanID, err)
+	}
+
+	return nil
 }
 
 // GetFileByID retrieves a file by its ID
@@ -616,6 +620,9 @@ func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, l
 	}
 
 	// Validate and sanitize orderBy
+	// SQL Injection Safety: ValidateOrderBy uses an allowlist to ensure only
+	// valid column names are used. This is safe from SQL injection because the
+	// value is validated against a fixed set of allowed column names.
 	safeOrderBy := ValidateOrderBy(orderBy)
 
 	query := fmt.Sprintf(`
@@ -680,6 +687,34 @@ func (db *DB) GetHardlinkGroups() (map[string][]*File, error) {
 	}
 
 	return groups, rows.Err()
+}
+
+// GetHardlinksByInodeDevice returns all hardlinked files for a specific inode and device
+func (db *DB) GetHardlinksByInodeDevice(inode, deviceID int64) ([]*File, error) {
+	query := `
+		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
+		       f.scan_id, f.last_verified, f.is_orphaned, f.created_at
+		FROM files f
+		WHERE f.device_id = ? AND f.inode = ?
+		ORDER BY f.path
+	`
+
+	rows, err := db.conn.Query(query, deviceID, inode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var files []*File
+	for rows.Next() {
+		file, err := scanFileRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, file)
+	}
+
+	return files, rows.Err()
 }
 
 // DeleteFile deletes a file and logs the action

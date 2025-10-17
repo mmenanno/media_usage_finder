@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -16,16 +17,10 @@ import (
 
 	"github.com/mmenanno/media-usage-finder/internal/api"
 	"github.com/mmenanno/media-usage-finder/internal/config"
+	"github.com/mmenanno/media-usage-finder/internal/constants"
 	"github.com/mmenanno/media-usage-finder/internal/database"
 	"github.com/mmenanno/media-usage-finder/internal/scanner"
 	"github.com/mmenanno/media-usage-finder/internal/stats"
-)
-
-const (
-	// DefaultHardlinkGroupsPerPage is the default pagination size for hardlink groups
-	DefaultHardlinkGroupsPerPage = 50
-	// DefaultScansPerPage is the default pagination size for scan history
-	DefaultScansPerPage = 20
 )
 
 // Server holds the application state
@@ -35,8 +30,9 @@ type Server struct {
 	scanner       *scanner.Scanner
 	templates     *template.Template
 	statsCache    *stats.Cache
-	templateFuncs template.FuncMap // Cached template functions
-	version       string           // Application version
+	templateFuncs template.FuncMap   // Cached template functions
+	version       string             // Application version
+	clientFactory *api.ClientFactory // Factory for creating service clients
 }
 
 // NewServer creates a new server instance
@@ -47,10 +43,11 @@ func NewServer(db *database.DB, cfg *config.Config) *Server {
 	}
 
 	srv := &Server{
-		db:         db,
-		config:     cfg,
-		statsCache: stats.NewCache(cacheTTL),
-		version:    loadVersion(),
+		db:            db,
+		config:        cfg,
+		statsCache:    stats.NewCache(cacheTTL),
+		version:       loadVersion(),
+		clientFactory: api.NewClientFactory(cfg),
 	}
 
 	// Initialize cached template functions
@@ -78,6 +75,7 @@ func loadVersion() string {
 	}
 
 	// Fallback to default version
+	log.Println("WARNING: VERSION file not found or empty, using default version 1.0.0")
 	return "1.0.0"
 }
 
@@ -95,13 +93,14 @@ func (s *Server) LoadTemplates(pattern string) error {
 func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	statistics := s.getStats()
 	if statistics == nil {
-		http.Error(w, "Failed to calculate stats", http.StatusInternalServerError)
+		log.Println("ERROR: Failed to calculate dashboard stats")
+		respondError(w, http.StatusInternalServerError, "Failed to calculate statistics. Database may be unavailable", "stats_calculation_failed")
 		return
 	}
 
-	data := map[string]interface{}{
-		"Stats": statistics,
-		"Title": "Dashboard",
+	data := DashboardData{
+		Stats: statistics,
+		Title: "Dashboard",
 	}
 
 	s.renderTemplate(w, "dashboard.html", data)
@@ -154,7 +153,8 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		http.Error(w, "Failed to list files", http.StatusInternalServerError)
+		log.Printf("ERROR: Failed to list files: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to list files. The database may be locked or experiencing issues", "database_error")
 		return
 	}
 
@@ -178,17 +178,17 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	data := map[string]interface{}{
-		"Files":      filesWithUsage,
-		"Total":      total,
-		"Page":       page,
-		"Limit":      limit,
-		"TotalPages": CalculateTotalPages(total, limit),
-		"Title":      "Files",
-		"Orphaned":   orphanedOnly,
-		"Hardlinks":  hardlinksOnly,
-		"Service":    service,
-		"Search":     search,
+	data := FilesData{
+		Files:      filesWithUsage,
+		Total:      total,
+		Page:       page,
+		Limit:      limit,
+		TotalPages: CalculateTotalPages(total, limit),
+		Title:      "Files",
+		Orphaned:   orphanedOnly,
+		Hardlinks:  hardlinksOnly,
+		Service:    service,
+		Search:     search,
 	}
 
 	s.renderTemplate(w, "files.html", data)
@@ -196,9 +196,9 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 
 // HandleConfig serves the configuration page
 func (s *Server) HandleConfig(w http.ResponseWriter, r *http.Request) {
-	data := map[string]interface{}{
-		"Config": s.config,
-		"Title":  "Configuration",
+	data := ConfigData{
+		Config: s.config,
+		Title:  "Configuration",
 	}
 
 	s.renderTemplate(w, "config.html", data)
@@ -208,13 +208,14 @@ func (s *Server) HandleConfig(w http.ResponseWriter, r *http.Request) {
 func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 	statistics := s.getStats()
 	if statistics == nil {
-		http.Error(w, "Failed to calculate stats", http.StatusInternalServerError)
+		log.Println("ERROR: Failed to calculate statistics page stats")
+		respondError(w, http.StatusInternalServerError, "Failed to calculate statistics. Database may be unavailable", "stats_calculation_failed")
 		return
 	}
 
-	data := map[string]interface{}{
-		"Stats": statistics,
-		"Title": "Statistics",
+	data := StatsData{
+		Stats: statistics,
+		Title: "Statistics",
 	}
 
 	s.renderTemplate(w, "stats.html", data)
@@ -232,12 +233,13 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	page = ValidatePage(page)
 
-	limit := DefaultHardlinkGroupsPerPage
+	limit := constants.DefaultHardlinkGroupsPerPage
 	offset := (page - 1) * limit
 
 	groupsMap, err := s.db.GetHardlinkGroups()
 	if err != nil {
-		http.Error(w, "Failed to get hardlink groups", http.StatusInternalServerError)
+		log.Printf("ERROR: Failed to get hardlink groups: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to retrieve hardlink groups. Database error occurred", "database_error")
 		return
 	}
 
@@ -245,17 +247,25 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 	groups := make([]HardlinkGroup, 0, len(groupsMap))
 	for key, files := range groupsMap {
 		if len(files) > 0 {
-			// Use minimum size to handle potential corruption edge cases
-			minSize := files[0].Size
-			for _, f := range files {
-				if f.Size < minSize {
-					minSize = f.Size
+			// Use first file size as baseline
+			baseSize := files[0].Size
+
+			// Check for size inconsistencies (possible corruption)
+			for _, f := range files[1:] {
+				if f.Size != baseSize {
+					log.Printf("WARNING: Hardlink group %s has files with different sizes (%d vs %d). This may indicate filesystem corruption",
+						key, baseSize, f.Size)
+					// Use minimum size for conservative calculation
+					if f.Size < baseSize {
+						baseSize = f.Size
+					}
 				}
 			}
+
 			groups = append(groups, HardlinkGroup{
 				Key:   key,
 				Files: files,
-				Size:  minSize * int64(len(files)-1), // Space saved
+				Size:  baseSize * int64(len(files)-1), // Space saved
 			})
 		}
 	}
@@ -278,12 +288,12 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 
 	paginatedGroups := groups[start:end]
 
-	data := map[string]interface{}{
-		"Groups":     paginatedGroups,
-		"Total":      total,
-		"Page":       page,
-		"TotalPages": CalculateTotalPages(total, limit),
-		"Title":      "Hardlink Groups",
+	data := HardlinksData{
+		Groups:     paginatedGroups,
+		Total:      total,
+		Page:       page,
+		TotalPages: CalculateTotalPages(total, limit),
+		Title:      "Hardlink Groups",
 	}
 
 	s.renderTemplate(w, "hardlinks.html", data)
@@ -294,21 +304,22 @@ func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	page = ValidatePage(page)
 
-	limit := DefaultScansPerPage
+	limit := constants.DefaultScansPerPage
 	offset := (page - 1) * limit
 
 	scans, total, err := s.db.ListScans(limit, offset)
 	if err != nil {
-		http.Error(w, "Failed to list scans", http.StatusInternalServerError)
+		log.Printf("ERROR: Failed to list scans: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to retrieve scan history. Database error occurred", "database_error")
 		return
 	}
 
-	data := map[string]interface{}{
-		"Scans":      scans,
-		"Total":      total,
-		"Page":       page,
-		"TotalPages": CalculateTotalPages(total, limit),
-		"Title":      "Scan History",
+	data := ScansData{
+		Scans:      scans,
+		Total:      total,
+		Page:       page,
+		TotalPages: CalculateTotalPages(total, limit),
+		Title:      "Scan History",
 	}
 
 	s.renderTemplate(w, "scans.html", data)
@@ -357,27 +368,6 @@ func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(health)
 }
 
-// createPlexClient creates a Plex API client with the given timeout
-func (s *Server) createPlexClient(timeout time.Duration) *api.PlexClient {
-	return api.NewPlexClient(s.config.Services.Plex.URL, s.config.Services.Plex.Token, timeout)
-}
-
-// createSonarrClient creates a Sonarr API client with the given timeout
-func (s *Server) createSonarrClient(timeout time.Duration) *api.SonarrClient {
-	return api.NewSonarrClient(s.config.Services.Sonarr.URL, s.config.Services.Sonarr.APIKey, timeout)
-}
-
-// createRadarrClient creates a Radarr API client with the given timeout
-func (s *Server) createRadarrClient(timeout time.Duration) *api.RadarrClient {
-	return api.NewRadarrClient(s.config.Services.Radarr.URL, s.config.Services.Radarr.APIKey, timeout)
-}
-
-// createQBittorrentClient creates a qBittorrent API client with the given timeout
-func (s *Server) createQBittorrentClient(timeout time.Duration) *api.QBittorrentClient {
-	qbConfig := s.config.Services.QBittorrent
-	return api.NewQBittorrentClient(qbConfig.URL, qbConfig.Username, qbConfig.Password, qbConfig.QuiProxyURL, timeout)
-}
-
 // checkExternalServices checks connectivity to external services concurrently
 func (s *Server) checkExternalServices() map[string]interface{} {
 	type serviceCheck struct {
@@ -385,61 +375,32 @@ func (s *Server) checkExternalServices() map[string]interface{} {
 		result map[string]string
 	}
 
-	results := make(chan serviceCheck, 4)
+	serviceNames := []string{"plex", "sonarr", "radarr", "qbittorrent"}
+	results := make(chan serviceCheck, len(serviceNames))
 	timeout := 2 * time.Second
 	var wg sync.WaitGroup
 
-	// Check Plex concurrently
-	if s.config.Services.Plex.URL != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := s.createPlexClient(timeout).Test(); err != nil {
-				results <- serviceCheck{"plex", map[string]string{"status": "error", "error": err.Error()}}
-			} else {
-				results <- serviceCheck{"plex", map[string]string{"status": "ok"}}
-			}
-		}()
-	}
+	// Check all configured services concurrently
+	for _, serviceName := range serviceNames {
+		if !s.clientFactory.IsServiceConfigured(serviceName) {
+			continue
+		}
 
-	// Check Sonarr concurrently
-	if s.config.Services.Sonarr.URL != "" {
 		wg.Add(1)
-		go func() {
+		go func(name string) {
 			defer wg.Done()
-			if err := s.createSonarrClient(timeout).Test(); err != nil {
-				results <- serviceCheck{"sonarr", map[string]string{"status": "error", "error": err.Error()}}
-			} else {
-				results <- serviceCheck{"sonarr", map[string]string{"status": "ok"}}
+			client, err := s.clientFactory.CreateClient(name, timeout)
+			if err != nil {
+				results <- serviceCheck{name, map[string]string{"status": "error", "error": err.Error()}}
+				return
 			}
-		}()
-	}
 
-	// Check Radarr concurrently
-	if s.config.Services.Radarr.URL != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := s.createRadarrClient(timeout).Test(); err != nil {
-				results <- serviceCheck{"radarr", map[string]string{"status": "error", "error": err.Error()}}
+			if err := client.Test(); err != nil {
+				results <- serviceCheck{name, map[string]string{"status": "error", "error": err.Error()}}
 			} else {
-				results <- serviceCheck{"radarr", map[string]string{"status": "ok"}}
+				results <- serviceCheck{name, map[string]string{"status": "ok"}}
 			}
-		}()
-	}
-
-	// Check qBittorrent concurrently
-	qbConfig := s.config.Services.QBittorrent
-	if qbConfig.URL != "" || qbConfig.QuiProxyURL != "" {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := s.createQBittorrentClient(timeout).Test(); err != nil {
-				results <- serviceCheck{"qbittorrent", map[string]string{"status": "error", "error": err.Error()}}
-			} else {
-				results <- serviceCheck{"qbittorrent", map[string]string{"status": "ok"}}
-			}
-		}()
+		}(serviceName)
 	}
 
 	// Close results channel when all checks complete
@@ -459,8 +420,7 @@ func (s *Server) checkExternalServices() map[string]interface{} {
 
 // HandleStartScan starts a new scan
 func (s *Server) HandleStartScan(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
 
@@ -484,7 +444,10 @@ func (s *Server) HandleStartScan(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 
 		if err := s.scanner.Scan(ctx, incremental); err != nil {
-			fmt.Printf("Scan error: %v\n", err)
+			log.Printf("ERROR: Scan failed: %v", err)
+			// Scan error will be recorded in database by scanner itself
+		} else {
+			log.Printf("INFO: Scan completed successfully")
 		}
 	}()
 
@@ -655,8 +618,7 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 
 // HandleSaveConfig saves configuration
 func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
 
@@ -681,23 +643,58 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Update Plex config
-	s.config.Services.Plex.URL = r.FormValue("plex_url")
+	// Update Plex config with validation
+	plexURL := r.FormValue("plex_url")
+	if err := ValidateURL(plexURL); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid Plex URL: %v", err), "validation_failed")
+		return
+	}
+	s.config.Services.Plex.URL = plexURL
 	s.config.Services.Plex.Token = r.FormValue("plex_token")
 
-	// Update Sonarr config
-	s.config.Services.Sonarr.URL = r.FormValue("sonarr_url")
-	s.config.Services.Sonarr.APIKey = r.FormValue("sonarr_api_key")
+	// Update Sonarr config with validation
+	sonarrURL := r.FormValue("sonarr_url")
+	if err := ValidateURL(sonarrURL); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid Sonarr URL: %v", err), "validation_failed")
+		return
+	}
+	sonarrAPIKey := r.FormValue("sonarr_api_key")
+	if err := ValidateAPIKey(sonarrAPIKey); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid Sonarr API key: %v", err), "validation_failed")
+		return
+	}
+	s.config.Services.Sonarr.URL = sonarrURL
+	s.config.Services.Sonarr.APIKey = sonarrAPIKey
 
-	// Update Radarr config
-	s.config.Services.Radarr.URL = r.FormValue("radarr_url")
-	s.config.Services.Radarr.APIKey = r.FormValue("radarr_api_key")
+	// Update Radarr config with validation
+	radarrURL := r.FormValue("radarr_url")
+	if err := ValidateURL(radarrURL); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid Radarr URL: %v", err), "validation_failed")
+		return
+	}
+	radarrAPIKey := r.FormValue("radarr_api_key")
+	if err := ValidateAPIKey(radarrAPIKey); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid Radarr API key: %v", err), "validation_failed")
+		return
+	}
+	s.config.Services.Radarr.URL = radarrURL
+	s.config.Services.Radarr.APIKey = radarrAPIKey
 
-	// Update qBittorrent config
-	s.config.Services.QBittorrent.URL = r.FormValue("qbittorrent_url")
+	// Update qBittorrent config with validation
+	qbURL := r.FormValue("qbittorrent_url")
+	if err := ValidateURL(qbURL); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid qBittorrent URL: %v", err), "validation_failed")
+		return
+	}
+	qbProxyURL := r.FormValue("qbittorrent_qui_proxy_url")
+	if err := ValidateURL(qbProxyURL); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid qBittorrent proxy URL: %v", err), "validation_failed")
+		return
+	}
+	s.config.Services.QBittorrent.URL = qbURL
 	s.config.Services.QBittorrent.Username = r.FormValue("qbittorrent_username")
 	s.config.Services.QBittorrent.Password = r.FormValue("qbittorrent_password")
-	s.config.Services.QBittorrent.QuiProxyURL = r.FormValue("qbittorrent_qui_proxy_url")
+	s.config.Services.QBittorrent.QuiProxyURL = qbProxyURL
 
 	// Validate config before saving
 	if err := s.config.Validate(); err != nil {
@@ -723,37 +720,30 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 
 // HandleTestService tests connection to a service
 func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
-	service := r.URL.Query().Get("service")
+	serviceName := r.URL.Query().Get("service")
 
-	var err error
-	switch service {
-	case "plex":
-		err = s.createPlexClient(s.config.APITimeout).Test()
-	case "sonarr":
-		err = s.createSonarrClient(s.config.APITimeout).Test()
-	case "radarr":
-		err = s.createRadarrClient(s.config.APITimeout).Test()
-	case "qbittorrent":
-		err = s.createQBittorrentClient(s.config.APITimeout).Test()
-	default:
+	// Use factory to create client
+	client, err := s.clientFactory.CreateClient(serviceName, s.config.APITimeout)
+	if err != nil {
 		respondError(w, http.StatusBadRequest, "Unknown service", "unknown_service")
 		return
 	}
 
-	if err != nil {
-		w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection failed: %v", service, err))
+	// Test the connection
+	if err := client.Test(); err != nil {
+		w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection failed: %v", serviceName, err))
 		w.Header().Set("X-Toast-Type", "error")
 		respondError(w, http.StatusBadRequest, err.Error(), "connection_failed")
 		return
 	}
 
-	w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection successful", service))
+	w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection successful", serviceName))
 	w.Header().Set("X-Toast-Type", "success")
 
 	response := TestServiceResponse{
 		Status:  "success",
 		Message: "Connection successful",
-		Service: service,
+		Service: serviceName,
 	}
 	respondJSON(w, http.StatusOK, response)
 }
@@ -763,8 +753,14 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 	format := r.URL.Query().Get("format")
 	orphanedOnly := r.URL.Query().Get("orphaned") == "true"
 
+	// Validate format before writing response
+	if format != "json" && format != "csv" {
+		http.Error(w, "Invalid format. Supported formats: json, csv", http.StatusBadRequest)
+		return
+	}
+
 	// Stream files in batches to avoid loading everything into memory
-	const batchSize = 1000
+	batchSize := constants.ExportBatchSize
 	offset := 0
 
 	switch format {
@@ -773,7 +769,7 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=files.json")
 
 		// Write opening bracket
-		w.Write([]byte("["))
+		w.Write([]byte("[\n"))
 
 		first := true
 		for {
@@ -791,12 +787,17 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 
 			for _, file := range files {
 				if !first {
-					w.Write([]byte(","))
+					w.Write([]byte(",\n"))
 				}
 				first = false
 
-				// Stream each file entry
-				json.NewEncoder(w).Encode(file)
+				// Stream each file entry - marshal manually to avoid newline issues
+				data, err := json.Marshal(file)
+				if err != nil {
+					log.Printf("Failed to marshal file: %v", err)
+					continue
+				}
+				w.Write(data)
 			}
 
 			offset += batchSize
@@ -808,14 +809,21 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Write closing bracket
-		w.Write([]byte("]"))
+		w.Write([]byte("\n]"))
 
 	case "csv":
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=files.csv")
 
+		// Create CSV writer for proper escaping
+		csvWriter := csv.NewWriter(w)
+		defer csvWriter.Flush()
+
 		// Write CSV header
-		w.Write([]byte("path,size,is_orphaned\n"))
+		if err := csvWriter.Write([]string{"path", "size", "is_orphaned"}); err != nil {
+			http.Error(w, "Failed to write CSV header", http.StatusInternalServerError)
+			return
+		}
 
 		for {
 			files, _, err := s.db.ListFiles(orphanedOnly, "", false, batchSize, offset, "path")
@@ -832,9 +840,18 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 
 			// Stream CSV rows in batches
 			for _, file := range files {
-				fmt.Fprintf(w, "%s,%d,%v\n", file.Path, file.Size, file.IsOrphaned)
+				record := []string{
+					file.Path,
+					fmt.Sprintf("%d", file.Size),
+					fmt.Sprintf("%v", file.IsOrphaned),
+				}
+				if err := csvWriter.Write(record); err != nil {
+					log.Printf("Failed to write CSV record: %v", err)
+					continue
+				}
 			}
 
+			csvWriter.Flush()
 			offset += batchSize
 
 			// Flush to client
@@ -844,14 +861,14 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 		}
 
 	default:
+		// This should never be reached due to validation at start
 		http.Error(w, "Invalid format", http.StatusBadRequest)
 	}
 }
 
 // HandleDeleteFile deletes a file or files
 func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
-		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+	if !requireAnyMethod(w, r, http.MethodPost, http.MethodDelete) {
 		return
 	}
 
@@ -879,7 +896,7 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 
 	// Bulk orphaned files deletion
 	if orphaned {
-		files, _, err := s.db.ListFiles(true, "", false, 100000, 0, "path")
+		files, _, err := s.db.ListFiles(true, "", false, constants.MaxExportFiles, 0, "path")
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to list orphaned files", "list_failed")
 			return
@@ -943,17 +960,14 @@ func (s *Server) HandleFileDetails(w http.ResponseWriter, r *http.Request) {
 		usage = []*database.Usage{} // Empty array on error
 	}
 
-	// Get hardlinks if applicable
+	// Get hardlinks if applicable (optimized query)
 	var hardlinks []string
 	if file.Inode != 0 && file.DeviceID != 0 {
-		groups, err := s.db.GetHardlinkGroups()
-		if err == nil {
-			key := fmt.Sprintf("%d-%d", file.DeviceID, file.Inode)
-			if group, ok := groups[key]; ok && len(group) > 1 {
-				hardlinks = make([]string, 0, len(group))
-				for _, f := range group {
-					hardlinks = append(hardlinks, f.Path)
-				}
+		group, err := s.db.GetHardlinksByInodeDevice(file.Inode, file.DeviceID)
+		if err == nil && len(group) > 1 {
+			hardlinks = make([]string, 0, len(group))
+			for _, f := range group {
+				hardlinks = append(hardlinks, f.Path)
 			}
 		}
 	}
@@ -978,8 +992,7 @@ func (s *Server) HandleFileDetails(w http.ResponseWriter, r *http.Request) {
 
 // HandleMarkRescan marks files for rescan
 func (s *Server) HandleMarkRescan(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
 
@@ -1035,7 +1048,7 @@ func (s *Server) HandleMarkRescan(w http.ResponseWriter, r *http.Request) {
 }
 
 // renderTemplate renders an HTML template
-func (s *Server) renderTemplate(w http.ResponseWriter, name string, data map[string]interface{}) {
+func (s *Server) renderTemplate(w http.ResponseWriter, name string, data interface{}) {
 	if s.templates == nil {
 		http.Error(w, "Templates not loaded", http.StatusInternalServerError)
 		return

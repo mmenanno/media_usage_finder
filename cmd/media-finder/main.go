@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/mmenanno/media-usage-finder/internal/config"
+	"github.com/mmenanno/media-usage-finder/internal/constants"
 	"github.com/mmenanno/media-usage-finder/internal/database"
 	"github.com/mmenanno/media-usage-finder/internal/scanner"
 	"github.com/mmenanno/media-usage-finder/internal/server"
@@ -27,6 +28,16 @@ var (
 )
 
 func main() {
+	// Ensure database is closed even on panic
+	defer func() {
+		if r := recover(); r != nil {
+			if db != nil {
+				db.Close()
+			}
+			panic(r) // Re-panic after cleanup
+		}
+	}()
+
 	rootCmd := &cobra.Command{
 		Use:   "media-finder",
 		Short: "Media Usage Finder - Track and manage media files across services",
@@ -201,7 +212,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
 	output, _ := cmd.Flags().GetString("output")
 
-	files, _, err := db.ListFiles(orphaned, "", false, 100000, 0, "path")
+	files, _, err := db.ListFiles(orphaned, "", false, constants.MaxExportFiles, 0, "path")
 	if err != nil {
 		return fmt.Errorf("failed to list files: %w", err)
 	}
@@ -322,7 +333,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	// Delete orphaned files
-	files, _, err := db.ListFiles(true, "", false, 100000, 0, "path")
+	files, _, err := db.ListFiles(true, "", false, constants.MaxExportFiles, 0, "path")
 	if err != nil {
 		return fmt.Errorf("failed to list orphaned files: %w", err)
 	}

@@ -36,19 +36,23 @@ func NewPlexClient(baseURL, token string, timeout time.Duration) *PlexClient {
 func (p *PlexClient) Test() error {
 	req, err := http.NewRequest("GET", p.baseURL+"/identity", nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create request for Plex at %s: %w. Check the URL format", p.baseURL, err)
 	}
 
 	req.Header.Set("X-Plex-Token", p.token)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to connect to Plex: %w", err)
+		return fmt.Errorf("failed to connect to Plex at %s: %w. Check the URL is reachable and the token is valid", p.baseURL, err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("plex authentication failed (401). Check your Plex token is valid")
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("plex returned status %d", resp.StatusCode)
+		return fmt.Errorf("plex returned status %d. Check your Plex URL and token configuration", resp.StatusCode)
 	}
 
 	return nil

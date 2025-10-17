@@ -10,6 +10,7 @@ import (
 
 	"github.com/mmenanno/media-usage-finder/internal/api"
 	"github.com/mmenanno/media-usage-finder/internal/config"
+	"github.com/mmenanno/media-usage-finder/internal/constants"
 	"github.com/mmenanno/media-usage-finder/internal/database"
 )
 
@@ -303,45 +304,21 @@ func (s *Scanner) updatePlexUsage() error {
 		return nil
 	}
 
-	// Create context with timeout for this specific service call
-	ctx, cancel := context.WithTimeout(context.Background(), s.config.APITimeout*2)
-	defer cancel()
-
-	// Channel to receive result
-	type result struct {
-		files []api.PlexFile
-		err   error
-	}
-	resultChan := make(chan result, 1)
-
-	go func() {
-		client := api.NewPlexClient(
-			s.config.Services.Plex.URL,
-			s.config.Services.Plex.Token,
-			s.config.APITimeout,
-		)
-		files, err := client.GetAllFiles()
-		resultChan <- result{files, err}
-	}()
-
-	var files []api.PlexFile
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("plex request timed out after %v", s.config.APITimeout*2)
-	case res := <-resultChan:
-		if res.err != nil {
-			return res.err
-		}
-		files = res.files
-	}
-
-	// Convert to generic interface
-	serviceFiles := make([]serviceFile, len(files))
-	for i, f := range files {
-		serviceFiles[i] = plexServiceFile{f}
-	}
-
-	return s.updateServiceUsage("plex", serviceFiles)
+	return s.updateServiceUsageWithTimeout(
+		"plex",
+		func() ([]serviceFile, error) {
+			client := api.NewPlexClient(s.config.Services.Plex.URL, s.config.Services.Plex.Token, s.config.APITimeout)
+			files, err := client.GetAllFiles()
+			if err != nil {
+				return nil, err
+			}
+			serviceFiles := make([]serviceFile, len(files))
+			for i, f := range files {
+				serviceFiles[i] = plexServiceFile{f}
+			}
+			return serviceFiles, nil
+		},
+	)
 }
 
 // updateSonarrUsage updates usage information from Sonarr
@@ -350,44 +327,21 @@ func (s *Scanner) updateSonarrUsage() error {
 		return nil
 	}
 
-	// Create context with timeout for this specific service call
-	ctx, cancel := context.WithTimeout(context.Background(), s.config.APITimeout*2)
-	defer cancel()
-
-	type result struct {
-		files []api.SonarrFile
-		err   error
-	}
-	resultChan := make(chan result, 1)
-
-	go func() {
-		client := api.NewSonarrClient(
-			s.config.Services.Sonarr.URL,
-			s.config.Services.Sonarr.APIKey,
-			s.config.APITimeout,
-		)
-		files, err := client.GetAllFiles()
-		resultChan <- result{files, err}
-	}()
-
-	var files []api.SonarrFile
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("sonarr request timed out after %v", s.config.APITimeout*2)
-	case res := <-resultChan:
-		if res.err != nil {
-			return res.err
-		}
-		files = res.files
-	}
-
-	// Convert to generic interface
-	serviceFiles := make([]serviceFile, len(files))
-	for i, f := range files {
-		serviceFiles[i] = sonarrServiceFile{f}
-	}
-
-	return s.updateServiceUsage("sonarr", serviceFiles)
+	return s.updateServiceUsageWithTimeout(
+		"sonarr",
+		func() ([]serviceFile, error) {
+			client := api.NewSonarrClient(s.config.Services.Sonarr.URL, s.config.Services.Sonarr.APIKey, s.config.APITimeout)
+			files, err := client.GetAllFiles()
+			if err != nil {
+				return nil, err
+			}
+			serviceFiles := make([]serviceFile, len(files))
+			for i, f := range files {
+				serviceFiles[i] = sonarrServiceFile{f}
+			}
+			return serviceFiles, nil
+		},
+	)
 }
 
 // updateRadarrUsage updates usage information from Radarr
@@ -396,44 +350,21 @@ func (s *Scanner) updateRadarrUsage() error {
 		return nil
 	}
 
-	// Create context with timeout for this specific service call
-	ctx, cancel := context.WithTimeout(context.Background(), s.config.APITimeout*2)
-	defer cancel()
-
-	type result struct {
-		files []api.RadarrFile
-		err   error
-	}
-	resultChan := make(chan result, 1)
-
-	go func() {
-		client := api.NewRadarrClient(
-			s.config.Services.Radarr.URL,
-			s.config.Services.Radarr.APIKey,
-			s.config.APITimeout,
-		)
-		files, err := client.GetAllFiles()
-		resultChan <- result{files, err}
-	}()
-
-	var files []api.RadarrFile
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("radarr request timed out after %v", s.config.APITimeout*2)
-	case res := <-resultChan:
-		if res.err != nil {
-			return res.err
-		}
-		files = res.files
-	}
-
-	// Convert to generic interface
-	serviceFiles := make([]serviceFile, len(files))
-	for i, f := range files {
-		serviceFiles[i] = radarrServiceFile{f}
-	}
-
-	return s.updateServiceUsage("radarr", serviceFiles)
+	return s.updateServiceUsageWithTimeout(
+		"radarr",
+		func() ([]serviceFile, error) {
+			client := api.NewRadarrClient(s.config.Services.Radarr.URL, s.config.Services.Radarr.APIKey, s.config.APITimeout)
+			files, err := client.GetAllFiles()
+			if err != nil {
+				return nil, err
+			}
+			serviceFiles := make([]serviceFile, len(files))
+			for i, f := range files {
+				serviceFiles[i] = radarrServiceFile{f}
+			}
+			return serviceFiles, nil
+		},
+	)
 }
 
 // updateQBittorrentUsage updates usage information from qBittorrent
@@ -443,46 +374,45 @@ func (s *Scanner) updateQBittorrentUsage() error {
 		return nil
 	}
 
-	// Create context with timeout for this specific service call
-	ctx, cancel := context.WithTimeout(context.Background(), s.config.APITimeout*2)
+	return s.updateServiceUsageWithTimeout(
+		"qbittorrent",
+		func() ([]serviceFile, error) {
+			client := api.NewQBittorrentClient(qbConfig.URL, qbConfig.Username, qbConfig.Password, qbConfig.QuiProxyURL, s.config.APITimeout)
+			files, err := client.GetAllFiles()
+			if err != nil {
+				return nil, err
+			}
+			serviceFiles := make([]serviceFile, len(files))
+			for i, f := range files {
+				serviceFiles[i] = qbittorrentServiceFile{f}
+			}
+			return serviceFiles, nil
+		},
+	)
+}
+
+// updateServiceUsageWithTimeout is a generic helper to update service usage with timeout handling
+// This eliminates duplication across all service update methods
+func (s *Scanner) updateServiceUsageWithTimeout(serviceName string, getFiles func() ([]serviceFile, error)) error {
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.APITimeout*constants.MaxAPITimeoutMultiplier)
 	defer cancel()
 
-	type result struct {
-		files []api.QBittorrentFile
-		err   error
-	}
-	resultChan := make(chan result, 1)
-
+	resultChan := make(chan error, 1)
 	go func() {
-		client := api.NewQBittorrentClient(
-			qbConfig.URL,
-			qbConfig.Username,
-			qbConfig.Password,
-			qbConfig.QuiProxyURL,
-			s.config.APITimeout,
-		)
-		files, err := client.GetAllFiles()
-		resultChan <- result{files, err}
+		files, err := getFiles()
+		if err != nil {
+			resultChan <- err
+			return
+		}
+		resultChan <- s.updateServiceUsage(serviceName, files)
 	}()
 
-	var files []api.QBittorrentFile
 	select {
 	case <-ctx.Done():
-		return fmt.Errorf("qbittorrent request timed out after %v", s.config.APITimeout*2)
-	case res := <-resultChan:
-		if res.err != nil {
-			return res.err
-		}
-		files = res.files
+		return fmt.Errorf("%s request timed out after %v", serviceName, s.config.APITimeout*constants.MaxAPITimeoutMultiplier)
+	case err := <-resultChan:
+		return err
 	}
-
-	// Convert to generic interface
-	serviceFiles := make([]serviceFile, len(files))
-	for i, f := range files {
-		serviceFiles[i] = qbittorrentServiceFile{f}
-	}
-
-	return s.updateServiceUsage("qbittorrent", serviceFiles)
 }
 
 // GetProgress returns the current scan progress

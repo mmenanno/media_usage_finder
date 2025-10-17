@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/mmenanno/media-usage-finder/internal/constants"
 )
 
 // Progress tracks the progress of a scan
@@ -30,8 +32,8 @@ func NewProgress() *Progress {
 	p := &Progress{
 		StartTime:    time.Now(),
 		IsRunning:    true,
-		Errors:       make([]string, 0, 100), // Pre-allocate capacity
-		logChan:      make(chan string, 100),
+		Errors:       make([]string, 0, constants.ErrorSliceCapacity),
+		logChan:      make(chan string, constants.LogChannelBuffer),
 		logListeners: make([]chan string, 0),
 	}
 
@@ -90,6 +92,14 @@ func (p *Progress) Log(message string) {
 		return // Don't write to closed channel
 	}
 
+	// Additional safety: use select with default to prevent blocking
+	// even if channel is closed between check and send
+	defer func() {
+		if r := recover(); r != nil {
+			// Channel was closed during send, ignore panic
+		}
+	}()
+
 	select {
 	case p.logChan <- message:
 	default:
@@ -102,7 +112,7 @@ func (p *Progress) Subscribe() chan string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	listener := make(chan string, 50)
+	listener := make(chan string, constants.LogListenerBuffer)
 	p.logListeners = append(p.logListeners, listener)
 	return listener
 }
@@ -121,19 +131,21 @@ func (p *Progress) Unsubscribe(listener chan string) {
 	}
 }
 
-// CleanupStaleListeners removes listeners that haven't been read from in a while
+// CleanupStaleListeners removes listeners that are blocking (likely abandoned)
 func (p *Progress) CleanupStaleListeners() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Remove listeners that are blocking (full channel buffer)
+	// Remove listeners whose channels are full (likely abandoned/stale)
+	// We use len() to check if the buffer is full, which is safer than writing test messages
 	activeListeners := make([]chan string, 0, len(p.logListeners))
 	for _, listener := range p.logListeners {
-		select {
-		case listener <- "": // Try to send empty message
+		// If the channel is at capacity (full buffer), it's likely stale
+		// Keep listeners that still have buffer space available
+		if len(listener) < cap(listener) {
 			activeListeners = append(activeListeners, listener)
-		default:
-			// Channel is full, likely stale/abandoned - close it
+		} else {
+			// Channel is full - close and discard
 			close(listener)
 		}
 	}
@@ -167,10 +179,9 @@ func (p *Progress) AddError(err string) {
 	// Also log to SSE stream
 	p.logChan <- fmt.Sprintf("ERROR: %s", err)
 
-	// Keep only last 1000 errors to prevent unbounded growth
-	const maxErrors = 1000
-	if len(p.Errors) > maxErrors {
-		p.Errors = p.Errors[len(p.Errors)-maxErrors:]
+	// Keep only last N errors to prevent unbounded growth
+	if len(p.Errors) > constants.MaxStoredErrors {
+		p.Errors = p.Errors[len(p.Errors)-constants.MaxStoredErrors:]
 	}
 }
 
@@ -185,10 +196,15 @@ func (p *Progress) SetPhase(phase string) {
 // Stop marks the scan as completed
 func (p *Progress) Stop() {
 	p.mu.Lock()
-	p.IsRunning = false
-	p.mu.Unlock()
+	defer p.mu.Unlock()
 
-	// Close log channel once
+	if !p.IsRunning {
+		return // Already stopped
+	}
+
+	p.IsRunning = false
+
+	// Close log channel once (protected by mutex)
 	p.stopOnce.Do(func() {
 		if p.logChan != nil {
 			close(p.logChan)

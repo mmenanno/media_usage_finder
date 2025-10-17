@@ -55,8 +55,12 @@ func (s *Server) Run(port int) error {
 		}
 	})
 
-	// Apply middleware chain (order matters: Recovery -> RequestID -> Logger -> RequestSizeLimit -> CORS -> handlers)
-	handler := Recovery(RequestID(Logger(RequestSizeLimit(CORS(s.config.CORSAllowedOrigin)(mux)))))
+	// Create rate limiter (10 requests per second with burst of 20)
+	rateLimiter := NewRateLimiter(10.0, 20)
+	rateLimiter.StartPeriodicCleanup(1 * time.Hour)
+
+	// Apply middleware chain (order matters: Recovery -> RateLimit -> RequestID -> Logger -> RequestSizeLimit -> CORS -> handlers)
+	handler := Recovery(rateLimiter.Middleware(RequestID(Logger(RequestSizeLimit(CORS(s.config.CORSAllowedOrigin)(mux))))))
 
 	// Start server
 	addr := fmt.Sprintf(":%d", port)

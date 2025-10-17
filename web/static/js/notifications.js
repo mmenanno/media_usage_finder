@@ -58,34 +58,62 @@ class ToastManager {
         }
     }
 
-    show(message, type = 'info') {
-        const toast = this.createToast(message, type);
+    show(message, type = 'info', options = {}) {
+        const {
+            duration = type === 'error' ? null : 5000, // Errors persist by default
+            retryAction = null, // Function to call on retry
+            dismissible = true
+        } = options;
+
+        const toast = this.createToast(message, type, retryAction, dismissible);
         this.container.appendChild(toast);
 
         // Animate in
         setTimeout(() => toast.classList.add('translate-x-0', 'opacity-100'), 10);
 
-        // Auto-dismiss after 5 seconds
-        setTimeout(() => this.dismiss(toast), 5000);
+        // Auto-dismiss if duration is set
+        if (duration) {
+            setTimeout(() => this.dismiss(toast), duration);
+        }
     }
 
-    createToast(message, type) {
+    createToast(message, type, retryAction, dismissible) {
         const toast = document.createElement('div');
         toast.className = `transform translate-x-full opacity-0 transition-all duration-300
                           rounded-lg shadow-lg p-4 flex items-center space-x-3
                           ${this.getTypeClasses(type)}`;
 
         const icon = this.getIcon(type);
-        const closeBtn = this.createCloseButton(toast);
+        const closeBtn = dismissible ? this.createCloseButton(toast) : '';
+        const retryBtn = retryAction && type === 'error' ? this.createRetryButton(toast, retryAction) : '';
 
         toast.innerHTML = `
             ${icon}
             <span class="flex-1 text-sm font-medium">${message}</span>
-            ${closeBtn}
+            <div class="flex items-center space-x-2">
+                ${retryBtn}
+                ${closeBtn}
+            </div>
         `;
 
         // Add click handler for close button
-        toast.querySelector('.toast-close').addEventListener('click', () => this.dismiss(toast));
+        if (dismissible) {
+            const closeBtnEl = toast.querySelector('.toast-close');
+            if (closeBtnEl) {
+                closeBtnEl.addEventListener('click', () => this.dismiss(toast));
+            }
+        }
+
+        // Add click handler for retry button
+        if (retryAction) {
+            const retryBtnEl = toast.querySelector('.toast-retry');
+            if (retryBtnEl) {
+                retryBtnEl.addEventListener('click', () => {
+                    this.dismiss(toast);
+                    retryAction();
+                });
+            }
+        }
 
         return toast;
     }
@@ -101,20 +129,20 @@ class ToastManager {
     }
 
     getIcon(type) {
-        const icons = {
-            success: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>',
-            error: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>',
-            warning: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>',
-            info: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
-        };
-        return icons[type] || icons.info;
+        // Use shared icon constants
+        return window.Icons ? window.Icons.get(type, 5) : '';
     }
 
     createCloseButton(toast) {
-        return `<button class="toast-close text-white hover:text-gray-200 transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
+        const closeIcon = window.Icons ? window.Icons.close : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+        return `<button class="toast-close text-white hover:text-gray-200 transition focus:outline-none focus:ring-2 focus:ring-white rounded" aria-label="Dismiss notification">
+                    ${closeIcon}
+                </button>`;
+    }
+
+    createRetryButton(toast) {
+        return `<button class="toast-retry px-3 py-1 bg-white bg-opacity-20 hover:bg-opacity-30 rounded text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-white" aria-label="Retry action">
+                    Retry
                 </button>`;
     }
 
@@ -131,9 +159,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Expose showToast globally for custom use
-window.showToast = (message, type = 'info') => {
+window.showToast = (message, type = 'info', options = {}) => {
     if (window.toastManager) {
-        window.toastManager.show(message, type);
+        window.toastManager.show(message, type, options);
     }
 };
 

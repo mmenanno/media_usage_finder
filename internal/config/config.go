@@ -29,6 +29,9 @@ type Config struct {
 	ServicePathMappings map[string][]PathMapping `yaml:"service_path_mappings"`
 	ScanPaths           []string                 `yaml:"scan_paths"`
 	Services            Services                 `yaml:"services"`
+
+	// Internal caching (not serialized)
+	pathCache *PathCache `yaml:"-"`
 }
 
 // PathMapping represents a container-to-host path mapping
@@ -114,7 +117,9 @@ func Load(path string) (*Config, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Return default config if file doesn't exist
-			return Default(), nil
+			cfg := Default()
+			cfg.pathCache = NewPathCache()
+			return cfg, nil
 		}
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -123,6 +128,9 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
+
+	// Initialize path cache
+	cfg.pathCache = NewPathCache()
 
 	return cfg, nil
 }
@@ -148,23 +156,48 @@ func (c *Config) Save(path string) error {
 }
 
 // TranslatePathToHost translates a container path to a host path for a specific service
+// Uses caching to improve performance for repeated translations
 func (c *Config) TranslatePathToHost(servicePath, service string) string {
-	// If service is empty, use local path mappings
+	// Check cache first
+	cacheKey := service + ":" + servicePath
+	if c.pathCache != nil {
+		if cached, ok := c.pathCache.Get(cacheKey); ok {
+			return cached
+		}
+	}
+
+	// Perform translation
+	var result string
 	if service == "" {
-		return c.translatePath(servicePath, c.LocalPathMappings)
+		result = c.translatePath(servicePath, c.LocalPathMappings)
+	} else {
+		mappings, ok := c.ServicePathMappings[service]
+		if !ok {
+			result = servicePath
+		} else {
+			result = c.translatePath(servicePath, mappings)
+		}
 	}
 
-	// Use service-specific mappings
-	mappings, ok := c.ServicePathMappings[service]
-	if !ok {
-		return servicePath
+	// Cache the result
+	if c.pathCache != nil {
+		c.pathCache.Set(cacheKey, result)
 	}
 
-	return c.translatePath(servicePath, mappings)
+	return result
 }
 
 // TranslatePathToContainer translates a host path to a container path for media-finder
+// Uses caching to improve performance for repeated translations
 func (c *Config) TranslatePathToContainer(hostPath string) string {
+	// Check cache first
+	cacheKey := "local:" + hostPath
+	if c.pathCache != nil {
+		if cached, ok := c.pathCache.Get(cacheKey); ok {
+			return cached
+		}
+	}
+
 	// Find the longest matching host path
 	var bestMatch PathMapping
 	maxLen := 0
@@ -176,13 +209,34 @@ func (c *Config) TranslatePathToContainer(hostPath string) string {
 		}
 	}
 
-	if maxLen == 0 {
-		return hostPath
+	result := hostPath
+	if maxLen > 0 {
+		// Replace host prefix with container prefix
+		remainder := strings.TrimPrefix(hostPath, bestMatch.Host)
+		result = filepath.Join(bestMatch.Container, remainder)
 	}
 
-	// Replace host prefix with container prefix
-	remainder := strings.TrimPrefix(hostPath, bestMatch.Host)
-	return filepath.Join(bestMatch.Container, remainder)
+	// Cache the result
+	if c.pathCache != nil {
+		c.pathCache.Set(cacheKey, result)
+	}
+
+	return result
+}
+
+// ClearPathCache clears the path translation cache
+func (c *Config) ClearPathCache() {
+	if c.pathCache != nil {
+		c.pathCache.Clear()
+	}
+}
+
+// GetPathCacheStats returns cache statistics for monitoring
+func (c *Config) GetPathCacheStats() (hits, total uint64, hitRate float64) {
+	if c.pathCache != nil {
+		return c.pathCache.Stats()
+	}
+	return 0, 0, 0
 }
 
 // translatePath performs the actual path translation
@@ -239,6 +293,18 @@ func (c *Config) Validate() error {
 
 	if c.StatsCacheTTL < 0 {
 		return fmt.Errorf("stats_cache_ttl cannot be negative")
+	}
+
+	if c.ServerPort < 1 || c.ServerPort > 65535 {
+		return fmt.Errorf("server_port must be between 1 and 65535")
+	}
+
+	// Validate CORS origin if provided
+	if c.CORSAllowedOrigin != "" && c.CORSAllowedOrigin != "*" {
+		// Basic validation: should start with http:// or https://
+		if !strings.HasPrefix(c.CORSAllowedOrigin, "http://") && !strings.HasPrefix(c.CORSAllowedOrigin, "https://") {
+			return fmt.Errorf("cors_allowed_origin must start with http:// or https:// (or be * for all origins)")
+		}
 	}
 
 	// Validate path mappings

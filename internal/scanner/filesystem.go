@@ -68,12 +68,11 @@ func WalkFiles(ctx context.Context, paths []string, out chan<- FileInfo, progres
 				DeviceID:     int64(stat.Dev),
 			}
 
-			// Send to workers
+			// Send to workers - block until space is available to ensure no files are dropped
 			select {
+			case <-ctx.Done():
+				return ctx.Err()
 			case out <- fileInfo:
-			default:
-				// Channel full, this shouldn't happen with proper buffering
-				progress.AddError(fmt.Sprintf("Channel blocked for %s", filePath))
 			}
 
 			return nil
@@ -115,6 +114,11 @@ func CountFiles(paths []string) (int64, error) {
 
 // GetFileInfo gets detailed information about a specific file
 func GetFileInfo(path string) (*FileInfo, error) {
+	// Validate path to prevent directory traversal
+	if err := validatePath(path); err != nil {
+		return nil, fmt.Errorf("invalid path: %w", err)
+	}
+
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat file: %w", err)
@@ -132,4 +136,28 @@ func GetFileInfo(path string) (*FileInfo, error) {
 		Inode:        int64(stat.Ino),
 		DeviceID:     int64(stat.Dev),
 	}, nil
+}
+
+// validatePath validates a file path to prevent directory traversal and other attacks
+func validatePath(path string) error {
+	if path == "" {
+		return fmt.Errorf("path cannot be empty")
+	}
+
+	// Check for null bytes
+	for i := 0; i < len(path); i++ {
+		if path[i] == 0 {
+			return fmt.Errorf("path contains null byte")
+		}
+	}
+
+	// Clean the path to resolve any ./ or ../ components
+	cleanPath := filepath.Clean(path)
+
+	// Ensure the path is absolute for security
+	if !filepath.IsAbs(cleanPath) {
+		return fmt.Errorf("path must be absolute")
+	}
+
+	return nil
 }

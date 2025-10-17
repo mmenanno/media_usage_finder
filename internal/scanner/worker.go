@@ -11,6 +11,12 @@ import (
 )
 
 // Worker processes files from the queue
+//
+// Concurrency Strategy:
+// - Workers run concurrently in goroutines, consuming from a shared input channel
+// - Each worker independently processes files and updates the database
+// - Progress tracking is thread-safe via mutex in Progress struct
+// - Context cancellation allows graceful shutdown of all workers
 type Worker struct {
 	id          int
 	db          *database.DB
@@ -96,6 +102,23 @@ func (w *Worker) processFile(fileInfo FileInfo) error {
 }
 
 // WorkerPool manages a pool of workers
+//
+// Concurrency Model:
+// - Fixed number of worker goroutines process files from a shared buffered channel
+// - Workers are created at pool initialization and run until Stop() or Cancel()
+// - Buffered channel (default 100) provides backpressure to filesystem walker
+// - WaitGroup ensures all workers complete before pool methods return
+// - Context allows cancellation to propagate to all workers simultaneously
+//
+// Synchronization:
+// - input channel: synchronized by Go runtime (safe for concurrent send/receive)
+// - wg: coordinates worker goroutine lifecycle
+// - closeOnce: ensures input channel is closed exactly once
+// - ctx/cancel: provides cancellation signal to all workers
+//
+// Shutdown:
+// - Stop(): graceful - closes input, waits for workers to finish current files
+// - Cancel(): immediate - cancels context, then closes input and waits
 type WorkerPool struct {
 	workers   []*Worker
 	input     chan FileInfo
@@ -140,14 +163,17 @@ func (p *WorkerPool) Submit(fileInfo FileInfo) {
 }
 
 // Stop stops all workers gracefully
+// Cleanup order: close input channel first, wait for workers to finish, then cancel context
 func (p *WorkerPool) Stop() {
 	p.closeOnce.Do(func() {
 		close(p.input)
 	})
 	p.wg.Wait()
+	p.cancel() // Always cancel context to prevent leaks
 }
 
 // Cancel cancels all workers immediately
+// Cleanup order: cancel context first (signals workers to stop), close input, then wait
 func (p *WorkerPool) Cancel() {
 	p.cancel()
 	p.closeOnce.Do(func() {

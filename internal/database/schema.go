@@ -24,6 +24,9 @@ CREATE INDEX IF NOT EXISTS idx_files_modified_time ON files(modified_time);
 CREATE INDEX IF NOT EXISTS idx_files_last_verified ON files(last_verified);
 CREATE INDEX IF NOT EXISTS idx_files_is_orphaned ON files(is_orphaned);
 CREATE INDEX IF NOT EXISTS idx_files_scan_id ON files(scan_id);
+-- Composite indexes for common query patterns
+CREATE INDEX IF NOT EXISTS idx_files_orphaned_size ON files(is_orphaned, size);
+CREATE INDEX IF NOT EXISTS idx_files_scan_verified ON files(scan_id, last_verified);
 
 -- Full-text search virtual table for file paths
 CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(

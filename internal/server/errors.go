@@ -65,3 +65,23 @@ func respondSuccess(w http.ResponseWriter, message string, data map[string]inter
 	}
 	respondJSON(w, http.StatusOK, response)
 }
+
+// requireMethod checks if the request method matches the expected method
+func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method != method {
+		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+		return false
+	}
+	return true
+}
+
+// requireAnyMethod checks if the request method matches any of the expected methods
+func requireAnyMethod(w http.ResponseWriter, r *http.Request, methods ...string) bool {
+	for _, method := range methods {
+		if r.Method == method {
+			return true
+		}
+	}
+	respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+	return false
+}

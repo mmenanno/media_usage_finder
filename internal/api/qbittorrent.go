@@ -11,11 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
-)
 
-const (
-	// MaxConcurrentTorrentWorkers limits concurrent torrent processing
-	MaxConcurrentTorrentWorkers = 20
+	"github.com/mmenanno/media-usage-finder/internal/constants"
 )
 
 // QBittorrentClient handles communication with qBittorrent
@@ -104,29 +101,36 @@ func (q *QBittorrentClient) login() error {
 // Test tests the connection to qBittorrent
 func (q *QBittorrentClient) Test() error {
 	if err := q.login(); err != nil {
-		return err
+		return fmt.Errorf("qBittorrent login failed: %w. Check username and password", err)
 	}
 
 	req, err := http.NewRequest("GET", q.getEffectiveURL()+"/api/v2/app/version", nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create qBittorrent request: %w. Check URL format", err)
 	}
 
 	resp, err := q.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to connect to qBittorrent: %w", err)
+		return fmt.Errorf("failed to connect to qBittorrent at %s: %w. Check the URL is reachable", q.getEffectiveURL(), err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("qBittorrent returned status %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("qBittorrent returned status %d: %s. Check your configuration", resp.StatusCode, string(body))
 	}
 
 	return nil
 }
 
 // GetAllFiles retrieves all files from all torrents using concurrent workers
+//
+// Concurrency Strategy:
+// - Uses a semaphore pattern to limit concurrent torrent processing to MaxConcurrentTorrentWorkers
+// - For each torrent, fetches file list and properties concurrently in separate goroutines
+// - Collects all results into a single slice protected by a mutex
+// - If any API call fails for a torrent, that torrent is skipped (logged but doesn't fail entire operation)
+// - This approach significantly improves performance for users with many torrents
 func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
 	if err := q.login(); err != nil {
 		return nil, err
@@ -143,7 +147,7 @@ func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
 	}
 
 	// Use concurrent workers to process torrents
-	sem := make(chan struct{}, MaxConcurrentTorrentWorkers) // Semaphore for concurrency control
+	sem := make(chan struct{}, constants.MaxConcurrentTorrentWorkers) // Semaphore for concurrency control
 
 	var mu sync.Mutex
 	var allFiles []QBittorrentFile
@@ -158,52 +162,54 @@ func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			// Get torrent files and properties concurrently
-			filesCh := make(chan []fileInfo, 1)
-			propsCh := make(chan *torrentProperties, 1)
-			errCh := make(chan error, 2)
-
-			go func() {
-				files, err := q.getTorrentFiles(t.Hash)
-				if err != nil {
-					errCh <- err
-					return
-				}
-				filesCh <- files
-			}()
-
-			go func() {
-				props, err := q.getTorrentProperties(t.Hash)
-				if err != nil {
-					errCh <- err
-					return
-				}
-				propsCh <- props
-			}()
-
-			// Wait for both to complete
-			var files []fileInfo
-			var props *torrentProperties
-			for i := 0; i < 2; i++ {
-				select {
-				case f := <-filesCh:
-					files = f
-				case p := <-propsCh:
-					props = p
-				case <-errCh:
-					return // Skip this torrent on error
-				}
+			// Get torrent files and properties concurrently with proper error handling
+			type result struct {
+				files []fileInfo
+				props *torrentProperties
+				err   error
 			}
+			resultCh := make(chan result, 1)
 
-			if files == nil || props == nil {
+			go func() {
+				var r result
+				var wg sync.WaitGroup
+				var filesErr, propsErr error
+
+				wg.Add(2)
+				go func() {
+					defer wg.Done()
+					r.files, filesErr = q.getTorrentFiles(t.Hash)
+				}()
+
+				go func() {
+					defer wg.Done()
+					r.props, propsErr = q.getTorrentProperties(t.Hash)
+				}()
+
+				wg.Wait()
+
+				// Check for errors
+				if filesErr != nil {
+					r.err = filesErr
+				} else if propsErr != nil {
+					r.err = propsErr
+				}
+
+				resultCh <- r
+			}()
+
+			// Wait for result
+			res := <-resultCh
+			if res.err != nil || res.files == nil || res.props == nil {
+				// Skip this torrent on error
 				return
 			}
 
 			// Process files
 			var torrentQBFiles []QBittorrentFile
-			for _, f := range files {
+			for _, f := range res.files {
 				// Build full file path using filepath.Join for safety
-				fullPath := filepath.Join(props.SavePath, f.Name)
+				fullPath := filepath.Join(res.props.SavePath, f.Name)
 
 				torrentQBFiles = append(torrentQBFiles, QBittorrentFile{
 					Path:        fullPath,
