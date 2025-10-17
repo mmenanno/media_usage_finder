@@ -96,8 +96,18 @@
             <table class="w-full min-w-full">
                 <thead class="bg-gray-700">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Path</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Size</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                            <a href="/files?order=path&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                               class="hover:text-gray-200 cursor-pointer">
+                                Path ↕
+                            </a>
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                            <a href="/files?order=size&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                               class="hover:text-gray-200 cursor-pointer">
+                                Size ↕
+                            </a>
+                        </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Services</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
@@ -169,7 +179,7 @@
             </div>
             <div class="flex space-x-2">
                 {{if gt .Page 1}}
-                <a href="/files?page={{sub .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                <a href="/files?page={{sub .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
                    class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
                     Previous
                 </a>
@@ -177,9 +187,9 @@
 
                 {{if lt .Page .TotalPages}}
                 <a id="next-page-btn"
-                   href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                   href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
                    class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition"
-                   hx-get="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                   hx-get="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
                    hx-trigger="revealed"
                    hx-target="#files-table tbody"
                    hx-swap="beforeend"

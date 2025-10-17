@@ -1,0 +1,62 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h2 class="text-3xl font-bold">Hardlink Groups</h2>
+        <div class="text-gray-400">
+            {{len .Groups}} groups found
+        </div>
+    </div>
+
+    {{if .Groups}}
+    <div class="space-y-4">
+        {{range $key, $files := .Groups}}
+        <div class="bg-gray-800 rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold">Group {{$key}}</h3>
+                    <p class="text-sm text-gray-400">{{len $files}} linked files</p>
+                </div>
+                <div class="text-right">
+                    {{if $files}}
+                    <div class="text-sm text-gray-400">Size: {{formatSize (index $files 0).Size}}</div>
+                    <div class="text-xs text-green-400">Saving: {{formatSize (mul (sub (len $files) 1) (index $files 0).Size)}}</div>
+                    {{end}}
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                {{range $files}}
+                <div class="bg-gray-700 rounded p-3 flex justify-between items-center">
+                    <div class="flex-1 font-mono text-sm text-gray-300 truncate mr-4" title="{{.Path}}">
+                        {{.Path}}
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        {{if .IsOrphaned}}
+                        <span class="px-2 py-1 bg-yellow-600 rounded text-xs">Orphaned</span>
+                        {{else}}
+                        <span class="px-2 py-1 bg-green-600 rounded text-xs">In Use</span>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="bg-gray-800 rounded-lg p-12 text-center">
+        <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+        </svg>
+        <h3 class="text-xl font-medium text-gray-400 mb-2">No Hardlink Groups Found</h3>
+        <p class="text-gray-500">Run a scan to detect hardlinked files</p>
+        <a href="/" class="inline-block mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
+            Go to Dashboard
+        </a>
+    </div>
+    {{end}}
+</div>
+{{end}}
+

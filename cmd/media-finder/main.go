@@ -197,7 +197,7 @@ func runExport(cmd *cobra.Command, args []string) error {
 	format, _ := cmd.Flags().GetString("format")
 	output, _ := cmd.Flags().GetString("output")
 
-	files, _, err := db.ListFiles(orphaned, "", 100000, 0, "path")
+	files, _, err := db.ListFiles(orphaned, "", false, 100000, 0, "path")
 	if err != nil {
 		return fmt.Errorf("failed to list files: %w", err)
 	}
@@ -314,7 +314,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 	}
 
 	// Delete orphaned files
-	files, _, err := db.ListFiles(true, "", 100000, 0, "path")
+	files, _, err := db.ListFiles(true, "", false, 100000, 0, "path")
 	if err != nil {
 		return fmt.Errorf("failed to list orphaned files: %w", err)
 	}

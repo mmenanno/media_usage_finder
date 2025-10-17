@@ -117,6 +117,44 @@ func (db *DB) GetFileByPath(path string) (*File, error) {
 	return scanFileRow(db.conn.QueryRow(query, path))
 }
 
+// GetFilesByPaths retrieves multiple files by their paths in one query (batch lookup)
+func (db *DB) GetFilesByPaths(paths []string) (map[string]*File, error) {
+	if len(paths) == 0 {
+		return make(map[string]*File), nil
+	}
+
+	// Build IN clause with placeholders
+	placeholders := make([]string, len(paths))
+	args := make([]interface{}, len(paths))
+	for i, path := range paths {
+		placeholders[i] = "?"
+		args[i] = path
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, created_at
+		FROM files
+		WHERE path IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	fileMap := make(map[string]*File)
+	for rows.Next() {
+		file, err := scanFileRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		fileMap[file.Path] = file
+	}
+
+	return fileMap, rows.Err()
+}
+
 // CreateScan creates a new scan record
 func (db *DB) CreateScan(scanType string) (*Scan, error) {
 	query := `
@@ -204,6 +242,67 @@ func (db *DB) GetCurrentScan() (*Scan, error) {
 	}
 
 	return scan, nil
+}
+
+// ListScans retrieves recent scans with pagination
+func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
+	// Count total
+	var total int
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM scans`).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Get scans
+	query := `
+		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, created_at
+		FROM scans
+		ORDER BY started_at DESC
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := db.conn.Query(query, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var scans []*Scan
+	for rows.Next() {
+		scan := &Scan{}
+		var startedAt, createdAt int64
+		var completedAt sql.NullInt64
+		var errors sql.NullString
+
+		err := rows.Scan(
+			&scan.ID,
+			&startedAt,
+			&completedAt,
+			&scan.Status,
+			&scan.FilesScanned,
+			&errors,
+			&scan.ScanType,
+			&createdAt,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		scan.StartedAt = time.Unix(startedAt, 0)
+		scan.CreatedAt = time.Unix(createdAt, 0)
+
+		if completedAt.Valid {
+			t := time.Unix(completedAt.Int64, 0)
+			scan.CompletedAt = &t
+		}
+		if errors.Valid {
+			scan.Errors = &errors.String
+		}
+
+		scans = append(scans, scan)
+	}
+
+	return scans, total, rows.Err()
 }
 
 // UpsertUsage inserts or updates a usage record
@@ -465,7 +564,7 @@ func ValidateOrderBy(orderBy string) string {
 }
 
 // ListFiles retrieves files with filtering and pagination
-func (db *DB) ListFiles(orphanedOnly bool, service string, limit, offset int, orderBy string) ([]*File, int, error) {
+func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, limit, offset int, orderBy string) ([]*File, int, error) {
 	whereClause := "WHERE 1=1"
 	args := []interface{}{}
 
@@ -476,6 +575,12 @@ func (db *DB) ListFiles(orphanedOnly bool, service string, limit, offset int, or
 	if service != "" {
 		whereClause += " AND EXISTS (SELECT 1 FROM usage u WHERE u.file_id = f.id AND u.service = ?)"
 		args = append(args, service)
+	}
+
+	if hardlinksOnly {
+		whereClause += ` AND (f.device_id, f.inode) IN (
+			SELECT device_id, inode FROM files GROUP BY device_id, inode HAVING COUNT(*) > 1
+		)`
 	}
 
 	// Count total

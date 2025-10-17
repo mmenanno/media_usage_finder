@@ -18,6 +18,8 @@ func (s *Server) Run(port int) error {
 	// Page routes
 	mux.HandleFunc("/", s.HandleIndex)
 	mux.HandleFunc("/files", s.HandleFiles)
+	mux.HandleFunc("/hardlinks", s.HandleHardlinks)
+	mux.HandleFunc("/scans", s.HandleScans)
 	mux.HandleFunc("/config", s.HandleConfig)
 	mux.HandleFunc("/stats", s.HandleStats)
 

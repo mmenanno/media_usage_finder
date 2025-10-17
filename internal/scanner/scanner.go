@@ -15,10 +15,11 @@ import (
 
 // Scanner coordinates the entire scanning process
 type Scanner struct {
-	db       *database.DB
-	config   *config.Config
-	progress *Progress
-	cancel   context.CancelFunc
+	db             *database.DB
+	config         *config.Config
+	progress       *Progress
+	cancel         context.CancelFunc
+	onScanComplete func() // Callback when scan completes
 }
 
 // NewScanner creates a new scanner
@@ -27,6 +28,11 @@ func NewScanner(db *database.DB, cfg *config.Config) *Scanner {
 		db:     db,
 		config: cfg,
 	}
+}
+
+// SetOnScanComplete sets the callback to be called when scan completes
+func (s *Scanner) SetOnScanComplete(callback func()) {
+	s.onScanComplete = callback
 }
 
 // Scan performs a full or incremental scan
@@ -90,6 +96,11 @@ func (s *Scanner) Scan(ctx context.Context, incremental bool) error {
 
 	if err := s.db.UpdateScan(scan.ID, status, s.progress.ProcessedFiles, errorMsg); err != nil {
 		log.Printf("Failed to update scan status: %v", err)
+	}
+
+	// Call completion callback if set
+	if s.onScanComplete != nil && status == "completed" {
+		s.onScanComplete()
 	}
 
 	return scanErr
@@ -201,15 +212,27 @@ func (s *Scanner) updatePlexUsage() error {
 		return err
 	}
 
-	// Collect all usage records for batch insert
-	var usages []*database.Usage
-	for _, file := range files {
-		// Translate Plex path to host path
-		hostPath := s.config.TranslatePathToHost(file.Path, "plex")
+	// Translate all paths and collect for batch lookup
+	hostPaths := make([]string, 0, len(files))
+	pathToFile := make(map[string]api.PlexFile)
 
-		// Find file in database
-		dbFile, err := s.db.GetFileByPath(hostPath)
-		if err != nil {
+	for _, file := range files {
+		hostPath := s.config.TranslatePathToHost(file.Path, "plex")
+		hostPaths = append(hostPaths, hostPath)
+		pathToFile[hostPath] = file
+	}
+
+	// Batch load all files from database
+	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
+	if err != nil {
+		return fmt.Errorf("failed to batch load files: %w", err)
+	}
+
+	// Collect usage records
+	var usages []*database.Usage
+	for hostPath, file := range pathToFile {
+		dbFile, ok := dbFiles[hostPath]
+		if !ok {
 			continue
 		}
 
@@ -230,6 +253,7 @@ func (s *Scanner) updatePlexUsage() error {
 		}
 	}
 
+	log.Printf("Updated Plex usage: %d files", len(usages))
 	return nil
 }
 
@@ -255,13 +279,27 @@ func (s *Scanner) updateSonarrUsage() error {
 		return err
 	}
 
-	// Collect all usage records for batch insert
-	var usages []*database.Usage
+	// Translate all paths and collect for batch lookup
+	hostPaths := make([]string, 0, len(files))
+	pathToFile := make(map[string]api.SonarrFile)
+
 	for _, file := range files {
 		hostPath := s.config.TranslatePathToHost(file.Path, "sonarr")
+		hostPaths = append(hostPaths, hostPath)
+		pathToFile[hostPath] = file
+	}
 
-		dbFile, err := s.db.GetFileByPath(hostPath)
-		if err != nil {
+	// Batch load all files from database
+	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
+	if err != nil {
+		return fmt.Errorf("failed to batch load files: %w", err)
+	}
+
+	// Collect usage records
+	var usages []*database.Usage
+	for hostPath, file := range pathToFile {
+		dbFile, ok := dbFiles[hostPath]
+		if !ok {
 			continue
 		}
 
@@ -284,6 +322,7 @@ func (s *Scanner) updateSonarrUsage() error {
 		}
 	}
 
+	log.Printf("Updated Sonarr usage: %d files", len(usages))
 	return nil
 }
 
@@ -309,13 +348,27 @@ func (s *Scanner) updateRadarrUsage() error {
 		return err
 	}
 
-	// Collect all usage records for batch insert
-	var usages []*database.Usage
+	// Translate all paths and collect for batch lookup
+	hostPaths := make([]string, 0, len(files))
+	pathToFile := make(map[string]api.RadarrFile)
+
 	for _, file := range files {
 		hostPath := s.config.TranslatePathToHost(file.Path, "radarr")
+		hostPaths = append(hostPaths, hostPath)
+		pathToFile[hostPath] = file
+	}
 
-		dbFile, err := s.db.GetFileByPath(hostPath)
-		if err != nil {
+	// Batch load all files from database
+	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
+	if err != nil {
+		return fmt.Errorf("failed to batch load files: %w", err)
+	}
+
+	// Collect usage records
+	var usages []*database.Usage
+	for hostPath, file := range pathToFile {
+		dbFile, ok := dbFiles[hostPath]
+		if !ok {
 			continue
 		}
 
@@ -338,6 +391,7 @@ func (s *Scanner) updateRadarrUsage() error {
 		}
 	}
 
+	log.Printf("Updated Radarr usage: %d files", len(usages))
 	return nil
 }
 
@@ -366,13 +420,27 @@ func (s *Scanner) updateQBittorrentUsage() error {
 		return err
 	}
 
-	// Collect all usage records for batch insert
-	var usages []*database.Usage
+	// Translate all paths and collect for batch lookup
+	hostPaths := make([]string, 0, len(files))
+	pathToFile := make(map[string]api.QBittorrentFile)
+
 	for _, file := range files {
 		hostPath := s.config.TranslatePathToHost(file.Path, "qbittorrent")
+		hostPaths = append(hostPaths, hostPath)
+		pathToFile[hostPath] = file
+	}
 
-		dbFile, err := s.db.GetFileByPath(hostPath)
-		if err != nil {
+	// Batch load all files from database
+	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
+	if err != nil {
+		return fmt.Errorf("failed to batch load files: %w", err)
+	}
+
+	// Collect usage records
+	var usages []*database.Usage
+	for hostPath, file := range pathToFile {
+		dbFile, ok := dbFiles[hostPath]
+		if !ok {
 			continue
 		}
 
@@ -394,6 +462,7 @@ func (s *Scanner) updateQBittorrentUsage() error {
 		}
 	}
 
+	log.Printf("Updated qBittorrent usage: %d files", len(usages))
 	return nil
 }
 

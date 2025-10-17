@@ -19,19 +19,29 @@ import (
 
 // Server holds the application state
 type Server struct {
-	db        *database.DB
-	config    *config.Config
-	scanner   *scanner.Scanner
-	templates *template.Template
+	db         *database.DB
+	config     *config.Config
+	scanner    *scanner.Scanner
+	templates  *template.Template
+	statsCache *stats.Cache
 }
 
 // NewServer creates a new server instance
 func NewServer(db *database.DB, cfg *config.Config) *Server {
-	return &Server{
-		db:      db,
-		config:  cfg,
-		scanner: scanner.NewScanner(db, cfg),
+	srv := &Server{
+		db:         db,
+		config:     cfg,
+		statsCache: stats.NewCache(30 * time.Second), // Cache stats for 30 seconds
 	}
+
+	srv.scanner = scanner.NewScanner(db, cfg)
+
+	// Invalidate stats cache when scan completes
+	srv.scanner.SetOnScanComplete(func() {
+		srv.statsCache.Invalidate()
+	})
+
+	return srv
 }
 
 // LoadTemplates loads HTML templates
@@ -46,9 +56,8 @@ func (s *Server) LoadTemplates(pattern string) error {
 
 // HandleIndex serves the dashboard page
 func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
-	calculator := stats.NewCalculator(s.db)
-	statistics, err := calculator.Calculate()
-	if err != nil {
+	statistics := s.getStats()
+	if statistics == nil {
 		http.Error(w, "Failed to calculate stats", http.StatusInternalServerError)
 		return
 	}
@@ -59,6 +68,25 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderTemplate(w, "dashboard.html", data)
+}
+
+// getStats retrieves stats from cache or calculates fresh
+func (s *Server) getStats() *stats.Stats {
+	// Try cache first
+	if cached := s.statsCache.Get(); cached != nil {
+		return cached
+	}
+
+	// Calculate fresh stats
+	calculator := stats.NewCalculator(s.db)
+	statistics, err := calculator.Calculate()
+	if err != nil {
+		return nil
+	}
+
+	// Cache for next time
+	s.statsCache.Set(statistics)
+	return statistics
 }
 
 // HandleFiles serves the files page
@@ -72,6 +100,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	offset := (page - 1) * limit
 
 	orphanedOnly := r.URL.Query().Get("orphaned") == "true"
+	hardlinksOnly := r.URL.Query().Get("hardlink") == "true"
 	service := r.URL.Query().Get("service")
 	search := r.URL.Query().Get("search")
 	orderBy := r.URL.Query().Get("order")
@@ -83,7 +112,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	if search != "" {
 		files, total, err = s.db.SearchFiles(search, limit, offset)
 	} else {
-		files, total, err = s.db.ListFiles(orphanedOnly, service, limit, offset, orderBy)
+		files, total, err = s.db.ListFiles(orphanedOnly, service, hardlinksOnly, limit, offset, orderBy)
 	}
 
 	if err != nil {
@@ -119,6 +148,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		"TotalPages": (total + limit - 1) / limit,
 		"Title":      "Files",
 		"Orphaned":   orphanedOnly,
+		"Hardlinks":  hardlinksOnly,
 		"Service":    service,
 		"Search":     search,
 	}
@@ -138,9 +168,8 @@ func (s *Server) HandleConfig(w http.ResponseWriter, r *http.Request) {
 
 // HandleStats serves the statistics page
 func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
-	calculator := stats.NewCalculator(s.db)
-	statistics, err := calculator.Calculate()
-	if err != nil {
+	statistics := s.getStats()
+	if statistics == nil {
 		http.Error(w, "Failed to calculate stats", http.StatusInternalServerError)
 		return
 	}
@@ -151,6 +180,47 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderTemplate(w, "stats.html", data)
+}
+
+// HandleHardlinks serves the hardlinks page
+func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
+	groups, err := s.db.GetHardlinkGroups()
+	if err != nil {
+		http.Error(w, "Failed to get hardlink groups", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Groups": groups,
+		"Title":  "Hardlink Groups",
+	}
+
+	s.renderTemplate(w, "hardlinks.html", data)
+}
+
+// HandleScans serves the scan history page
+func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	page = ValidatePage(page)
+
+	limit := 20
+	offset := (page - 1) * limit
+
+	scans, total, err := s.db.ListScans(limit, offset)
+	if err != nil {
+		http.Error(w, "Failed to list scans", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Scans":      scans,
+		"Total":      total,
+		"Page":       page,
+		"TotalPages": (total + limit - 1) / limit,
+		"Title":      "Scan History",
+	}
+
+	s.renderTemplate(w, "scans.html", data)
 }
 
 // HandleStartScan starts a new scan
@@ -363,7 +433,7 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 	format := r.URL.Query().Get("format")
 	orphanedOnly := r.URL.Query().Get("orphaned") == "true"
 
-	files, _, err := s.db.ListFiles(orphanedOnly, "", 100000, 0, "path")
+	files, _, err := s.db.ListFiles(orphanedOnly, "", false, 100000, 0, "path")
 	if err != nil {
 		http.Error(w, "Failed to list files", http.StatusInternalServerError)
 		return
@@ -417,7 +487,7 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 
 	// Bulk orphaned files deletion
 	if orphaned {
-		files, _, err := s.db.ListFiles(true, "", 100000, 0, "path")
+		files, _, err := s.db.ListFiles(true, "", false, 100000, 0, "path")
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to list orphaned files", "list_failed")
 			return
@@ -593,5 +663,15 @@ func (s *Server) templateFuncs() template.FuncMap {
 			return fa / fb
 		},
 		"join": strings.Join,
+		"len": func(v interface{}) int {
+			switch val := v.(type) {
+			case map[string]interface{}:
+				return len(val)
+			case []interface{}:
+				return len(val)
+			default:
+				return 0
+			}
+		},
 	}
 }
