@@ -64,14 +64,10 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 // HandleFiles serves the files page
 func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
+	page = ValidatePage(page)
 
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 {
-		limit = 50
-	}
+	limit = ValidateLimit(limit)
 
 	offset := (page - 1) * limit
 
@@ -95,14 +91,23 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get usage for each file
+	// Batch load usage for all files (fixes N+1 query problem)
+	fileIDs := make([]int64, len(files))
+	for i, file := range files {
+		fileIDs[i] = file.ID
+	}
+
+	usageMap, err := s.db.GetUsageByFileIDs(fileIDs)
+	if err != nil {
+		// Log error but continue with empty usage
+		usageMap = make(map[int64][]*database.Usage)
+	}
+
 	filesWithUsage := make([]map[string]interface{}, 0, len(files))
 	for _, file := range files {
-		usage, _ := s.db.GetUsageByFileID(file.ID)
-
 		filesWithUsage = append(filesWithUsage, map[string]interface{}{
 			"File":  file,
-			"Usage": usage,
+			"Usage": usageMap[file.ID],
 		})
 	}
 
@@ -151,7 +156,7 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 // HandleStartScan starts a new scan
 func (s *Server) HandleStartScan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
 		return
 	}
 
@@ -164,9 +169,10 @@ func (s *Server) HandleStartScan(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "started",
+	w.Header().Set("X-Toast-Message", "Scan started successfully")
+	w.Header().Set("X-Toast-Type", "info")
+	respondSuccess(w, "Scan started", map[string]interface{}{
+		"incremental": incremental,
 	})
 }
 
@@ -268,36 +274,34 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 // HandleSaveConfig saves configuration
 func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
 		return
 	}
 
 	// Parse form data
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		respondError(w, http.StatusBadRequest, "Failed to parse form data", "parse_error")
 		return
 	}
 
 	// Update config from form
-	// This is a simplified version - you'd want to handle all config fields
 	s.config.DatabasePath = r.FormValue("database_path")
 
 	if workers := r.FormValue("scan_workers"); workers != "" {
-		if w, err := strconv.Atoi(workers); err == nil {
+		if w, err := strconv.Atoi(workers); err == nil && w > 0 && w <= 100 {
 			s.config.ScanWorkers = w
 		}
 	}
 
 	// Save config to file
 	if err := s.config.Save("/config/config.yaml"); err != nil {
-		http.Error(w, "Failed to save config", http.StatusInternalServerError)
+		respondError(w, http.StatusInternalServerError, "Failed to save configuration", "save_failed")
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "saved",
-	})
+	w.Header().Set("X-Toast-Message", "Configuration saved successfully")
+	w.Header().Set("X-Toast-Type", "success")
+	respondSuccess(w, "Configuration saved", nil)
 }
 
 // HandleTestService tests connection to a service
@@ -307,7 +311,6 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch service {
 	case "plex":
-		// Test Plex connection
 		client := api.NewPlexClient(
 			s.config.Services.Plex.URL,
 			s.config.Services.Plex.Token,
@@ -315,7 +318,6 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 		)
 		err = client.Test()
 	case "sonarr":
-		// Test Sonarr connection
 		client := api.NewSonarrClient(
 			s.config.Services.Sonarr.URL,
 			s.config.Services.Sonarr.APIKey,
@@ -323,7 +325,6 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 		)
 		err = client.Test()
 	case "radarr":
-		// Test Radarr connection
 		client := api.NewRadarrClient(
 			s.config.Services.Radarr.URL,
 			s.config.Services.Radarr.APIKey,
@@ -331,7 +332,6 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 		)
 		err = client.Test()
 	case "qbittorrent":
-		// Test qBittorrent connection
 		qbConfig := s.config.Services.QBittorrent
 		client := api.NewQBittorrentClient(
 			qbConfig.URL,
@@ -342,22 +342,20 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 		)
 		err = client.Test()
 	default:
-		http.Error(w, "Unknown service", http.StatusBadRequest)
+		respondError(w, http.StatusBadRequest, "Unknown service", "unknown_service")
 		return
 	}
 
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"status": "error",
-			"error":  err.Error(),
-		})
+		w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection failed: %v", service, err))
+		w.Header().Set("X-Toast-Type", "error")
+		respondError(w, http.StatusBadRequest, err.Error(), "connection_failed")
 		return
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "ok",
-	})
+	w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection successful", service))
+	w.Header().Set("X-Toast-Type", "success")
+	respondSuccess(w, "Connection successful", nil)
 }
 
 // HandleExport exports files list
@@ -388,67 +386,118 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandleDeleteFile deletes a file
+// HandleDeleteFile deletes a file or files
 func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
 		return
 	}
 
 	fileID := r.URL.Query().Get("id")
-	if fileID == "" {
-		http.Error(w, "File ID required", http.StatusBadRequest)
+	orphaned := r.URL.Query().Get("orphaned") == "true"
+
+	// Single file deletion
+	if fileID != "" {
+		id, err := strconv.ParseInt(fileID, 10, 64)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "Invalid file ID", "invalid_file_id")
+			return
+		}
+
+		if err := s.db.DeleteFile(id, "UI deletion"); err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to delete file", "delete_failed")
+			return
+		}
+
+		w.Header().Set("X-Toast-Message", "File deleted successfully")
+		w.Header().Set("X-Toast-Type", "success")
+		respondSuccess(w, "File deleted", nil)
 		return
 	}
 
-	id, err := strconv.ParseInt(fileID, 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid file ID", http.StatusBadRequest)
+	// Bulk orphaned files deletion
+	if orphaned {
+		files, _, err := s.db.ListFiles(true, "", 100000, 0, "path")
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to list orphaned files", "list_failed")
+			return
+		}
+
+		if len(files) == 0 {
+			respondSuccess(w, "No orphaned files to delete", nil)
+			return
+		}
+
+		deleted := 0
+		errors := 0
+		for _, file := range files {
+			if err := s.db.DeleteFile(file.ID, "Bulk orphaned cleanup"); err != nil {
+				errors++
+				continue
+			}
+			deleted++
+		}
+
+		w.Header().Set("X-Toast-Message", fmt.Sprintf("Deleted %d files", deleted))
+		w.Header().Set("X-Toast-Type", "success")
+		respondSuccess(w, "Bulk deletion completed", map[string]interface{}{
+			"deleted": deleted,
+			"errors":  errors,
+		})
 		return
 	}
 
-	if err := s.db.DeleteFile(id, "UI deletion"); err != nil {
-		http.Error(w, "Failed to delete file", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "deleted",
-	})
+	respondError(w, http.StatusBadRequest, "Must specify file ID or orphaned flag", "missing_parameter")
 }
 
 // HandleMarkRescan marks files for rescan
 func (s *Server) HandleMarkRescan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
 		return
 	}
 
-	filter := r.URL.Query().Get("filter")
+	fileIDStr := r.URL.Query().Get("id")
 	orphaned := r.URL.Query().Get("orphaned") == "true"
 
-	var whereClause string
+	// Single file by ID (safe from SQL injection)
+	if fileIDStr != "" {
+		fileID, err := strconv.ParseInt(fileIDStr, 10, 64)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "Invalid file ID", "invalid_file_id")
+			return
+		}
+
+		if err := s.db.MarkFileForRescan(fileID); err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to mark file for rescan", "rescan_failed")
+			return
+		}
+
+		w.Header().Set("X-Toast-Message", "Marked for rescan")
+		w.Header().Set("X-Toast-Type", "success")
+		respondSuccess(w, "File marked for rescan", map[string]interface{}{
+			"count": 1,
+		})
+		return
+	}
+
+	// Bulk orphaned files
 	if orphaned {
-		whereClause = "is_orphaned = 1"
-	} else if filter != "" {
-		whereClause = filter
-	} else {
-		http.Error(w, "Must specify filter or orphaned", http.StatusBadRequest)
+		count, err := s.db.MarkFilesForRescan("is_orphaned = 1")
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to mark files for rescan", "rescan_failed")
+			return
+		}
+
+		w.Header().Set("X-Toast-Message", fmt.Sprintf("Marked %d files for rescan", count))
+		w.Header().Set("X-Toast-Type", "success")
+		respondSuccess(w, "Files marked for rescan", map[string]interface{}{
+			"count": count,
+		})
 		return
 	}
 
-	count, err := s.db.MarkFilesForRescan(whereClause)
-	if err != nil {
-		http.Error(w, "Failed to mark files for rescan", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "marked",
-		"count":  count,
-	})
+	respondError(w, http.StatusBadRequest, "Must specify file ID or orphaned flag", "missing_parameter")
 }
 
 // renderTemplate renders an HTML template

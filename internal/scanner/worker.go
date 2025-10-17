@@ -10,19 +10,21 @@ import (
 
 // Worker processes files from the queue
 type Worker struct {
-	id       int
-	db       *database.DB
-	scanID   int64
-	progress *Progress
+	id          int
+	db          *database.DB
+	scanID      int64
+	progress    *Progress
+	incremental bool
 }
 
 // NewWorker creates a new worker
-func NewWorker(id int, db *database.DB, scanID int64, progress *Progress) *Worker {
+func NewWorker(id int, db *database.DB, scanID int64, progress *Progress, incremental bool) *Worker {
 	return &Worker{
-		id:       id,
-		db:       db,
-		scanID:   scanID,
-		progress: progress,
+		id:          id,
+		db:          db,
+		scanID:      scanID,
+		progress:    progress,
+		incremental: incremental,
 	}
 }
 
@@ -56,6 +58,17 @@ func (w *Worker) processFile(fileInfo FileInfo) error {
 		return err
 	}
 
+	// If incremental scan and file hasn't changed, skip processing
+	if w.incremental && existingFile != nil && existingFile.ModifiedTime.Unix() == fileInfo.ModifiedTime {
+		// Just update last_verified to mark as seen
+		existingFile.LastVerified = time.Now()
+		existingFile.ScanID = w.scanID
+		if err := w.db.UpsertFile(existingFile); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	file := &database.File{
 		Path:         fileInfo.Path,
 		Size:         fileInfo.Size,
@@ -67,11 +80,9 @@ func (w *Worker) processFile(fileInfo FileInfo) error {
 		IsOrphaned:   true, // Will be updated later when we check services
 	}
 
-	// If file exists and hasn't been modified, skip detailed processing
-	if existingFile != nil && existingFile.ModifiedTime.Unix() == fileInfo.ModifiedTime {
-		// Just update last_verified and scan_id
+	// Preserve existing ID if file already exists
+	if existingFile != nil {
 		file.ID = existingFile.ID
-		file.IsOrphaned = existingFile.IsOrphaned
 	}
 
 	// Upsert file record
@@ -93,7 +104,7 @@ type WorkerPool struct {
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(numWorkers int, db *database.DB, scanID int64, progress *Progress) *WorkerPool {
+func NewWorkerPool(numWorkers int, db *database.DB, scanID int64, progress *Progress, incremental bool) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pool := &WorkerPool{
@@ -106,7 +117,7 @@ func NewWorkerPool(numWorkers int, db *database.DB, scanID int64, progress *Prog
 
 	// Create workers
 	for i := 0; i < numWorkers; i++ {
-		pool.workers[i] = NewWorker(i, db, scanID, progress)
+		pool.workers[i] = NewWorker(i, db, scanID, progress, incremental)
 	}
 
 	return pool

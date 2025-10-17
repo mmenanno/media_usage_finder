@@ -2,13 +2,11 @@ package scanner
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/mmenanno/media-usage-finder/internal/api"
 	"github.com/mmenanno/media-usage-finder/internal/config"
@@ -113,9 +111,13 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 
 	// Phase 2: Scan filesystem
 	s.progress.SetPhase("Scanning filesystem")
-	log.Println("Starting filesystem scan...")
+	if incremental {
+		log.Println("Starting incremental filesystem scan (only changed files)...")
+	} else {
+		log.Println("Starting full filesystem scan...")
+	}
 
-	if err := s.scanFilesystem(ctx, scanID); err != nil {
+	if err := s.scanFilesystem(ctx, scanID, incremental); err != nil {
 		return fmt.Errorf("filesystem scan failed: %w", err)
 	}
 
@@ -155,28 +157,26 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 }
 
 // scanFilesystem scans the filesystem and processes files
-func (s *Scanner) scanFilesystem(ctx context.Context, scanID int64) error {
+func (s *Scanner) scanFilesystem(ctx context.Context, scanID int64, incremental bool) error {
 	// Create worker pool
-	pool := NewWorkerPool(s.config.ScanWorkers, s.db, scanID, s.progress)
+	pool := NewWorkerPool(s.config.ScanWorkers, s.db, scanID, s.progress, incremental)
 	pool.Start()
 
-	// Walk filesystem and feed workers
+	// Walk filesystem in goroutine
+	walkDone := make(chan error, 1)
 	go func() {
-		if err := WalkFiles(s.config.ScanPaths, pool.GetInputChannel(), s.progress); err != nil {
-			log.Printf("Error walking files: %v", err)
-		}
+		walkDone <- WalkFiles(s.config.ScanPaths, pool.GetInputChannel(), s.progress)
 	}()
 
-	// Wait for completion or cancellation
+	// Wait for walk to complete or context cancellation
 	select {
 	case <-ctx.Done():
 		pool.Cancel()
 		return ctx.Err()
-	case <-time.After(time.Until(time.Now().Add(24 * time.Hour))): // Max scan time
-		pool.Stop()
+	case err := <-walkDone:
+		pool.Stop() // Graceful shutdown after walk completes
+		return err
 	}
-
-	return nil
 }
 
 // updatePlexUsage updates usage information from Plex
@@ -201,7 +201,8 @@ func (s *Scanner) updatePlexUsage() error {
 		return err
 	}
 
-	// Add new usage records
+	// Collect all usage records for batch insert
+	var usages []*database.Usage
 	for _, file := range files {
 		// Translate Plex path to host path
 		hostPath := s.config.TranslatePathToHost(file.Path, "plex")
@@ -212,17 +213,20 @@ func (s *Scanner) updatePlexUsage() error {
 			continue
 		}
 
-		usage := &database.Usage{
+		usages = append(usages, &database.Usage{
 			FileID:        dbFile.ID,
 			Service:       "plex",
 			ReferencePath: file.Path,
 			Metadata: map[string]interface{}{
 				"size": file.Size,
 			},
-		}
+		})
+	}
 
-		if err := s.db.UpsertUsage(usage); err != nil {
-			log.Printf("Failed to upsert Plex usage for %s: %v", file.Path, err)
+	// Batch insert all usage records
+	if len(usages) > 0 {
+		if err := s.db.BatchUpsertUsage(usages); err != nil {
+			return fmt.Errorf("failed to batch insert Plex usage: %w", err)
 		}
 	}
 
@@ -251,7 +255,8 @@ func (s *Scanner) updateSonarrUsage() error {
 		return err
 	}
 
-	// Add new usage records
+	// Collect all usage records for batch insert
+	var usages []*database.Usage
 	for _, file := range files {
 		hostPath := s.config.TranslatePathToHost(file.Path, "sonarr")
 
@@ -260,24 +265,22 @@ func (s *Scanner) updateSonarrUsage() error {
 			continue
 		}
 
-		metadata, _ := json.Marshal(map[string]interface{}{
-			"series_title":  file.SeriesTitle,
-			"season_number": file.SeasonNumber,
-			"episode_id":    file.EpisodeID,
-		})
-
-		var metadataMap map[string]interface{}
-		json.Unmarshal(metadata, &metadataMap)
-
-		usage := &database.Usage{
+		usages = append(usages, &database.Usage{
 			FileID:        dbFile.ID,
 			Service:       "sonarr",
 			ReferencePath: file.Path,
-			Metadata:      metadataMap,
-		}
+			Metadata: map[string]interface{}{
+				"series_title":  file.SeriesTitle,
+				"season_number": file.SeasonNumber,
+				"episode_id":    file.EpisodeID,
+			},
+		})
+	}
 
-		if err := s.db.UpsertUsage(usage); err != nil {
-			log.Printf("Failed to upsert Sonarr usage for %s: %v", file.Path, err)
+	// Batch insert all usage records
+	if len(usages) > 0 {
+		if err := s.db.BatchUpsertUsage(usages); err != nil {
+			return fmt.Errorf("failed to batch insert Sonarr usage: %w", err)
 		}
 	}
 
@@ -306,7 +309,8 @@ func (s *Scanner) updateRadarrUsage() error {
 		return err
 	}
 
-	// Add new usage records
+	// Collect all usage records for batch insert
+	var usages []*database.Usage
 	for _, file := range files {
 		hostPath := s.config.TranslatePathToHost(file.Path, "radarr")
 
@@ -315,24 +319,22 @@ func (s *Scanner) updateRadarrUsage() error {
 			continue
 		}
 
-		metadata, _ := json.Marshal(map[string]interface{}{
-			"movie_title": file.MovieTitle,
-			"movie_year":  file.MovieYear,
-			"movie_id":    file.MovieID,
-		})
-
-		var metadataMap map[string]interface{}
-		json.Unmarshal(metadata, &metadataMap)
-
-		usage := &database.Usage{
+		usages = append(usages, &database.Usage{
 			FileID:        dbFile.ID,
 			Service:       "radarr",
 			ReferencePath: file.Path,
-			Metadata:      metadataMap,
-		}
+			Metadata: map[string]interface{}{
+				"movie_title": file.MovieTitle,
+				"movie_year":  file.MovieYear,
+				"movie_id":    file.MovieID,
+			},
+		})
+	}
 
-		if err := s.db.UpsertUsage(usage); err != nil {
-			log.Printf("Failed to upsert Radarr usage for %s: %v", file.Path, err)
+	// Batch insert all usage records
+	if len(usages) > 0 {
+		if err := s.db.BatchUpsertUsage(usages); err != nil {
+			return fmt.Errorf("failed to batch insert Radarr usage: %w", err)
 		}
 	}
 
@@ -364,7 +366,8 @@ func (s *Scanner) updateQBittorrentUsage() error {
 		return err
 	}
 
-	// Add new usage records
+	// Collect all usage records for batch insert
+	var usages []*database.Usage
 	for _, file := range files {
 		hostPath := s.config.TranslatePathToHost(file.Path, "qbittorrent")
 
@@ -373,23 +376,21 @@ func (s *Scanner) updateQBittorrentUsage() error {
 			continue
 		}
 
-		metadata, _ := json.Marshal(map[string]interface{}{
-			"torrent_hash": file.TorrentHash,
-			"torrent_name": file.TorrentName,
-		})
-
-		var metadataMap map[string]interface{}
-		json.Unmarshal(metadata, &metadataMap)
-
-		usage := &database.Usage{
+		usages = append(usages, &database.Usage{
 			FileID:        dbFile.ID,
 			Service:       "qbittorrent",
 			ReferencePath: file.Path,
-			Metadata:      metadataMap,
-		}
+			Metadata: map[string]interface{}{
+				"torrent_hash": file.TorrentHash,
+				"torrent_name": file.TorrentName,
+			},
+		})
+	}
 
-		if err := s.db.UpsertUsage(usage); err != nil {
-			log.Printf("Failed to upsert qBittorrent usage for %s: %v", file.Path, err)
+	// Batch insert all usage records
+	if len(usages) > 0 {
+		if err := s.db.BatchUpsertUsage(usages); err != nil {
+			return fmt.Errorf("failed to batch insert qBittorrent usage: %w", err)
 		}
 	}
 

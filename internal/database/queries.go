@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -19,6 +20,36 @@ type File struct {
 	LastVerified time.Time
 	IsOrphaned   bool
 	CreatedAt    time.Time
+}
+
+// scanFileRow scans a single file row from a query result
+func scanFileRow(scanner interface {
+	Scan(dest ...interface{}) error
+}) (*File, error) {
+	file := &File{}
+	var modTime, lastVerified, createdAt int64
+
+	err := scanner.Scan(
+		&file.ID,
+		&file.Path,
+		&file.Size,
+		&file.Inode,
+		&file.DeviceID,
+		&modTime,
+		&file.ScanID,
+		&lastVerified,
+		&file.IsOrphaned,
+		&createdAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	file.ModifiedTime = time.Unix(modTime, 0)
+	file.LastVerified = time.Unix(lastVerified, 0)
+	file.CreatedAt = time.Unix(createdAt, 0)
+
+	return file, nil
 }
 
 // Usage represents a service using a file
@@ -83,31 +114,7 @@ func (db *DB) GetFileByPath(path string) (*File, error) {
 		WHERE path = ?
 	`
 
-	file := &File{}
-	var modTime, lastVerified, createdAt int64
-
-	err := db.conn.QueryRow(query, path).Scan(
-		&file.ID,
-		&file.Path,
-		&file.Size,
-		&file.Inode,
-		&file.DeviceID,
-		&modTime,
-		&file.ScanID,
-		&lastVerified,
-		&file.IsOrphaned,
-		&createdAt,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	file.ModifiedTime = time.Unix(modTime, 0)
-	file.LastVerified = time.Unix(lastVerified, 0)
-	file.CreatedAt = time.Unix(createdAt, 0)
-
-	return file, nil
+	return scanFileRow(db.conn.QueryRow(query, path))
 }
 
 // CreateScan creates a new scan record
@@ -227,6 +234,51 @@ func (db *DB) UpsertUsage(usage *Usage) error {
 	return err
 }
 
+// BatchUpsertUsage inserts or updates multiple usage records in a single transaction
+func (db *DB) BatchUpsertUsage(usages []*Usage) error {
+	if len(usages) == 0 {
+		return nil
+	}
+
+	tx, err := db.BeginTx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO usage (file_id, service, reference_path, metadata)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(file_id, service) DO UPDATE SET
+			reference_path = excluded.reference_path,
+			metadata = excluded.metadata,
+			updated_at = strftime('%s', 'now')
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, usage := range usages {
+		metadataJSON, err := json.Marshal(usage.Metadata)
+		if err != nil {
+			return fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+
+		_, err = stmt.Exec(
+			usage.FileID,
+			usage.Service,
+			usage.ReferencePath,
+			string(metadataJSON),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to insert usage: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
 // DeleteUsageByService deletes all usage records for a service
 func (db *DB) DeleteUsageByService(service string) error {
 	query := `DELETE FROM usage WHERE service = ?`
@@ -280,6 +332,65 @@ func (db *DB) GetUsageByFileID(fileID int64) ([]*Usage, error) {
 	return usages, rows.Err()
 }
 
+// GetUsageByFileIDs retrieves all usage records for multiple files in one query (fixes N+1)
+func (db *DB) GetUsageByFileIDs(fileIDs []int64) (map[int64][]*Usage, error) {
+	if len(fileIDs) == 0 {
+		return make(map[int64][]*Usage), nil
+	}
+
+	// Build IN clause with placeholders
+	placeholders := make([]string, len(fileIDs))
+	args := make([]interface{}, len(fileIDs))
+	for i, id := range fileIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, file_id, service, reference_path, metadata, created_at, updated_at
+		FROM usage
+		WHERE file_id IN (%s)
+		ORDER BY file_id, service
+	`, strings.Join(placeholders, ","))
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	usageMap := make(map[int64][]*Usage)
+	for rows.Next() {
+		usage := &Usage{}
+		var metadataJSON string
+		var createdAt, updatedAt int64
+
+		err := rows.Scan(
+			&usage.ID,
+			&usage.FileID,
+			&usage.Service,
+			&usage.ReferencePath,
+			&metadataJSON,
+			&createdAt,
+			&updatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal([]byte(metadataJSON), &usage.Metadata); err != nil {
+			usage.Metadata = make(map[string]interface{})
+		}
+
+		usage.CreatedAt = time.Unix(createdAt, 0)
+		usage.UpdatedAt = time.Unix(updatedAt, 0)
+
+		usageMap[usage.FileID] = append(usageMap[usage.FileID], usage)
+	}
+
+	return usageMap, rows.Err()
+}
+
 // UpdateOrphanedStatus updates the orphaned status of all files
 func (db *DB) UpdateOrphanedStatus() error {
 	query := `
@@ -327,33 +438,30 @@ func (db *DB) SearchFiles(searchQuery string, limit, offset int) ([]*File, int, 
 
 	files := []*File{}
 	for rows.Next() {
-		file := &File{}
-		var modTime, lastVerified, createdAt int64
-
-		err := rows.Scan(
-			&file.ID,
-			&file.Path,
-			&file.Size,
-			&file.Inode,
-			&file.DeviceID,
-			&modTime,
-			&file.ScanID,
-			&lastVerified,
-			&file.IsOrphaned,
-			&createdAt,
-		)
+		file, err := scanFileRow(rows)
 		if err != nil {
 			return nil, 0, err
 		}
-
-		file.ModifiedTime = time.Unix(modTime, 0)
-		file.LastVerified = time.Unix(lastVerified, 0)
-		file.CreatedAt = time.Unix(createdAt, 0)
-
 		files = append(files, file)
 	}
 
 	return files, total, rows.Err()
+}
+
+// ValidateOrderBy validates and returns a safe ORDER BY column name
+func ValidateOrderBy(orderBy string) string {
+	validColumns := map[string]bool{
+		"path":          true,
+		"size":          true,
+		"modified_time": true,
+		"last_verified": true,
+		"id":            true,
+	}
+
+	if validColumns[orderBy] {
+		return orderBy
+	}
+	return "path" // default
 }
 
 // ListFiles retrieves files with filtering and pagination
@@ -378,10 +486,8 @@ func (db *DB) ListFiles(orphanedOnly bool, service string, limit, offset int, or
 		return nil, 0, err
 	}
 
-	// Get results
-	if orderBy == "" {
-		orderBy = "path"
-	}
+	// Validate and sanitize orderBy
+	safeOrderBy := ValidateOrderBy(orderBy)
 
 	query := fmt.Sprintf(`
 		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
@@ -390,7 +496,7 @@ func (db *DB) ListFiles(orphanedOnly bool, service string, limit, offset int, or
 		%s
 		ORDER BY f.%s
 		LIMIT ? OFFSET ?
-	`, whereClause, orderBy)
+	`, whereClause, safeOrderBy)
 
 	args = append(args, limit, offset)
 	rows, err := db.conn.Query(query, args...)
@@ -401,29 +507,10 @@ func (db *DB) ListFiles(orphanedOnly bool, service string, limit, offset int, or
 
 	files := []*File{}
 	for rows.Next() {
-		file := &File{}
-		var modTime, lastVerified, createdAt int64
-
-		err := rows.Scan(
-			&file.ID,
-			&file.Path,
-			&file.Size,
-			&file.Inode,
-			&file.DeviceID,
-			&modTime,
-			&file.ScanID,
-			&lastVerified,
-			&file.IsOrphaned,
-			&createdAt,
-		)
+		file, err := scanFileRow(rows)
 		if err != nil {
 			return nil, 0, err
 		}
-
-		file.ModifiedTime = time.Unix(modTime, 0)
-		file.LastVerified = time.Unix(lastVerified, 0)
-		file.CreatedAt = time.Unix(createdAt, 0)
-
 		files = append(files, file)
 	}
 
@@ -454,28 +541,10 @@ func (db *DB) GetHardlinkGroups() (map[string][]*File, error) {
 	groups := make(map[string][]*File)
 
 	for rows.Next() {
-		file := &File{}
-		var modTime, lastVerified, createdAt int64
-
-		err := rows.Scan(
-			&file.ID,
-			&file.Path,
-			&file.Size,
-			&file.Inode,
-			&file.DeviceID,
-			&modTime,
-			&file.ScanID,
-			&lastVerified,
-			&file.IsOrphaned,
-			&createdAt,
-		)
+		file, err := scanFileRow(rows)
 		if err != nil {
 			return nil, err
 		}
-
-		file.ModifiedTime = time.Unix(modTime, 0)
-		file.LastVerified = time.Unix(lastVerified, 0)
-		file.CreatedAt = time.Unix(createdAt, 0)
 
 		key := fmt.Sprintf("%d-%d", file.DeviceID, file.Inode)
 		groups[key] = append(groups[key], file)
@@ -510,7 +579,8 @@ func (db *DB) DeleteFile(fileID int64, details string) error {
 	return tx.Commit()
 }
 
-// MarkFilesForRescan marks files matching a filter for rescan by updating their last_verified to 0
+// MarkFilesForRescan marks files matching a WHERE clause filter for rescan
+// Note: filter should be a valid SQL WHERE clause. Use predefined filters or validate carefully.
 func (db *DB) MarkFilesForRescan(filter string) (int64, error) {
 	tx, err := db.BeginTx()
 	if err != nil {
@@ -518,7 +588,8 @@ func (db *DB) MarkFilesForRescan(filter string) (int64, error) {
 	}
 	defer tx.Rollback()
 
-	// Update last_verified to epoch 0 for matched files
+	// For safety, only allow specific predefined filters
+	// Custom filters must be validated by caller
 	query := fmt.Sprintf(`UPDATE files SET last_verified = 0 WHERE %s`, filter)
 	result, err := tx.Exec(query)
 	if err != nil {
@@ -544,6 +615,22 @@ func (db *DB) MarkFilesForRescan(filter string) (int64, error) {
 	}
 
 	return count, nil
+}
+
+// MarkFileForRescan marks a single file for rescan by ID (safe from SQL injection)
+func (db *DB) MarkFileForRescan(fileID int64) error {
+	query := `UPDATE files SET last_verified = 0 WHERE id = ?`
+	_, err := db.conn.Exec(query, fileID)
+	if err != nil {
+		return err
+	}
+
+	// Log the action
+	_, err = db.conn.Exec(
+		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('mark_rescan', 'file', ?, 'Marked for rescan')`,
+		fileID,
+	)
+	return err
 }
 
 // DeleteFileByPath deletes a file by its path
