@@ -15,6 +15,9 @@ func (s *Server) Run(port int) error {
 	// Static files (serve from filesystem for now)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
+	// Health check
+	mux.HandleFunc("/health", s.HandleHealth)
+
 	// Page routes
 	mux.HandleFunc("/", s.HandleIndex)
 	mux.HandleFunc("/files", s.HandleFiles)

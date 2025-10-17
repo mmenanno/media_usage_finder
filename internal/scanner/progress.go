@@ -17,14 +17,76 @@ type Progress struct {
 	StartTime      time.Time
 	IsRunning      bool
 	CurrentPhase   string
+
+	// Log streaming
+	logChan      chan string
+	logListeners []chan string
 }
 
 // NewProgress creates a new progress tracker
 func NewProgress() *Progress {
-	return &Progress{
-		StartTime: time.Now(),
-		IsRunning: true,
-		Errors:    make([]string, 0),
+	p := &Progress{
+		StartTime:    time.Now(),
+		IsRunning:    true,
+		Errors:       make([]string, 0),
+		logChan:      make(chan string, 100),
+		logListeners: make([]chan string, 0),
+	}
+
+	// Start log broadcaster
+	go p.broadcastLogs()
+
+	return p
+}
+
+// broadcastLogs broadcasts log messages to all listeners
+func (p *Progress) broadcastLogs() {
+	for msg := range p.logChan {
+		p.mu.RLock()
+		listeners := make([]chan string, len(p.logListeners))
+		copy(listeners, p.logListeners)
+		p.mu.RUnlock()
+
+		for _, listener := range listeners {
+			select {
+			case listener <- msg:
+			default:
+				// Skip if listener is blocked
+			}
+		}
+	}
+}
+
+// Log sends a log message
+func (p *Progress) Log(message string) {
+	select {
+	case p.logChan <- message:
+	default:
+		// Drop message if channel is full
+	}
+}
+
+// Subscribe returns a channel that receives log messages
+func (p *Progress) Subscribe() chan string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	listener := make(chan string, 50)
+	p.logListeners = append(p.logListeners, listener)
+	return listener
+}
+
+// Unsubscribe removes a log listener
+func (p *Progress) Unsubscribe(listener chan string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	for i, l := range p.logListeners {
+		if l == listener {
+			p.logListeners = append(p.logListeners[:i], p.logListeners[i+1:]...)
+			close(listener)
+			break
+		}
 	}
 }
 
@@ -67,6 +129,11 @@ func (p *Progress) Stop() {
 	defer p.mu.Unlock()
 
 	p.IsRunning = false
+
+	// Close log channel
+	if p.logChan != nil {
+		close(p.logChan)
+	}
 }
 
 // GetSnapshot returns a snapshot of the current progress

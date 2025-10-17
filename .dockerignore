@@ -1,0 +1,54 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*.test
+*.out
+
+# Dependencies
+node_modules/
+vendor/
+
+# Development
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data and config
+data/
+config/
+*.db
+*.db-shm
+*.db-wal
+
+# Documentation
+*.md
+!README.md
+
+# Build artifacts
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary
+tmp/
+temp/
+
+# Package manager
+package-lock.json
+

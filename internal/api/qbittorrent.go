@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -121,7 +123,7 @@ func (q *QBittorrentClient) Test() error {
 	return nil
 }
 
-// GetAllFiles retrieves all files from all torrents
+// GetAllFiles retrieves all files from all torrents using concurrent workers
 func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
 	if err := q.login(); err != nil {
 		return nil, err
@@ -133,42 +135,90 @@ func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
 		return nil, fmt.Errorf("failed to get torrents: %w", err)
 	}
 
-	var allFiles []QBittorrentFile
-
-	// For each torrent, get its files
-	for _, torrent := range torrents {
-		files, err := q.getTorrentFiles(torrent.Hash)
-		if err != nil {
-			// Log error but continue with other torrents
-			continue
-		}
-
-		// Get torrent properties to find save path
-		props, err := q.getTorrentProperties(torrent.Hash)
-		if err != nil {
-			continue
-		}
-
-		var torrentFiles []TorrentFileInfo
-		for _, f := range files {
-			torrentFiles = append(torrentFiles, TorrentFileInfo{
-				Name: f.Name,
-				Size: f.Size,
-			})
-
-			// Build full file path
-			fullPath := props.SavePath + "/" + f.Name
-
-			allFiles = append(allFiles, QBittorrentFile{
-				Path:         fullPath,
-				Size:         f.Size,
-				TorrentHash:  torrent.Hash,
-				TorrentName:  torrent.Name,
-				TorrentFiles: torrentFiles,
-			})
-		}
+	if len(torrents) == 0 {
+		return []QBittorrentFile{}, nil
 	}
 
+	// Use concurrent workers to process torrents
+	const maxWorkers = 20
+	sem := make(chan struct{}, maxWorkers) // Semaphore for concurrency control
+
+	var mu sync.Mutex
+	var allFiles []QBittorrentFile
+	var wg sync.WaitGroup
+
+	for _, torrent := range torrents {
+		wg.Add(1)
+		go func(t torrentInfo) {
+			defer wg.Done()
+
+			// Acquire semaphore
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// Get torrent files and properties concurrently
+			filesCh := make(chan []fileInfo, 1)
+			propsCh := make(chan *torrentProperties, 1)
+			errCh := make(chan error, 2)
+
+			go func() {
+				files, err := q.getTorrentFiles(t.Hash)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				filesCh <- files
+			}()
+
+			go func() {
+				props, err := q.getTorrentProperties(t.Hash)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				propsCh <- props
+			}()
+
+			// Wait for both to complete
+			var files []fileInfo
+			var props *torrentProperties
+			for i := 0; i < 2; i++ {
+				select {
+				case f := <-filesCh:
+					files = f
+				case p := <-propsCh:
+					props = p
+				case <-errCh:
+					return // Skip this torrent on error
+				}
+			}
+
+			if files == nil || props == nil {
+				return
+			}
+
+			// Process files
+			var torrentQBFiles []QBittorrentFile
+			for _, f := range files {
+				// Build full file path using filepath.Join for safety
+				fullPath := filepath.Join(props.SavePath, f.Name)
+
+				torrentQBFiles = append(torrentQBFiles, QBittorrentFile{
+					Path:        fullPath,
+					Size:        f.Size,
+					TorrentHash: t.Hash,
+					TorrentName: t.Name,
+				})
+			}
+
+			// Append to results with mutex
+			mu.Lock()
+			allFiles = append(allFiles, torrentQBFiles...)
+			mu.Unlock()
+		}(torrent)
+	}
+
+	wg.Wait()
 	return allFiles, nil
 }
 

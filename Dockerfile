@@ -25,8 +25,8 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-X main.Version=$(cat VERSION)" 
 # Runtime stage
 FROM alpine:latest
 
-# Install ca-certificates and sqlite libs
-RUN apk --no-cache add ca-certificates sqlite-libs
+# Install ca-certificates, sqlite libs, and wget for healthcheck
+RUN apk --no-cache add ca-certificates sqlite-libs wget
 
 WORKDIR /app
 
@@ -41,6 +41,10 @@ RUN mkdir -p /data /config
 
 # Expose port
 EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Set default command
 ENTRYPOINT ["/app/media-finder"]

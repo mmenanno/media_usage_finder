@@ -223,6 +223,24 @@ func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
 	s.renderTemplate(w, "scans.html", data)
 }
 
+// HandleHealth serves the health check endpoint
+func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
+	// Check database connectivity
+	if err := s.db.Ping(); err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "unhealthy",
+			"error":  "database unavailable",
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "healthy",
+	})
+}
+
 // HandleStartScan starts a new scan
 func (s *Server) HandleStartScan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -315,28 +333,31 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "data: Connected to log stream\n\n")
 	flusher.Flush()
 
-	// TODO: Implement actual log streaming from scanner
-	// For now, send periodic updates
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+	progress := s.scanner.GetProgress()
+	if progress == nil {
+		fmt.Fprintf(w, "data: No scan currently running\n\n")
+		flusher.Flush()
+		return
+	}
 
+	// Subscribe to log messages
+	logChan := progress.Subscribe()
+	defer progress.Unsubscribe(logChan)
+
+	// Stream log messages
 	for {
 		select {
 		case <-r.Context().Done():
 			return
-		case <-ticker.C:
-			progress := s.scanner.GetProgress()
-			if progress != nil {
-				snapshot := progress.GetSnapshot()
-				msg := fmt.Sprintf("Processed %d/%d files (%.1f%%) - %s",
-					snapshot.ProcessedFiles,
-					snapshot.TotalFiles,
-					snapshot.PercentComplete,
-					snapshot.CurrentPhase,
-				)
-				fmt.Fprintf(w, "data: %s\n\n", msg)
+		case msg, ok := <-logChan:
+			if !ok {
+				// Channel closed, scan finished
+				fmt.Fprintf(w, "data: Scan completed\n\n")
 				flusher.Flush()
+				return
 			}
+			fmt.Fprintf(w, "data: %s\n\n", msg)
+			flusher.Flush()
 		}
 	}
 }

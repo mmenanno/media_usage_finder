@@ -110,7 +110,7 @@ func (s *Scanner) Scan(ctx context.Context, incremental bool) error {
 func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) error {
 	// Phase 1: Count files
 	s.progress.SetPhase("Counting files")
-	log.Println("Counting files...")
+	s.progress.Log("Counting files...")
 
 	totalFiles, err := CountFiles(s.config.ScanPaths)
 	if err != nil {
@@ -118,14 +118,14 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 	}
 
 	s.progress.SetTotalFiles(totalFiles)
-	log.Printf("Found %d files to scan\n", totalFiles)
+	s.progress.Log(fmt.Sprintf("Found %d files to scan", totalFiles))
 
 	// Phase 2: Scan filesystem
 	s.progress.SetPhase("Scanning filesystem")
 	if incremental {
-		log.Println("Starting incremental filesystem scan (only changed files)...")
+		s.progress.Log("Starting incremental filesystem scan (only changed files)...")
 	} else {
-		log.Println("Starting full filesystem scan...")
+		s.progress.Log("Starting full filesystem scan...")
 	}
 
 	if err := s.scanFilesystem(ctx, scanID, incremental); err != nil {
@@ -134,35 +134,39 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 
 	// Phase 3: Update service usage
 	s.progress.SetPhase("Checking Plex")
+	s.progress.Log("Querying Plex for tracked files...")
 	if err := s.updatePlexUsage(); err != nil {
-		log.Printf("Warning: Failed to update Plex usage: %v", err)
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update Plex usage: %v", err))
 	}
 
 	s.progress.SetPhase("Checking Sonarr")
+	s.progress.Log("Querying Sonarr for tracked files...")
 	if err := s.updateSonarrUsage(); err != nil {
-		log.Printf("Warning: Failed to update Sonarr usage: %v", err)
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update Sonarr usage: %v", err))
 	}
 
 	s.progress.SetPhase("Checking Radarr")
+	s.progress.Log("Querying Radarr for tracked files...")
 	if err := s.updateRadarrUsage(); err != nil {
-		log.Printf("Warning: Failed to update Radarr usage: %v", err)
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update Radarr usage: %v", err))
 	}
 
 	s.progress.SetPhase("Checking qBittorrent")
+	s.progress.Log("Querying qBittorrent for tracked files...")
 	if err := s.updateQBittorrentUsage(); err != nil {
-		log.Printf("Warning: Failed to update qBittorrent usage: %v", err)
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update qBittorrent usage: %v", err))
 	}
 
 	// Phase 4: Update orphaned status
 	s.progress.SetPhase("Updating orphaned status")
-	log.Println("Updating orphaned file status...")
+	s.progress.Log("Calculating orphaned file status...")
 
 	if err := s.db.UpdateOrphanedStatus(); err != nil {
 		return fmt.Errorf("failed to update orphaned status: %w", err)
 	}
 
 	s.progress.SetPhase("Completed")
-	log.Println("Scan completed successfully")
+	s.progress.Log("Scan completed successfully!")
 
 	return nil
 }
