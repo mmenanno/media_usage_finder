@@ -422,13 +422,43 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update config from form
+	// Update all config fields from form
 	s.config.DatabasePath = r.FormValue("database_path")
 
 	if workers := r.FormValue("scan_workers"); workers != "" {
 		if w, err := strconv.Atoi(workers); err == nil && w > 0 && w <= 100 {
 			s.config.ScanWorkers = w
 		}
+	}
+
+	if port := r.FormValue("server_port"); port != "" {
+		if p, err := strconv.Atoi(port); err == nil && p > 0 && p <= 65535 {
+			s.config.ServerPort = p
+		}
+	}
+
+	// Update Plex config
+	s.config.Services.Plex.URL = r.FormValue("plex_url")
+	s.config.Services.Plex.Token = r.FormValue("plex_token")
+
+	// Update Sonarr config
+	s.config.Services.Sonarr.URL = r.FormValue("sonarr_url")
+	s.config.Services.Sonarr.APIKey = r.FormValue("sonarr_api_key")
+
+	// Update Radarr config
+	s.config.Services.Radarr.URL = r.FormValue("radarr_url")
+	s.config.Services.Radarr.APIKey = r.FormValue("radarr_api_key")
+
+	// Update qBittorrent config
+	s.config.Services.QBittorrent.URL = r.FormValue("qbittorrent_url")
+	s.config.Services.QBittorrent.Username = r.FormValue("qbittorrent_username")
+	s.config.Services.QBittorrent.Password = r.FormValue("qbittorrent_password")
+	s.config.Services.QBittorrent.QuiProxyURL = r.FormValue("qbittorrent_qui_proxy_url")
+
+	// Validate config before saving
+	if err := s.config.Validate(); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid configuration: %v", err), "validation_failed")
+		return
 	}
 
 	// Save config to file

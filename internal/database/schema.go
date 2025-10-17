@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS files (
 );
 
 -- Performance indexes for files table
-CREATE INDEX IF NOT EXISTS idx_files_path ON files(path);
+-- Note: path has UNIQUE constraint which creates index automatically
 CREATE INDEX IF NOT EXISTS idx_files_hardlink ON files(device_id, inode);
 CREATE INDEX IF NOT EXISTS idx_files_size ON files(size);
 CREATE INDEX IF NOT EXISTS idx_files_modified_time ON files(modified_time);

@@ -49,7 +49,7 @@ func (p *PlexClient) Test() error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Plex returned status %d", resp.StatusCode)
+		return fmt.Errorf("plex returned status %d", resp.StatusCode)
 	}
 
 	return nil
@@ -104,7 +104,7 @@ func (p *PlexClient) getLibrarySections() ([]struct {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Plex API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("plex API returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -167,7 +167,7 @@ func (p *PlexClient) getFilesForSection(sectionKey string) ([]PlexFile, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Plex API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("plex API returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
