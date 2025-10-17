@@ -33,28 +33,18 @@ func NewCalculator(db *database.DB) *Calculator {
 	return &Calculator{db: db}
 }
 
-// Calculate calculates all statistics
+// Calculate calculates all statistics efficiently using combined queries
 func (c *Calculator) Calculate() (*Stats, error) {
 	stats := &Stats{
 		ServiceBreakdown: make(map[string]ServiceStats),
 	}
 
-	// Get total files and size
-	if err := c.calculateTotals(stats); err != nil {
-		return nil, fmt.Errorf("failed to calculate totals: %w", err)
+	// Calculate basic stats in a single query using CTE
+	if err := c.calculateBasicStats(stats); err != nil {
+		return nil, fmt.Errorf("failed to calculate basic stats: %w", err)
 	}
 
-	// Get orphaned files and size
-	if err := c.calculateOrphaned(stats); err != nil {
-		return nil, fmt.Errorf("failed to calculate orphaned: %w", err)
-	}
-
-	// Get hardlink statistics
-	if err := c.calculateHardlinks(stats); err != nil {
-		return nil, fmt.Errorf("failed to calculate hardlinks: %w", err)
-	}
-
-	// Get service breakdown
+	// Get service breakdown (requires separate queries per service)
 	if err := c.calculateServiceBreakdown(stats); err != nil {
 		return nil, fmt.Errorf("failed to calculate service breakdown: %w", err)
 	}
@@ -62,31 +52,42 @@ func (c *Calculator) Calculate() (*Stats, error) {
 	return stats, nil
 }
 
-func (c *Calculator) calculateTotals(stats *Stats) error {
-	query := `SELECT COUNT(*), COALESCE(SUM(size), 0) FROM files`
-	return c.db.Conn().QueryRow(query).Scan(&stats.TotalFiles, &stats.TotalSize)
-}
-
-func (c *Calculator) calculateOrphaned(stats *Stats) error {
-	query := `SELECT COUNT(*), COALESCE(SUM(size), 0) FROM files WHERE is_orphaned = 1`
-	return c.db.Conn().QueryRow(query).Scan(&stats.OrphanedFiles, &stats.OrphanedSize)
-}
-
-func (c *Calculator) calculateHardlinks(stats *Stats) error {
-	// Count distinct (device_id, inode) pairs with more than one file
+func (c *Calculator) calculateBasicStats(stats *Stats) error {
+	// Combined query using CTE for efficiency
 	query := `
-		SELECT COUNT(*), COALESCE(SUM(savings), 0)
-		FROM (
+		WITH basic AS (
 			SELECT
-				device_id,
-				inode,
-				(COUNT(*) - 1) * MAX(size) as savings
+				COUNT(*) as total_files,
+				COALESCE(SUM(size), 0) as total_size,
+				SUM(CASE WHEN is_orphaned = 1 THEN 1 ELSE 0 END) as orphaned_files,
+				SUM(CASE WHEN is_orphaned = 1 THEN size ELSE 0 END) as orphaned_size
 			FROM files
-			GROUP BY device_id, inode
-			HAVING COUNT(*) > 1
+		),
+		hardlinks AS (
+			SELECT
+				COUNT(*) as hardlink_groups,
+				COALESCE(SUM(savings), 0) as hardlink_savings
+			FROM (
+				SELECT (COUNT(*) - 1) * MAX(size) as savings
+				FROM files
+				GROUP BY device_id, inode
+				HAVING COUNT(*) > 1
+			)
 		)
+		SELECT
+			b.total_files, b.total_size, b.orphaned_files, b.orphaned_size,
+			h.hardlink_groups, h.hardlink_savings
+		FROM basic b, hardlinks h
 	`
-	return c.db.Conn().QueryRow(query).Scan(&stats.HardlinkGroups, &stats.HardlinkSavings)
+
+	return c.db.Conn().QueryRow(query).Scan(
+		&stats.TotalFiles,
+		&stats.TotalSize,
+		&stats.OrphanedFiles,
+		&stats.OrphanedSize,
+		&stats.HardlinkGroups,
+		&stats.HardlinkSavings,
+	)
 }
 
 func (c *Calculator) calculateServiceBreakdown(stats *Stats) error {

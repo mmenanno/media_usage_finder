@@ -183,8 +183,21 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 	s.renderTemplate(w, "stats.html", data)
 }
 
-// HandleHardlinks serves the hardlinks page
+// HardlinkGroup represents a group of hardlinked files
+type HardlinkGroup struct {
+	Key   string
+	Files []*database.File
+	Size  int64
+}
+
+// HandleHardlinks serves the hardlinks page with pagination
 func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	page = ValidatePage(page)
+
+	limit := 50 // Groups per page
+	offset := (page - 1) * limit
+
 	groupsMap, err := s.db.GetHardlinkGroups()
 	if err != nil {
 		http.Error(w, "Failed to get hardlink groups", http.StatusInternalServerError)
@@ -192,12 +205,6 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert map to sorted slice for consistent display
-	type HardlinkGroup struct {
-		Key   string
-		Files []*database.File
-		Size  int64
-	}
-
 	groups := make([]HardlinkGroup, 0, len(groupsMap))
 	for key, files := range groupsMap {
 		if len(files) > 0 {
@@ -214,9 +221,25 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 		return groups[i].Size > groups[j].Size
 	})
 
+	// Paginate
+	total := len(groups)
+	start := offset
+	end := offset + limit
+	if start > total {
+		start = total
+	}
+	if end > total {
+		end = total
+	}
+
+	paginatedGroups := groups[start:end]
+
 	data := map[string]interface{}{
-		"Groups": groups,
-		"Title":  "Hardlink Groups",
+		"Groups":     paginatedGroups,
+		"Total":      total,
+		"Page":       page,
+		"TotalPages": (total + limit - 1) / limit,
+		"Title":      "Hardlink Groups",
 	}
 
 	s.renderTemplate(w, "hardlinks.html", data)

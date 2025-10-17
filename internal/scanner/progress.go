@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -107,12 +108,21 @@ func (p *Progress) SetTotalFiles(total int64) {
 	p.TotalFiles = total
 }
 
-// AddError adds an error message
+// AddError adds an error message (keeps only last 1000 errors to prevent memory issues)
 func (p *Progress) AddError(err string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	p.Errors = append(p.Errors, err)
+
+	// Also log to SSE stream
+	p.logChan <- fmt.Sprintf("ERROR: %s", err)
+
+	// Keep only last 1000 errors to prevent unbounded growth
+	const maxErrors = 1000
+	if len(p.Errors) > maxErrors {
+		p.Errors = p.Errors[len(p.Errors)-maxErrors:]
+	}
 }
 
 // SetPhase sets the current phase

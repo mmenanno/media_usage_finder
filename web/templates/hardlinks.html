@@ -5,7 +5,7 @@
     <div class="flex justify-between items-center">
         <h2 class="text-3xl font-bold">Hardlink Groups</h2>
         <div class="text-gray-400">
-            {{len .Groups}} groups found
+            {{.Total}} total groups (showing {{len .Groups}})
         </div>
     </div>
 
@@ -45,6 +45,30 @@
         </div>
         {{end}}
     </div>
+
+    <!-- Pagination -->
+    {{if gt .TotalPages 1}}
+    <div class="bg-gray-800 rounded-lg px-6 py-4 flex items-center justify-between">
+        <div class="text-sm text-gray-400">
+            Page {{.Page}} of {{.TotalPages}}
+        </div>
+        <div class="flex space-x-2">
+            {{if gt .Page 1}}
+            <a href="/hardlinks?page={{sub .Page 1}}"
+               class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
+                Previous
+            </a>
+            {{end}}
+
+            {{if lt .Page .TotalPages}}
+            <a href="/hardlinks?page={{add .Page 1}}"
+               class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
+                Next
+            </a>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
     {{else}}
     <div class="bg-gray-800 rounded-lg p-12 text-center">
         <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

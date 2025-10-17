@@ -33,6 +33,11 @@ func WalkFiles(paths []string, out chan<- FileInfo, progress *Progress) error {
 				return nil
 			}
 
+			// Skip symlinks (we track the actual files they point to)
+			if d.Type()&fs.ModeSymlink != 0 {
+				return nil
+			}
+
 			// Get file info
 			info, err := d.Info()
 			if err != nil {
@@ -84,7 +89,8 @@ func CountFiles(paths []string) (int64, error) {
 				return nil // Continue counting
 			}
 
-			if !d.IsDir() {
+			// Count only regular files (skip directories and symlinks)
+			if !d.IsDir() && d.Type()&fs.ModeSymlink == 0 {
 				count++
 			}
 

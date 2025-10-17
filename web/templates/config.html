@@ -45,8 +45,15 @@
                 <button
                     type="button"
                     hx-get="/api/config/test?service=plex"
-                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
-                    Test Connection
+                    hx-indicator="#plex-test-indicator"
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative">
+                    <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="plex-test-indicator">
+                        <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                    <span class="htmx-indicator-hidden">Test Connection</span>
                 </button>
             </div>
             <div class="space-y-4">
@@ -77,8 +84,15 @@
                 <button
                     type="button"
                     hx-get="/api/config/test?service=sonarr"
-                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
-                    Test Connection
+                    hx-indicator="#sonarr-test-indicator"
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative">
+                    <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="sonarr-test-indicator">
+                        <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                    <span class="htmx-indicator-hidden">Test Connection</span>
                 </button>
             </div>
             <div class="space-y-4">
@@ -109,8 +123,15 @@
                 <button
                     type="button"
                     hx-get="/api/config/test?service=radarr"
-                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
-                    Test Connection
+                    hx-indicator="#radarr-test-indicator"
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative">
+                    <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="radarr-test-indicator">
+                        <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                    <span class="htmx-indicator-hidden">Test Connection</span>
                 </button>
             </div>
             <div class="space-y-4">
@@ -141,8 +162,15 @@
                 <button
                     type="button"
                     hx-get="/api/config/test?service=qbittorrent"
-                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
-                    Test Connection
+                    hx-indicator="#qbit-test-indicator"
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative">
+                    <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="qbit-test-indicator">
+                        <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                    <span class="htmx-indicator-hidden">Test Connection</span>
                 </button>
             </div>
             <div class="space-y-4">
