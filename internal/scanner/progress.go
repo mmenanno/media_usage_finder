@@ -22,6 +22,7 @@ type Progress struct {
 	// Log streaming
 	logChan      chan string
 	logListeners []chan string
+	stopOnce     sync.Once
 }
 
 // NewProgress creates a new progress tracker
@@ -29,7 +30,7 @@ func NewProgress() *Progress {
 	p := &Progress{
 		StartTime:    time.Now(),
 		IsRunning:    true,
-		Errors:       make([]string, 0),
+		Errors:       make([]string, 0, 100), // Pre-allocate capacity
 		logChan:      make(chan string, 100),
 		logListeners: make([]chan string, 0),
 	}
@@ -37,7 +38,28 @@ func NewProgress() *Progress {
 	// Start log broadcaster
 	go p.broadcastLogs()
 
+	// Start periodic cleanup of stale listeners
+	go p.periodicCleanup()
+
 	return p
+}
+
+// periodicCleanup periodically removes stale listeners
+func (p *Progress) periodicCleanup() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		p.mu.RLock()
+		running := p.IsRunning
+		p.mu.RUnlock()
+
+		if !running {
+			return
+		}
+
+		p.CleanupStaleListeners()
+	}
 }
 
 // broadcastLogs broadcasts log messages to all listeners
@@ -60,6 +82,14 @@ func (p *Progress) broadcastLogs() {
 
 // Log sends a log message
 func (p *Progress) Log(message string) {
+	p.mu.RLock()
+	running := p.IsRunning
+	p.mu.RUnlock()
+
+	if !running {
+		return // Don't write to closed channel
+	}
+
 	select {
 	case p.logChan <- message:
 	default:
@@ -89,6 +119,25 @@ func (p *Progress) Unsubscribe(listener chan string) {
 			break
 		}
 	}
+}
+
+// CleanupStaleListeners removes listeners that haven't been read from in a while
+func (p *Progress) CleanupStaleListeners() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	// Remove listeners that are blocking (full channel buffer)
+	activeListeners := make([]chan string, 0, len(p.logListeners))
+	for _, listener := range p.logListeners {
+		select {
+		case listener <- "": // Try to send empty message
+			activeListeners = append(activeListeners, listener)
+		default:
+			// Channel is full, likely stale/abandoned - close it
+			close(listener)
+		}
+	}
+	p.logListeners = activeListeners
 }
 
 // IncrementFiles increments the file counters
@@ -136,14 +185,15 @@ func (p *Progress) SetPhase(phase string) {
 // Stop marks the scan as completed
 func (p *Progress) Stop() {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	p.IsRunning = false
+	p.mu.Unlock()
 
-	// Close log channel
-	if p.logChan != nil {
-		close(p.logChan)
-	}
+	// Close log channel once
+	p.stopOnce.Do(func() {
+		if p.logChan != nil {
+			close(p.logChan)
+		}
+	})
 }
 
 // GetSnapshot returns a snapshot of the current progress

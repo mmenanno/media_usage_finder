@@ -24,17 +24,10 @@ type QBittorrentClient struct {
 
 // QBittorrentFile represents a file in a torrent
 type QBittorrentFile struct {
-	Path         string
-	Size         int64
-	TorrentHash  string
-	TorrentName  string
-	TorrentFiles []TorrentFileInfo
-}
-
-// TorrentFileInfo represents a file within a torrent
-type TorrentFileInfo struct {
-	Name string
-	Size int64
+	Path        string
+	Size        int64
+	TorrentHash string
+	TorrentName string
 }
 
 // NewQBittorrentClient creates a new qBittorrent API client

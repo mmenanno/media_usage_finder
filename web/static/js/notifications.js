@@ -20,32 +20,32 @@ class ToastManager {
         document.body.addEventListener('htmx:afterRequest', (event) => {
             const xhr = event.detail.xhr;
 
-            // Check for custom toast headers
+            // Prioritize custom toast headers - only show if present
             const toastMessage = xhr.getResponseHeader('X-Toast-Message');
             const toastType = xhr.getResponseHeader('X-Toast-Type') || 'info';
 
             if (toastMessage) {
                 this.show(toastMessage, toastType);
-                return;
+                return; // Don't auto-generate if custom message exists
             }
 
-            // Auto-generate toasts for common operations
-            if (xhr.status >= 200 && xhr.status < 300) {
-                const path = event.detail.pathInfo.requestPath;
-
-                if (path.includes('/delete')) {
-                    this.show('File deleted successfully', 'success');
-                } else if (path.includes('/mark-rescan')) {
-                    this.show('Marked for rescan', 'success');
-                } else if (path.includes('/save')) {
-                    this.show('Configuration saved', 'success');
-                } else if (path.includes('/start')) {
-                    this.show('Scan started', 'info');
-                }
-            } else if (xhr.status >= 400) {
-                this.show('Operation failed', 'error');
+            // Auto-generate toasts only for operations that don't send X-Toast-Message
+            // This prevents duplicate notifications
+            if (xhr.status >= 400) {
+                // Always show error toasts if no custom message
+                const errorMsg = this.parseErrorMessage(xhr);
+                this.show(errorMsg, 'error');
             }
         });
+    }
+
+    parseErrorMessage(xhr) {
+        try {
+            const response = JSON.parse(xhr.responseText);
+            return response.error || response.message || 'Operation failed';
+        } catch {
+            return 'Operation failed';
+        }
     }
 
     show(message, type = 'info') {

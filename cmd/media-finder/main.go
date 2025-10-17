@@ -42,8 +42,12 @@ orphaned files and optimizes storage through hardlink detection.`,
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
-			// Open database
-			db, err = database.New(cfg.DatabasePath)
+			// Open database with config
+			db, err = database.NewWithConfig(cfg.DatabasePath, database.DBConfig{
+				MaxOpenConns:    cfg.DBMaxOpenConns,
+				MaxIdleConns:    cfg.DBMaxIdleConns,
+				ConnMaxLifetime: cfg.DBConnMaxLifetime,
+			})
 			if err != nil {
 				return fmt.Errorf("failed to open database: %w", err)
 			}
@@ -265,14 +269,18 @@ func runMarkRescan(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("must specify either --filter or --orphaned")
 	}
 
-	var whereClause string
+	var filterType string
 	if orphaned {
-		whereClause = "is_orphaned = 1"
+		filterType = "orphaned"
+	} else if filter == "" {
+		return fmt.Errorf("filter is required when --orphaned is not specified")
 	} else {
-		whereClause = filter
+		// For CLI, we only support predefined filters for safety
+		// Could extend this with more specific filter types if needed
+		return fmt.Errorf("custom filters not supported via CLI for security. Use --orphaned flag")
 	}
 
-	count, err := db.MarkFilesForRescan(whereClause)
+	count, err := db.MarkFilesForRescan(filterType)
 	if err != nil {
 		return fmt.Errorf("failed to mark files for rescan: %w", err)
 	}

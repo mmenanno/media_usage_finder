@@ -173,14 +173,14 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 
 // scanFilesystem scans the filesystem and processes files
 func (s *Scanner) scanFilesystem(ctx context.Context, scanID int64, incremental bool) error {
-	// Create worker pool
-	pool := NewWorkerPool(s.config.ScanWorkers, s.db, scanID, s.progress, incremental)
+	// Create worker pool with configurable buffer size
+	pool := NewWorkerPool(s.config.ScanWorkers, s.config.ScanBufferSize, s.db, scanID, s.progress, incremental)
 	pool.Start()
 
 	// Walk filesystem in goroutine
 	walkDone := make(chan error, 1)
 	go func() {
-		walkDone <- WalkFiles(s.config.ScanPaths, pool.GetInputChannel(), s.progress)
+		walkDone <- WalkFiles(ctx, s.config.ScanPaths, pool.GetInputChannel(), s.progress)
 	}()
 
 	// Wait for walk to complete or context cancellation

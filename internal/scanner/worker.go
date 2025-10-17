@@ -2,6 +2,8 @@ package scanner
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"sync"
 	"time"
 
@@ -54,7 +56,7 @@ func (w *Worker) Run(ctx context.Context, in <-chan FileInfo, wg *sync.WaitGroup
 func (w *Worker) processFile(fileInfo FileInfo) error {
 	// Check if file exists in database
 	existingFile, err := w.db.GetFileByPath(fileInfo.Path)
-	if err != nil && err.Error() != "sql: no rows in result set" {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
 
@@ -95,21 +97,22 @@ func (w *Worker) processFile(fileInfo FileInfo) error {
 
 // WorkerPool manages a pool of workers
 type WorkerPool struct {
-	workers  []*Worker
-	input    chan FileInfo
-	wg       sync.WaitGroup
-	ctx      context.Context
-	cancel   context.CancelFunc
-	progress *Progress
+	workers   []*Worker
+	input     chan FileInfo
+	wg        sync.WaitGroup
+	ctx       context.Context
+	cancel    context.CancelFunc
+	progress  *Progress
+	closeOnce sync.Once
 }
 
 // NewWorkerPool creates a new worker pool
-func NewWorkerPool(numWorkers int, db *database.DB, scanID int64, progress *Progress, incremental bool) *WorkerPool {
+func NewWorkerPool(numWorkers, bufferSize int, db *database.DB, scanID int64, progress *Progress, incremental bool) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pool := &WorkerPool{
 		workers:  make([]*Worker, numWorkers),
-		input:    make(chan FileInfo, numWorkers*10), // Buffer to reduce blocking
+		input:    make(chan FileInfo, bufferSize),
 		ctx:      ctx,
 		cancel:   cancel,
 		progress: progress,
@@ -138,14 +141,18 @@ func (p *WorkerPool) Submit(fileInfo FileInfo) {
 
 // Stop stops all workers gracefully
 func (p *WorkerPool) Stop() {
-	close(p.input)
+	p.closeOnce.Do(func() {
+		close(p.input)
+	})
 	p.wg.Wait()
 }
 
 // Cancel cancels all workers immediately
 func (p *WorkerPool) Cancel() {
 	p.cancel()
-	close(p.input)
+	p.closeOnce.Do(func() {
+		close(p.input)
+	})
 	p.wg.Wait()
 }
 

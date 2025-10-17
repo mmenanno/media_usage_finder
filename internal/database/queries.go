@@ -565,22 +565,27 @@ func ValidateOrderBy(orderBy string) string {
 
 // ListFiles retrieves files with filtering and pagination
 func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, limit, offset int, orderBy string) ([]*File, int, error) {
-	whereClause := "WHERE 1=1"
+	var conditions []string
 	args := []interface{}{}
 
 	if orphanedOnly {
-		whereClause += " AND f.is_orphaned = 1"
+		conditions = append(conditions, "f.is_orphaned = 1")
 	}
 
 	if service != "" {
-		whereClause += " AND EXISTS (SELECT 1 FROM usage u WHERE u.file_id = f.id AND u.service = ?)"
+		conditions = append(conditions, "EXISTS (SELECT 1 FROM usage u WHERE u.file_id = f.id AND u.service = ?)")
 		args = append(args, service)
 	}
 
 	if hardlinksOnly {
-		whereClause += ` AND (f.device_id, f.inode) IN (
+		conditions = append(conditions, `(f.device_id, f.inode) IN (
 			SELECT device_id, inode FROM files GROUP BY device_id, inode HAVING COUNT(*) > 1
-		)`
+		)`)
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
 	// Count total
@@ -684,18 +689,31 @@ func (db *DB) DeleteFile(fileID int64, details string) error {
 	return tx.Commit()
 }
 
-// MarkFilesForRescan marks files matching a WHERE clause filter for rescan
-// Note: filter should be a valid SQL WHERE clause. Use predefined filters or validate carefully.
-func (db *DB) MarkFilesForRescan(filter string) (int64, error) {
+// MarkFilesForRescan marks files matching a predefined filter for rescan
+// Only accepts predefined safe filter types to prevent SQL injection
+func (db *DB) MarkFilesForRescan(filterType string) (int64, error) {
+	// Allowlist of safe filters - no user input in SQL
+	var whereClause string
+	var filterDesc string
+
+	switch filterType {
+	case "orphaned":
+		whereClause = "is_orphaned = 1"
+		filterDesc = "orphaned files"
+	case "all":
+		whereClause = "1=1"
+		filterDesc = "all files"
+	default:
+		return 0, fmt.Errorf("invalid filter type: %s (allowed: orphaned, all)", filterType)
+	}
+
 	tx, err := db.BeginTx()
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback()
 
-	// For safety, only allow specific predefined filters
-	// Custom filters must be validated by caller
-	query := fmt.Sprintf(`UPDATE files SET last_verified = 0 WHERE %s`, filter)
+	query := fmt.Sprintf(`UPDATE files SET last_verified = 0 WHERE %s`, whereClause)
 	result, err := tx.Exec(query)
 	if err != nil {
 		return 0, fmt.Errorf("failed to mark files for rescan: %w", err)
@@ -709,7 +727,7 @@ func (db *DB) MarkFilesForRescan(filter string) (int64, error) {
 	// Log the action
 	_, err = tx.Exec(
 		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('mark_rescan', 'files', 0, ?)`,
-		fmt.Sprintf("Marked %d files for rescan with filter: %s", count, filter),
+		fmt.Sprintf("Marked %d files for rescan (%s)", count, filterDesc),
 	)
 	if err != nil {
 		return 0, err

@@ -13,17 +13,33 @@ type DB struct {
 	conn *sql.DB
 }
 
+// DBConfig holds database connection configuration
+type DBConfig struct {
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+}
+
 // New creates a new database connection and initializes the schema
 func New(dbPath string) (*DB, error) {
+	return NewWithConfig(dbPath, DBConfig{
+		MaxOpenConns:    25,
+		MaxIdleConns:    5,
+		ConnMaxLifetime: 5 * time.Minute,
+	})
+}
+
+// NewWithConfig creates a new database connection with custom pool settings
+func NewWithConfig(dbPath string, cfg DBConfig) (*DB, error) {
 	conn, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on", dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Set connection pool settings
-	conn.SetMaxOpenConns(25)
-	conn.SetMaxIdleConns(5)
-	conn.SetConnMaxLifetime(5 * time.Minute)
+	// Set connection pool settings from config
+	conn.SetMaxOpenConns(cfg.MaxOpenConns)
+	conn.SetMaxIdleConns(cfg.MaxIdleConns)
+	conn.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 
 	db := &DB{conn: conn}
 

@@ -12,10 +12,18 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	DatabasePath string        `yaml:"database_path"`
-	ScanWorkers  int           `yaml:"scan_workers"`
-	APITimeout   time.Duration `yaml:"api_timeout"`
-	ServerPort   int           `yaml:"server_port"`
+	DatabasePath      string        `yaml:"database_path"`
+	ScanWorkers       int           `yaml:"scan_workers"`
+	ScanBufferSize    int           `yaml:"scan_buffer_size"`
+	APITimeout        time.Duration `yaml:"api_timeout"`
+	ServerPort        int           `yaml:"server_port"`
+	CORSAllowedOrigin string        `yaml:"cors_allowed_origin"`
+	StatsCacheTTL     time.Duration `yaml:"stats_cache_ttl"`
+
+	// Database connection pool settings
+	DBMaxOpenConns    int           `yaml:"db_max_open_conns"`
+	DBMaxIdleConns    int           `yaml:"db_max_idle_conns"`
+	DBConnMaxLifetime time.Duration `yaml:"db_conn_max_lifetime"`
 
 	LocalPathMappings   []PathMapping            `yaml:"local_path_mappings"`
 	ServicePathMappings map[string][]PathMapping `yaml:"service_path_mappings"`
@@ -66,10 +74,16 @@ type QBittorrentConfig struct {
 // Default returns a default configuration
 func Default() *Config {
 	return &Config{
-		DatabasePath: "/data/media-finder.db",
-		ScanWorkers:  10,
-		APITimeout:   30 * time.Second,
-		ServerPort:   8080,
+		DatabasePath:      "/data/media-finder.db",
+		ScanWorkers:       10,
+		ScanBufferSize:    100,
+		APITimeout:        30 * time.Second,
+		ServerPort:        8080,
+		CORSAllowedOrigin: "http://localhost:8080",
+		StatsCacheTTL:     30 * time.Second,
+		DBMaxOpenConns:    25,
+		DBMaxIdleConns:    5,
+		DBConnMaxLifetime: 5 * time.Minute,
 		LocalPathMappings: []PathMapping{
 			{Container: "/media", Host: "/mnt/user/data/media"},
 			{Container: "/downloads", Host: "/mnt/user/data/downloads/torrents"},
@@ -203,12 +217,80 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("scan_workers must be at least 1")
 	}
 
+	if c.ScanBufferSize < 1 {
+		return fmt.Errorf("scan_buffer_size must be at least 1")
+	}
+
 	if c.APITimeout < time.Second {
 		return fmt.Errorf("api_timeout must be at least 1 second")
 	}
 
 	if len(c.ScanPaths) == 0 {
 		return fmt.Errorf("at least one scan path is required")
+	}
+
+	if c.DBMaxOpenConns < 1 {
+		return fmt.Errorf("db_max_open_conns must be at least 1")
+	}
+
+	if c.DBMaxIdleConns < 0 {
+		return fmt.Errorf("db_max_idle_conns cannot be negative")
+	}
+
+	if c.StatsCacheTTL < 0 {
+		return fmt.Errorf("stats_cache_ttl cannot be negative")
+	}
+
+	// Validate path mappings
+	if err := c.validatePathMappings(); err != nil {
+		return fmt.Errorf("invalid path mappings: %w", err)
+	}
+
+	return nil
+}
+
+// validatePathMappings validates all path mappings
+func (c *Config) validatePathMappings() error {
+	// Validate local path mappings
+	for i, mapping := range c.LocalPathMappings {
+		if err := validatePathMapping(mapping, fmt.Sprintf("local_path_mappings[%d]", i)); err != nil {
+			return err
+		}
+	}
+
+	// Validate service path mappings
+	for service, mappings := range c.ServicePathMappings {
+		for i, mapping := range mappings {
+			if err := validatePathMapping(mapping, fmt.Sprintf("service_path_mappings.%s[%d]", service, i)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// validatePathMapping validates a single path mapping
+func validatePathMapping(mapping PathMapping, context string) error {
+	if mapping.Container == "" {
+		return fmt.Errorf("%s: container path cannot be empty", context)
+	}
+
+	if mapping.Host == "" {
+		return fmt.Errorf("%s: host path cannot be empty", context)
+	}
+
+	if !filepath.IsAbs(mapping.Container) {
+		return fmt.Errorf("%s: container path must be absolute (got: %s)", context, mapping.Container)
+	}
+
+	if !filepath.IsAbs(mapping.Host) {
+		return fmt.Errorf("%s: host path must be absolute (got: %s)", context, mapping.Host)
+	}
+
+	// Check for directory traversal attempts
+	if strings.Contains(mapping.Container, "..") || strings.Contains(mapping.Host, "..") {
+		return fmt.Errorf("%s: paths cannot contain '..' (directory traversal)", context)
 	}
 
 	return nil

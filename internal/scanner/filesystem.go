@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -18,11 +19,18 @@ type FileInfo struct {
 }
 
 // WalkFiles walks the filesystem and sends file info to the channel
-func WalkFiles(paths []string, out chan<- FileInfo, progress *Progress) error {
+func WalkFiles(ctx context.Context, paths []string, out chan<- FileInfo, progress *Progress) error {
 	defer close(out)
 
 	for _, path := range paths {
 		err := filepath.WalkDir(path, func(filePath string, d fs.DirEntry, err error) error {
+			// Check for context cancellation
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+
 			if err != nil {
 				progress.AddError(fmt.Sprintf("Error accessing %s: %v", filePath, err))
 				return nil // Continue walking

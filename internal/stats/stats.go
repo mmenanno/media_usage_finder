@@ -2,6 +2,7 @@ package stats
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/mmenanno/media-usage-finder/internal/database"
 )
@@ -91,27 +92,41 @@ func (c *Calculator) calculateBasicStats(stats *Stats) error {
 }
 
 func (c *Calculator) calculateServiceBreakdown(stats *Stats) error {
+	// Optimized: Single query instead of 4 separate queries
+	query := `
+		SELECT u.service, COUNT(DISTINCT f.id), COALESCE(SUM(f.size), 0)
+		FROM files f
+		INNER JOIN usage u ON f.id = u.file_id
+		WHERE u.service IN ('plex', 'sonarr', 'radarr', 'qbittorrent')
+		GROUP BY u.service
+	`
+
+	rows, err := c.db.Conn().Query(query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	// Initialize all services with zero stats
 	services := []string{"plex", "sonarr", "radarr", "qbittorrent"}
-
 	for _, service := range services {
-		query := `
-			SELECT COUNT(DISTINCT f.id), COALESCE(SUM(f.size), 0)
-			FROM files f
-			INNER JOIN usage u ON f.id = u.file_id
-			WHERE u.service = ?
-		`
+		stats.ServiceBreakdown[service] = ServiceStats{FileCount: 0, TotalSize: 0}
+	}
 
+	// Update with actual values from query
+	for rows.Next() {
+		var service string
 		var serviceStats ServiceStats
-		err := c.db.Conn().QueryRow(query, service).Scan(&serviceStats.FileCount, &serviceStats.TotalSize)
-		if err != nil {
+		if err := rows.Scan(&service, &serviceStats.FileCount, &serviceStats.TotalSize); err != nil {
 			return err
 		}
-
 		stats.ServiceBreakdown[service] = serviceStats
 	}
 
-	return nil
+	return rows.Err()
 }
+
+var sizeUnits = []string{"B", "KB", "MB", "GB", "TB", "PB"}
 
 // FormatSize formats a size in bytes to a human-readable string
 func FormatSize(bytes int64) string {
@@ -126,6 +141,27 @@ func FormatSize(bytes int64) string {
 		exp++
 	}
 
-	units := []string{"KB", "MB", "GB", "TB", "PB"}
-	return fmt.Sprintf("%.2f %s", float64(bytes)/float64(div), units[exp])
+	return fmt.Sprintf("%.2f %s", float64(bytes)/float64(div), sizeUnits[exp+1])
+}
+
+// FormatDuration formats a duration to a human-readable string
+func FormatDuration(d time.Duration) string {
+	if d == 0 {
+		return "calculating..."
+	}
+
+	d = d.Round(time.Second)
+	h := d / time.Hour
+	d -= h * time.Hour
+	m := d / time.Minute
+	d -= m * time.Minute
+	s := d / time.Second
+
+	if h > 0 {
+		return fmt.Sprintf("%dh %dm", h, m)
+	}
+	if m > 0 {
+		return fmt.Sprintf("%dm %ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
 }
