@@ -257,7 +257,9 @@ func (s *Scanner) updatePlexUsage() error {
 		}
 	}
 
-	log.Printf("Updated Plex usage: %d files", len(usages))
+	matched := len(usages)
+	total := len(files)
+	s.progress.Log(fmt.Sprintf("Plex: matched %d of %d files (%d not found in filesystem)", matched, total, total-matched))
 	return nil
 }
 
@@ -326,7 +328,9 @@ func (s *Scanner) updateSonarrUsage() error {
 		}
 	}
 
-	log.Printf("Updated Sonarr usage: %d files", len(usages))
+	matched := len(usages)
+	total := len(files)
+	s.progress.Log(fmt.Sprintf("Sonarr: matched %d of %d files (%d not found in filesystem)", matched, total, total-matched))
 	return nil
 }
 
@@ -395,7 +399,9 @@ func (s *Scanner) updateRadarrUsage() error {
 		}
 	}
 
-	log.Printf("Updated Radarr usage: %d files", len(usages))
+	matched := len(usages)
+	total := len(files)
+	s.progress.Log(fmt.Sprintf("Radarr: matched %d of %d files (%d not found in filesystem)", matched, total, total-matched))
 	return nil
 }
 
@@ -466,7 +472,9 @@ func (s *Scanner) updateQBittorrentUsage() error {
 		}
 	}
 
-	log.Printf("Updated qBittorrent usage: %d files", len(usages))
+	matched := len(usages)
+	total := len(files)
+	s.progress.Log(fmt.Sprintf("qBittorrent: matched %d of %d files (%d not found in filesystem)", matched, total, total-matched))
 	return nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -184,11 +185,34 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 
 // HandleHardlinks serves the hardlinks page
 func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
-	groups, err := s.db.GetHardlinkGroups()
+	groupsMap, err := s.db.GetHardlinkGroups()
 	if err != nil {
 		http.Error(w, "Failed to get hardlink groups", http.StatusInternalServerError)
 		return
 	}
+
+	// Convert map to sorted slice for consistent display
+	type HardlinkGroup struct {
+		Key   string
+		Files []*database.File
+		Size  int64
+	}
+
+	groups := make([]HardlinkGroup, 0, len(groupsMap))
+	for key, files := range groupsMap {
+		if len(files) > 0 {
+			groups = append(groups, HardlinkGroup{
+				Key:   key,
+				Files: files,
+				Size:  files[0].Size * int64(len(files)-1), // Space saved
+			})
+		}
+	}
+
+	// Sort by space saved (descending)
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].Size > groups[j].Size
+	})
 
 	data := map[string]interface{}{
 		"Groups": groups,

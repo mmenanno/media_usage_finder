@@ -53,10 +53,13 @@
                             {{end}}
                             {{if .Errors}}
                             <button
-                                onclick="alert('Error: {{.Errors}}')"
+                                onclick="this.nextElementSibling.classList.toggle('hidden')"
                                 class="ml-2 text-xs text-red-400 hover:text-red-300">
                                 View Error
                             </button>
+                            <div class="hidden mt-2 p-2 bg-red-900/30 border border-red-700 rounded text-xs text-red-300">
+                                {{.Errors}}
+                            </div>
                             {{end}}
                         </td>
                     </tr>
