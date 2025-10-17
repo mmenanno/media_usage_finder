@@ -42,7 +42,17 @@ class ToastManager {
     parseErrorMessage(xhr) {
         try {
             const response = JSON.parse(xhr.responseText);
-            return response.error || response.message || 'Operation failed';
+            const errorMsg = response.error || response.message || 'Operation failed';
+            const suggestion = response.suggestion;
+
+            // If there's a suggestion, show it in a separate toast after the error
+            if (suggestion) {
+                setTimeout(() => {
+                    this.show(suggestion, 'info');
+                }, 500);
+            }
+
+            return errorMsg;
         } catch {
             return 'Operation failed';
         }

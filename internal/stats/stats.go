@@ -8,20 +8,22 @@ import (
 )
 
 // Stats contains statistical information about the media files
+// Note: Size fields use int64 and have a theoretical limit of ~9 exabytes.
+// For filesystems with total sizes exceeding this, overflow may occur.
 type Stats struct {
 	TotalFiles       int64
-	TotalSize        int64
+	TotalSize        int64 // In bytes, max ~9 EB before overflow
 	OrphanedFiles    int64
-	OrphanedSize     int64
+	OrphanedSize     int64 // In bytes, max ~9 EB before overflow
 	HardlinkGroups   int64
 	ServiceBreakdown map[string]ServiceStats
-	HardlinkSavings  int64
+	HardlinkSavings  int64 // In bytes, max ~9 EB before overflow
 }
 
 // ServiceStats contains statistics for a specific service
 type ServiceStats struct {
 	FileCount int64
-	TotalSize int64
+	TotalSize int64 // In bytes, max ~9 EB before overflow
 }
 
 // Calculator calculates statistics from the database

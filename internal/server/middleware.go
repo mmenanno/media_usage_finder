@@ -9,6 +9,11 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	// MaxRequestBodySize limits the size of request bodies (10 MB)
+	MaxRequestBodySize = 10 << 20
+)
+
 // Logger middleware logs HTTP requests with request ID
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -86,12 +91,10 @@ func Recovery(next http.Handler) http.Handler {
 
 // RequestSizeLimit middleware limits request body size
 func RequestSizeLimit(next http.Handler) http.Handler {
-	const maxBodySize = 10 << 20 // 10 MB
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Only limit POST, PUT, PATCH requests
 		if r.Method == "POST" || r.Method == "PUT" || r.Method == "PATCH" {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+			r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBodySize)
 		}
 
 		next.ServeHTTP(w, r)

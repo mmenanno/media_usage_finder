@@ -13,6 +13,11 @@ import (
 	"time"
 )
 
+const (
+	// MaxConcurrentTorrentWorkers limits concurrent torrent processing
+	MaxConcurrentTorrentWorkers = 20
+)
+
 // QBittorrentClient handles communication with qBittorrent
 type QBittorrentClient struct {
 	baseURL     string
@@ -20,6 +25,7 @@ type QBittorrentClient struct {
 	password    string
 	quiProxyURL string
 	client      *http.Client
+	loginMu     sync.Mutex // Protects concurrent login attempts
 }
 
 // QBittorrentFile represents a file in a torrent
@@ -54,12 +60,16 @@ func (q *QBittorrentClient) getEffectiveURL() string {
 	return q.baseURL
 }
 
-// login authenticates with qBittorrent
+// login authenticates with qBittorrent (thread-safe)
 func (q *QBittorrentClient) login() error {
 	// If using qui proxy, no login needed
 	if q.quiProxyURL != "" {
 		return nil
 	}
+
+	// Protect concurrent login attempts with mutex
+	q.loginMu.Lock()
+	defer q.loginMu.Unlock()
 
 	data := url.Values{}
 	data.Set("username", q.username)
@@ -133,8 +143,7 @@ func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
 	}
 
 	// Use concurrent workers to process torrents
-	const maxWorkers = 20
-	sem := make(chan struct{}, maxWorkers) // Semaphore for concurrency control
+	sem := make(chan struct{}, MaxConcurrentTorrentWorkers) // Semaphore for concurrency control
 
 	var mu sync.Mutex
 	var allFiles []QBittorrentFile

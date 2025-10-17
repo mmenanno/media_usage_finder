@@ -171,6 +171,109 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 	return nil
 }
 
+// serviceFile is a generic interface for files from different services
+type serviceFile interface {
+	GetPath() string
+	GetMetadata() map[string]interface{}
+}
+
+// Implement serviceFile for each service type
+type plexServiceFile struct{ api.PlexFile }
+
+func (f plexServiceFile) GetPath() string { return f.Path }
+func (f plexServiceFile) GetMetadata() map[string]interface{} {
+	return map[string]interface{}{"size": f.Size}
+}
+
+type sonarrServiceFile struct{ api.SonarrFile }
+
+func (f sonarrServiceFile) GetPath() string { return f.Path }
+func (f sonarrServiceFile) GetMetadata() map[string]interface{} {
+	return map[string]interface{}{
+		"series_title":  f.SeriesTitle,
+		"season_number": f.SeasonNumber,
+		"episode_id":    f.EpisodeID,
+	}
+}
+
+type radarrServiceFile struct{ api.RadarrFile }
+
+func (f radarrServiceFile) GetPath() string { return f.Path }
+func (f radarrServiceFile) GetMetadata() map[string]interface{} {
+	return map[string]interface{}{
+		"movie_title": f.MovieTitle,
+		"movie_year":  f.MovieYear,
+		"movie_id":    f.MovieID,
+	}
+}
+
+type qbittorrentServiceFile struct{ api.QBittorrentFile }
+
+func (f qbittorrentServiceFile) GetPath() string { return f.Path }
+func (f qbittorrentServiceFile) GetMetadata() map[string]interface{} {
+	return map[string]interface{}{
+		"torrent_hash": f.TorrentHash,
+		"torrent_name": f.TorrentName,
+	}
+}
+
+// updateServiceUsage is a generic method to update usage information for any service
+func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) error {
+	if len(files) == 0 {
+		return nil
+	}
+
+	// Clear old usage records
+	if err := s.db.DeleteUsageByService(serviceName); err != nil {
+		return err
+	}
+
+	// Translate all paths and collect for batch lookup
+	hostPaths := make([]string, 0, len(files))
+	pathToFile := make(map[string]serviceFile)
+
+	for _, file := range files {
+		hostPath := s.config.TranslatePathToHost(file.GetPath(), serviceName)
+		hostPaths = append(hostPaths, hostPath)
+		pathToFile[hostPath] = file
+	}
+
+	// Batch load all files from database
+	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
+	if err != nil {
+		return fmt.Errorf("failed to batch load files: %w", err)
+	}
+
+	// Collect usage records
+	var usages []*database.Usage
+	for hostPath, file := range pathToFile {
+		dbFile, ok := dbFiles[hostPath]
+		if !ok {
+			continue
+		}
+
+		usages = append(usages, &database.Usage{
+			FileID:        dbFile.ID,
+			Service:       serviceName,
+			ReferencePath: file.GetPath(),
+			Metadata:      file.GetMetadata(),
+		})
+	}
+
+	// Batch insert all usage records
+	if len(usages) > 0 {
+		if err := s.db.BatchUpsertUsage(usages); err != nil {
+			return fmt.Errorf("failed to batch insert %s usage: %w", serviceName, err)
+		}
+	}
+
+	matched := len(usages)
+	total := len(files)
+	s.progress.Log(fmt.Sprintf("%s: matched %d of %d files (%d not found in filesystem)",
+		serviceName, matched, total, total-matched))
+	return nil
+}
+
 // scanFilesystem scans the filesystem and processes files
 func (s *Scanner) scanFilesystem(ctx context.Context, scanID int64, incremental bool) error {
 	// Create worker pool with configurable buffer size
@@ -200,67 +303,45 @@ func (s *Scanner) updatePlexUsage() error {
 		return nil
 	}
 
-	client := api.NewPlexClient(
-		s.config.Services.Plex.URL,
-		s.config.Services.Plex.Token,
-		s.config.APITimeout,
-	)
+	// Create context with timeout for this specific service call
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.APITimeout*2)
+	defer cancel()
 
-	files, err := client.GetAllFiles()
-	if err != nil {
-		return err
+	// Channel to receive result
+	type result struct {
+		files []api.PlexFile
+		err   error
 	}
+	resultChan := make(chan result, 1)
 
-	// Clear old usage records
-	if err := s.db.DeleteUsageByService("plex"); err != nil {
-		return err
-	}
+	go func() {
+		client := api.NewPlexClient(
+			s.config.Services.Plex.URL,
+			s.config.Services.Plex.Token,
+			s.config.APITimeout,
+		)
+		files, err := client.GetAllFiles()
+		resultChan <- result{files, err}
+	}()
 
-	// Translate all paths and collect for batch lookup
-	hostPaths := make([]string, 0, len(files))
-	pathToFile := make(map[string]api.PlexFile)
-
-	for _, file := range files {
-		hostPath := s.config.TranslatePathToHost(file.Path, "plex")
-		hostPaths = append(hostPaths, hostPath)
-		pathToFile[hostPath] = file
-	}
-
-	// Batch load all files from database
-	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
-	if err != nil {
-		return fmt.Errorf("failed to batch load files: %w", err)
-	}
-
-	// Collect usage records
-	var usages []*database.Usage
-	for hostPath, file := range pathToFile {
-		dbFile, ok := dbFiles[hostPath]
-		if !ok {
-			continue
+	var files []api.PlexFile
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("plex request timed out after %v", s.config.APITimeout*2)
+	case res := <-resultChan:
+		if res.err != nil {
+			return res.err
 		}
-
-		usages = append(usages, &database.Usage{
-			FileID:        dbFile.ID,
-			Service:       "plex",
-			ReferencePath: file.Path,
-			Metadata: map[string]interface{}{
-				"size": file.Size,
-			},
-		})
+		files = res.files
 	}
 
-	// Batch insert all usage records
-	if len(usages) > 0 {
-		if err := s.db.BatchUpsertUsage(usages); err != nil {
-			return fmt.Errorf("failed to batch insert Plex usage: %w", err)
-		}
+	// Convert to generic interface
+	serviceFiles := make([]serviceFile, len(files))
+	for i, f := range files {
+		serviceFiles[i] = plexServiceFile{f}
 	}
 
-	matched := len(usages)
-	total := len(files)
-	s.progress.Log(fmt.Sprintf("Plex: matched %d of %d files (%d not found in filesystem)", matched, total, total-matched))
-	return nil
+	return s.updateServiceUsage("plex", serviceFiles)
 }
 
 // updateSonarrUsage updates usage information from Sonarr
@@ -269,69 +350,44 @@ func (s *Scanner) updateSonarrUsage() error {
 		return nil
 	}
 
-	client := api.NewSonarrClient(
-		s.config.Services.Sonarr.URL,
-		s.config.Services.Sonarr.APIKey,
-		s.config.APITimeout,
-	)
+	// Create context with timeout for this specific service call
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.APITimeout*2)
+	defer cancel()
 
-	files, err := client.GetAllFiles()
-	if err != nil {
-		return err
+	type result struct {
+		files []api.SonarrFile
+		err   error
 	}
+	resultChan := make(chan result, 1)
 
-	// Clear old usage records
-	if err := s.db.DeleteUsageByService("sonarr"); err != nil {
-		return err
-	}
+	go func() {
+		client := api.NewSonarrClient(
+			s.config.Services.Sonarr.URL,
+			s.config.Services.Sonarr.APIKey,
+			s.config.APITimeout,
+		)
+		files, err := client.GetAllFiles()
+		resultChan <- result{files, err}
+	}()
 
-	// Translate all paths and collect for batch lookup
-	hostPaths := make([]string, 0, len(files))
-	pathToFile := make(map[string]api.SonarrFile)
-
-	for _, file := range files {
-		hostPath := s.config.TranslatePathToHost(file.Path, "sonarr")
-		hostPaths = append(hostPaths, hostPath)
-		pathToFile[hostPath] = file
-	}
-
-	// Batch load all files from database
-	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
-	if err != nil {
-		return fmt.Errorf("failed to batch load files: %w", err)
-	}
-
-	// Collect usage records
-	var usages []*database.Usage
-	for hostPath, file := range pathToFile {
-		dbFile, ok := dbFiles[hostPath]
-		if !ok {
-			continue
+	var files []api.SonarrFile
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("sonarr request timed out after %v", s.config.APITimeout*2)
+	case res := <-resultChan:
+		if res.err != nil {
+			return res.err
 		}
-
-		usages = append(usages, &database.Usage{
-			FileID:        dbFile.ID,
-			Service:       "sonarr",
-			ReferencePath: file.Path,
-			Metadata: map[string]interface{}{
-				"series_title":  file.SeriesTitle,
-				"season_number": file.SeasonNumber,
-				"episode_id":    file.EpisodeID,
-			},
-		})
+		files = res.files
 	}
 
-	// Batch insert all usage records
-	if len(usages) > 0 {
-		if err := s.db.BatchUpsertUsage(usages); err != nil {
-			return fmt.Errorf("failed to batch insert Sonarr usage: %w", err)
-		}
+	// Convert to generic interface
+	serviceFiles := make([]serviceFile, len(files))
+	for i, f := range files {
+		serviceFiles[i] = sonarrServiceFile{f}
 	}
 
-	matched := len(usages)
-	total := len(files)
-	s.progress.Log(fmt.Sprintf("Sonarr: matched %d of %d files (%d not found in filesystem)", matched, total, total-matched))
-	return nil
+	return s.updateServiceUsage("sonarr", serviceFiles)
 }
 
 // updateRadarrUsage updates usage information from Radarr
@@ -340,69 +396,44 @@ func (s *Scanner) updateRadarrUsage() error {
 		return nil
 	}
 
-	client := api.NewRadarrClient(
-		s.config.Services.Radarr.URL,
-		s.config.Services.Radarr.APIKey,
-		s.config.APITimeout,
-	)
+	// Create context with timeout for this specific service call
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.APITimeout*2)
+	defer cancel()
 
-	files, err := client.GetAllFiles()
-	if err != nil {
-		return err
+	type result struct {
+		files []api.RadarrFile
+		err   error
 	}
+	resultChan := make(chan result, 1)
 
-	// Clear old usage records
-	if err := s.db.DeleteUsageByService("radarr"); err != nil {
-		return err
-	}
+	go func() {
+		client := api.NewRadarrClient(
+			s.config.Services.Radarr.URL,
+			s.config.Services.Radarr.APIKey,
+			s.config.APITimeout,
+		)
+		files, err := client.GetAllFiles()
+		resultChan <- result{files, err}
+	}()
 
-	// Translate all paths and collect for batch lookup
-	hostPaths := make([]string, 0, len(files))
-	pathToFile := make(map[string]api.RadarrFile)
-
-	for _, file := range files {
-		hostPath := s.config.TranslatePathToHost(file.Path, "radarr")
-		hostPaths = append(hostPaths, hostPath)
-		pathToFile[hostPath] = file
-	}
-
-	// Batch load all files from database
-	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
-	if err != nil {
-		return fmt.Errorf("failed to batch load files: %w", err)
-	}
-
-	// Collect usage records
-	var usages []*database.Usage
-	for hostPath, file := range pathToFile {
-		dbFile, ok := dbFiles[hostPath]
-		if !ok {
-			continue
+	var files []api.RadarrFile
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("radarr request timed out after %v", s.config.APITimeout*2)
+	case res := <-resultChan:
+		if res.err != nil {
+			return res.err
 		}
-
-		usages = append(usages, &database.Usage{
-			FileID:        dbFile.ID,
-			Service:       "radarr",
-			ReferencePath: file.Path,
-			Metadata: map[string]interface{}{
-				"movie_title": file.MovieTitle,
-				"movie_year":  file.MovieYear,
-				"movie_id":    file.MovieID,
-			},
-		})
+		files = res.files
 	}
 
-	// Batch insert all usage records
-	if len(usages) > 0 {
-		if err := s.db.BatchUpsertUsage(usages); err != nil {
-			return fmt.Errorf("failed to batch insert Radarr usage: %w", err)
-		}
+	// Convert to generic interface
+	serviceFiles := make([]serviceFile, len(files))
+	for i, f := range files {
+		serviceFiles[i] = radarrServiceFile{f}
 	}
 
-	matched := len(usages)
-	total := len(files)
-	s.progress.Log(fmt.Sprintf("Radarr: matched %d of %d files (%d not found in filesystem)", matched, total, total-matched))
-	return nil
+	return s.updateServiceUsage("radarr", serviceFiles)
 }
 
 // updateQBittorrentUsage updates usage information from qBittorrent
@@ -412,70 +443,46 @@ func (s *Scanner) updateQBittorrentUsage() error {
 		return nil
 	}
 
-	client := api.NewQBittorrentClient(
-		qbConfig.URL,
-		qbConfig.Username,
-		qbConfig.Password,
-		qbConfig.QuiProxyURL,
-		s.config.APITimeout,
-	)
+	// Create context with timeout for this specific service call
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.APITimeout*2)
+	defer cancel()
 
-	files, err := client.GetAllFiles()
-	if err != nil {
-		return err
+	type result struct {
+		files []api.QBittorrentFile
+		err   error
 	}
+	resultChan := make(chan result, 1)
 
-	// Clear old usage records
-	if err := s.db.DeleteUsageByService("qbittorrent"); err != nil {
-		return err
-	}
+	go func() {
+		client := api.NewQBittorrentClient(
+			qbConfig.URL,
+			qbConfig.Username,
+			qbConfig.Password,
+			qbConfig.QuiProxyURL,
+			s.config.APITimeout,
+		)
+		files, err := client.GetAllFiles()
+		resultChan <- result{files, err}
+	}()
 
-	// Translate all paths and collect for batch lookup
-	hostPaths := make([]string, 0, len(files))
-	pathToFile := make(map[string]api.QBittorrentFile)
-
-	for _, file := range files {
-		hostPath := s.config.TranslatePathToHost(file.Path, "qbittorrent")
-		hostPaths = append(hostPaths, hostPath)
-		pathToFile[hostPath] = file
-	}
-
-	// Batch load all files from database
-	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
-	if err != nil {
-		return fmt.Errorf("failed to batch load files: %w", err)
-	}
-
-	// Collect usage records
-	var usages []*database.Usage
-	for hostPath, file := range pathToFile {
-		dbFile, ok := dbFiles[hostPath]
-		if !ok {
-			continue
+	var files []api.QBittorrentFile
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("qbittorrent request timed out after %v", s.config.APITimeout*2)
+	case res := <-resultChan:
+		if res.err != nil {
+			return res.err
 		}
-
-		usages = append(usages, &database.Usage{
-			FileID:        dbFile.ID,
-			Service:       "qbittorrent",
-			ReferencePath: file.Path,
-			Metadata: map[string]interface{}{
-				"torrent_hash": file.TorrentHash,
-				"torrent_name": file.TorrentName,
-			},
-		})
+		files = res.files
 	}
 
-	// Batch insert all usage records
-	if len(usages) > 0 {
-		if err := s.db.BatchUpsertUsage(usages); err != nil {
-			return fmt.Errorf("failed to batch insert qBittorrent usage: %w", err)
-		}
+	// Convert to generic interface
+	serviceFiles := make([]serviceFile, len(files))
+	for i, f := range files {
+		serviceFiles[i] = qbittorrentServiceFile{f}
 	}
 
-	matched := len(usages)
-	total := len(files)
-	s.progress.Log(fmt.Sprintf("qBittorrent: matched %d of %d files (%d not found in filesystem)", matched, total, total-matched))
-	return nil
+	return s.updateServiceUsage("qbittorrent", serviceFiles)
 }
 
 // GetProgress returns the current scan progress

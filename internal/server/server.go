@@ -41,6 +41,20 @@ func (s *Server) Run(port int) error {
 	mux.HandleFunc("/api/files/delete", s.HandleDeleteFile)
 	mux.HandleFunc("/api/files/mark-rescan", s.HandleMarkRescan)
 
+	// File details endpoint (with dynamic ID in query param)
+	mux.HandleFunc("/api/files/", func(w http.ResponseWriter, r *http.Request) {
+		// Extract ID from path like /api/files/123/details
+		path := r.URL.Path
+		if len(path) > len("/api/files/") && path[len(path)-8:] == "/details" {
+			// Extract ID from path
+			idPart := path[len("/api/files/") : len(path)-8]
+			r.URL.RawQuery = "id=" + idPart
+			s.HandleFileDetails(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})
+
 	// Apply middleware chain (order matters: Recovery -> RequestID -> Logger -> RequestSizeLimit -> CORS -> handlers)
 	handler := Recovery(RequestID(Logger(RequestSizeLimit(CORS(s.config.CORSAllowedOrigin)(mux)))))
 

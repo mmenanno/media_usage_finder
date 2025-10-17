@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/xml"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -107,13 +106,10 @@ func (p *PlexClient) getLibrarySections() ([]struct {
 		return nil, fmt.Errorf("plex API returned status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
+	// Use streaming XML decoder for better performance with large responses
 	var libResp libraryResponse
-	if err := xml.Unmarshal(body, &libResp); err != nil {
+	decoder := xml.NewDecoder(resp.Body)
+	if err := decoder.Decode(&libResp); err != nil {
 		return nil, fmt.Errorf("failed to parse library sections: %w", err)
 	}
 
@@ -170,13 +166,10 @@ func (p *PlexClient) getFilesForSection(sectionKey string) ([]PlexFile, error) {
 		return nil, fmt.Errorf("plex API returned status %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
+	// Use streaming XML decoder for better performance with large libraries
 	var container mediaContainerResponse
-	if err := xml.Unmarshal(body, &container); err != nil {
+	decoder := xml.NewDecoder(resp.Body)
+	if err := decoder.Decode(&container); err != nil {
 		return nil, fmt.Errorf("failed to parse media container: %w", err)
 	}
 

@@ -16,16 +16,31 @@
                 <!-- Search -->
                 <div>
                     <label class="block text-sm font-medium text-gray-400 mb-2">Search Files</label>
-                    <input
-                        type="text"
-                        name="search"
-                        value="{{.Search}}"
-                        placeholder="Search by path..."
-                        hx-get="/files"
-                        hx-trigger="keyup changed delay:500ms, search"
-                        hx-target="#files-table"
-                        hx-include="[name='service'], [name='orphaned'], [name='limit']"
-                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                    <div class="relative">
+                        <input
+                            type="text"
+                            name="search"
+                            id="search-input"
+                            value="{{.Search}}"
+                            placeholder="Search by path..."
+                            hx-get="/files"
+                            hx-trigger="keyup changed delay:500ms, search"
+                            hx-target="#files-table"
+                            hx-include="[name='service'], [name='orphaned'], [name='limit']"
+                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                        <div id="search-spinner" class="absolute right-3 top-1/2 transform -translate-y-1/2 hidden">
+                            <svg class="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    {{if .Search}}
+                    <p class="text-xs text-gray-500 mt-1">
+                        Showing results for "{{.Search}}"
+                        <a href="/files" class="text-blue-400 hover:text-blue-300 ml-2">Clear</a>
+                    </p>
+                    {{end}}
                 </div>
 
                 <!-- Service Filter -->
@@ -95,26 +110,28 @@
     </div>
 
     <!-- Files Table -->
-    <div id="files-table" class="bg-gray-800 rounded-lg overflow-hidden">
+    <div id="files-table" class="bg-gray-800 rounded-lg overflow-hidden" role="region" aria-label="Files list">
         <div class="overflow-x-auto scrollbar-thin">
-            <table class="w-full min-w-full">
+            <table class="w-full min-w-full" role="table" aria-label="Media files">
                 <thead class="bg-gray-700">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    <tr role="row">
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             <a href="/files?order=path&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
-                               class="hover:text-gray-200 cursor-pointer">
+                               class="hover:text-gray-200 cursor-pointer"
+                               aria-label="Sort by path">
                                 Path ↕
                             </a>
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             <a href="/files?order=size&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
-                               class="hover:text-gray-200 cursor-pointer">
+                               class="hover:text-gray-200 cursor-pointer"
+                               aria-label="Sort by size">
                                 Size ↕
                             </a>
                         </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Services</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Services</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-700">
@@ -149,25 +166,67 @@
                         <td class="px-6 py-4 text-sm">
                             <div class="flex flex-col sm:flex-row sm:space-x-2 space-y-1 sm:space-y-0">
                                 <button
+                                    onclick="showFileDetails({{.File.ID}})"
+                                    aria-label="View details for {{.File.Path}}"
+                                    class="text-green-400 hover:text-green-300 whitespace-nowrap text-left sm:text-center">
+                                    Details
+                                </button>
+                                <button
+                                    hx-post="/api/files/mark-rescan?id={{.File.ID}}"
+                                    aria-label="Mark {{.File.Path}} for rescan"
+                                    class="text-blue-400 hover:text-blue-300 whitespace-nowrap text-left sm:text-center">
+                                    Rescan
+                                </button>
+                                <button
                                     hx-delete="/api/files/delete?id={{.File.ID}}"
                                     hx-confirm="Are you sure you want to delete this file? This action cannot be undone."
                                     hx-target="closest tr"
                                     hx-swap="outerHTML"
+                                    aria-label="Delete {{.File.Path}}"
                                     class="text-red-400 hover:text-red-300 whitespace-nowrap text-left sm:text-center">
                                     Delete
-                                </button>
-                                <button
-                                    hx-post="/api/files/mark-rescan?id={{.File.ID}}"
-                                    class="text-blue-400 hover:text-blue-300 whitespace-nowrap text-left sm:text-center">
-                                    Mark for Rescan
                                 </button>
                             </div>
                         </td>
                     </tr>
                     {{else}}
                     <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
-                            No files found
+                        <td colspan="5" class="px-6 py-16">
+                            <div class="flex flex-col items-center justify-center text-center space-y-4">
+                                <svg class="w-16 h-16 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                {{if .Search}}
+                                    <div class="space-y-2">
+                                        <p class="text-lg font-medium text-gray-400">No files match your search</p>
+                                        <p class="text-sm text-gray-500">Try adjusting your search terms or filters</p>
+                                    </div>
+                                {{else if .Orphaned}}
+                                    <div class="space-y-2">
+                                        <p class="text-lg font-medium text-gray-400">No orphaned files found</p>
+                                        <p class="text-sm text-gray-500">All your files are being tracked by at least one service!</p>
+                                    </div>
+                                {{else if .Service}}
+                                    <div class="space-y-2">
+                                        <p class="text-lg font-medium text-gray-400">No files found for {{.Service}}</p>
+                                        <p class="text-sm text-gray-500">This service hasn't indexed any files yet</p>
+                                    </div>
+                                {{else}}
+                                    <div class="space-y-3">
+                                        <p class="text-lg font-medium text-gray-400">No files found</p>
+                                        <p class="text-sm text-gray-500">Start a scan to discover and track your media files</p>
+                                        <button
+                                            hx-post="/api/scan/start"
+                                            hx-confirm="Start a new scan? This may take a while for large libraries."
+                                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition inline-flex items-center space-x-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                            </svg>
+                                            <span>Start Scan</span>
+                                        </button>
+                                    </div>
+                                {{end}}
+                            </div>
                         </td>
                     </tr>
                     {{end}}

@@ -106,6 +106,17 @@ func (db *DB) UpsertFile(file *File) error {
 	return err
 }
 
+// GetFileByID retrieves a file by its ID
+func (db *DB) GetFileByID(id int64) (*File, error) {
+	query := `
+		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, created_at
+		FROM files
+		WHERE id = ?
+	`
+
+	return scanFileRow(db.conn.QueryRow(query, id))
+}
+
 // GetFileByPath retrieves a file by its path
 func (db *DB) GetFileByPath(path string) (*File, error) {
 	query := `
@@ -117,6 +128,18 @@ func (db *DB) GetFileByPath(path string) (*File, error) {
 	return scanFileRow(db.conn.QueryRow(query, path))
 }
 
+// buildInClause builds an IN clause with placeholders for SQL queries
+func buildInClause(count int) string {
+	if count == 0 {
+		return ""
+	}
+	placeholders := make([]string, count)
+	for i := 0; i < count; i++ {
+		placeholders[i] = "?"
+	}
+	return strings.Join(placeholders, ",")
+}
+
 // GetFilesByPaths retrieves multiple files by their paths in one query (batch lookup)
 func (db *DB) GetFilesByPaths(paths []string) (map[string]*File, error) {
 	if len(paths) == 0 {
@@ -124,10 +147,8 @@ func (db *DB) GetFilesByPaths(paths []string) (map[string]*File, error) {
 	}
 
 	// Build IN clause with placeholders
-	placeholders := make([]string, len(paths))
 	args := make([]interface{}, len(paths))
 	for i, path := range paths {
-		placeholders[i] = "?"
 		args[i] = path
 	}
 
@@ -135,7 +156,7 @@ func (db *DB) GetFilesByPaths(paths []string) (map[string]*File, error) {
 		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, created_at
 		FROM files
 		WHERE path IN (%s)
-	`, strings.Join(placeholders, ","))
+	`, buildInClause(len(paths)))
 
 	rows, err := db.conn.Query(query, args...)
 	if err != nil {
@@ -438,10 +459,8 @@ func (db *DB) GetUsageByFileIDs(fileIDs []int64) (map[int64][]*Usage, error) {
 	}
 
 	// Build IN clause with placeholders
-	placeholders := make([]string, len(fileIDs))
 	args := make([]interface{}, len(fileIDs))
 	for i, id := range fileIDs {
-		placeholders[i] = "?"
 		args[i] = id
 	}
 
@@ -450,7 +469,7 @@ func (db *DB) GetUsageByFileIDs(fileIDs []int64) (map[int64][]*Usage, error) {
 		FROM usage
 		WHERE file_id IN (%s)
 		ORDER BY file_id, service
-	`, strings.Join(placeholders, ","))
+	`, buildInClause(len(fileIDs)))
 
 	rows, err := db.conn.Query(query, args...)
 	if err != nil {

@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mmenanno/media-usage-finder/internal/api"
@@ -16,6 +19,13 @@ import (
 	"github.com/mmenanno/media-usage-finder/internal/database"
 	"github.com/mmenanno/media-usage-finder/internal/scanner"
 	"github.com/mmenanno/media-usage-finder/internal/stats"
+)
+
+const (
+	// DefaultHardlinkGroupsPerPage is the default pagination size for hardlink groups
+	DefaultHardlinkGroupsPerPage = 50
+	// DefaultScansPerPage is the default pagination size for scan history
+	DefaultScansPerPage = 20
 )
 
 // Server holds the application state
@@ -26,6 +36,7 @@ type Server struct {
 	templates     *template.Template
 	statsCache    *stats.Cache
 	templateFuncs template.FuncMap // Cached template functions
+	version       string           // Application version
 }
 
 // NewServer creates a new server instance
@@ -39,6 +50,7 @@ func NewServer(db *database.DB, cfg *config.Config) *Server {
 		db:         db,
 		config:     cfg,
 		statsCache: stats.NewCache(cacheTTL),
+		version:    loadVersion(),
 	}
 
 	// Initialize cached template functions
@@ -52,6 +64,21 @@ func NewServer(db *database.DB, cfg *config.Config) *Server {
 	})
 
 	return srv
+}
+
+// loadVersion loads the application version from VERSION file or returns default
+func loadVersion() string {
+	// Try to read from VERSION file
+	data, err := os.ReadFile("VERSION")
+	if err == nil {
+		version := strings.TrimSpace(string(data))
+		if version != "" {
+			return version
+		}
+	}
+
+	// Fallback to default version
+	return "1.0.0"
 }
 
 // LoadTemplates loads HTML templates
@@ -91,6 +118,7 @@ func (s *Server) getStats() *stats.Stats {
 	calculator := stats.NewCalculator(s.db)
 	statistics, err := calculator.Calculate()
 	if err != nil {
+		log.Printf("Failed to calculate stats: %v", err)
 		return nil
 	}
 
@@ -204,7 +232,7 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	page = ValidatePage(page)
 
-	limit := 50 // Groups per page
+	limit := DefaultHardlinkGroupsPerPage
 	offset := (page - 1) * limit
 
 	groupsMap, err := s.db.GetHardlinkGroups()
@@ -266,7 +294,7 @@ func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	page = ValidatePage(page)
 
-	limit := 20
+	limit := DefaultScansPerPage
 	offset := (page - 1) * limit
 
 	scans, total, err := s.db.ListScans(limit, offset)
@@ -288,41 +316,39 @@ func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
 
 // HandleHealth serves the health check endpoint with detailed status
 func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
-	health := map[string]interface{}{
-		"status":  "healthy",
-		"version": "1.0.0", // Could be from build flag
-		"checks":  make(map[string]interface{}),
+	health := HealthResponse{
+		Status:  "healthy",
+		Version: s.version,
+		Checks:  make(map[string]interface{}),
 	}
 
 	// Check database
-	dbHealth := map[string]string{"status": "ok"}
+	dbHealth := ServiceHealthCheck{Status: "ok"}
 	if err := s.db.Ping(); err != nil {
-		dbHealth["status"] = "error"
-		dbHealth["error"] = err.Error()
-		health["status"] = "degraded"
+		dbHealth.Status = "error"
+		dbHealth.Error = err.Error()
+		health.Status = "degraded"
 	}
-	health["checks"].(map[string]interface{})["database"] = dbHealth
+	health.Checks["database"] = dbHealth
 
 	// Check if scan is running
-	scanHealth := map[string]interface{}{"status": "ok"}
+	scanHealth := ScannerHealthCheck{Status: "ok", Running: false}
 	if progress := s.scanner.GetProgress(); progress != nil {
 		snapshot := progress.GetSnapshot()
-		scanHealth["running"] = true
-		scanHealth["progress"] = snapshot.PercentComplete
-		scanHealth["phase"] = snapshot.CurrentPhase
-	} else {
-		scanHealth["running"] = false
+		scanHealth.Running = true
+		scanHealth.Progress = snapshot.PercentComplete
+		scanHealth.Phase = snapshot.CurrentPhase
 	}
-	health["checks"].(map[string]interface{})["scanner"] = scanHealth
+	health.Checks["scanner"] = scanHealth
 
 	// Optionally check external services (quick timeout)
 	if r.URL.Query().Get("detailed") == "true" {
-		health["checks"].(map[string]interface{})["services"] = s.checkExternalServices()
+		health.Checks["services"] = s.checkExternalServices()
 	}
 
 	// Set status code based on health
 	statusCode := http.StatusOK
-	if health["status"] == "degraded" {
+	if health.Status == "degraded" {
 		statusCode = http.StatusServiceUnavailable
 	}
 
@@ -331,50 +357,101 @@ func (s *Server) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(health)
 }
 
-// checkExternalServices checks connectivity to external services
+// createPlexClient creates a Plex API client with the given timeout
+func (s *Server) createPlexClient(timeout time.Duration) *api.PlexClient {
+	return api.NewPlexClient(s.config.Services.Plex.URL, s.config.Services.Plex.Token, timeout)
+}
+
+// createSonarrClient creates a Sonarr API client with the given timeout
+func (s *Server) createSonarrClient(timeout time.Duration) *api.SonarrClient {
+	return api.NewSonarrClient(s.config.Services.Sonarr.URL, s.config.Services.Sonarr.APIKey, timeout)
+}
+
+// createRadarrClient creates a Radarr API client with the given timeout
+func (s *Server) createRadarrClient(timeout time.Duration) *api.RadarrClient {
+	return api.NewRadarrClient(s.config.Services.Radarr.URL, s.config.Services.Radarr.APIKey, timeout)
+}
+
+// createQBittorrentClient creates a qBittorrent API client with the given timeout
+func (s *Server) createQBittorrentClient(timeout time.Duration) *api.QBittorrentClient {
+	qbConfig := s.config.Services.QBittorrent
+	return api.NewQBittorrentClient(qbConfig.URL, qbConfig.Username, qbConfig.Password, qbConfig.QuiProxyURL, timeout)
+}
+
+// checkExternalServices checks connectivity to external services concurrently
 func (s *Server) checkExternalServices() map[string]interface{} {
-	services := make(map[string]interface{})
+	type serviceCheck struct {
+		name   string
+		result map[string]string
+	}
+
+	results := make(chan serviceCheck, 4)
 	timeout := 2 * time.Second
+	var wg sync.WaitGroup
 
-	// Check Plex
+	// Check Plex concurrently
 	if s.config.Services.Plex.URL != "" {
-		plexClient := api.NewPlexClient(s.config.Services.Plex.URL, s.config.Services.Plex.Token, timeout)
-		if err := plexClient.Test(); err != nil {
-			services["plex"] = map[string]string{"status": "error", "error": err.Error()}
-		} else {
-			services["plex"] = map[string]string{"status": "ok"}
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.createPlexClient(timeout).Test(); err != nil {
+				results <- serviceCheck{"plex", map[string]string{"status": "error", "error": err.Error()}}
+			} else {
+				results <- serviceCheck{"plex", map[string]string{"status": "ok"}}
+			}
+		}()
 	}
 
-	// Check Sonarr
+	// Check Sonarr concurrently
 	if s.config.Services.Sonarr.URL != "" {
-		sonarrClient := api.NewSonarrClient(s.config.Services.Sonarr.URL, s.config.Services.Sonarr.APIKey, timeout)
-		if err := sonarrClient.Test(); err != nil {
-			services["sonarr"] = map[string]string{"status": "error", "error": err.Error()}
-		} else {
-			services["sonarr"] = map[string]string{"status": "ok"}
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.createSonarrClient(timeout).Test(); err != nil {
+				results <- serviceCheck{"sonarr", map[string]string{"status": "error", "error": err.Error()}}
+			} else {
+				results <- serviceCheck{"sonarr", map[string]string{"status": "ok"}}
+			}
+		}()
 	}
 
-	// Check Radarr
+	// Check Radarr concurrently
 	if s.config.Services.Radarr.URL != "" {
-		radarrClient := api.NewRadarrClient(s.config.Services.Radarr.URL, s.config.Services.Radarr.APIKey, timeout)
-		if err := radarrClient.Test(); err != nil {
-			services["radarr"] = map[string]string{"status": "error", "error": err.Error()}
-		} else {
-			services["radarr"] = map[string]string{"status": "ok"}
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.createRadarrClient(timeout).Test(); err != nil {
+				results <- serviceCheck{"radarr", map[string]string{"status": "error", "error": err.Error()}}
+			} else {
+				results <- serviceCheck{"radarr", map[string]string{"status": "ok"}}
+			}
+		}()
 	}
 
-	// Check qBittorrent
+	// Check qBittorrent concurrently
 	qbConfig := s.config.Services.QBittorrent
 	if qbConfig.URL != "" || qbConfig.QuiProxyURL != "" {
-		qbClient := api.NewQBittorrentClient(qbConfig.URL, qbConfig.Username, qbConfig.Password, qbConfig.QuiProxyURL, timeout)
-		if err := qbClient.Test(); err != nil {
-			services["qbittorrent"] = map[string]string{"status": "error", "error": err.Error()}
-		} else {
-			services["qbittorrent"] = map[string]string{"status": "ok"}
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.createQBittorrentClient(timeout).Test(); err != nil {
+				results <- serviceCheck{"qbittorrent", map[string]string{"status": "error", "error": err.Error()}}
+			} else {
+				results <- serviceCheck{"qbittorrent", map[string]string{"status": "ok"}}
+			}
+		}()
+	}
+
+	// Close results channel when all checks complete
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results
+	services := make(map[string]interface{})
+	for check := range results {
+		services[check.name] = check.result
 	}
 
 	return services
@@ -384,6 +461,18 @@ func (s *Server) checkExternalServices() map[string]interface{} {
 func (s *Server) HandleStartScan(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+		return
+	}
+
+	// Check if a scan is already running
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check scan status", "scan_check_failed")
+		return
+	}
+
+	if currentScan != nil {
+		respondError(w, http.StatusConflict, "A scan is already running", "scan_already_running")
 		return
 	}
 
@@ -401,25 +490,33 @@ func (s *Server) HandleStartScan(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("X-Toast-Message", "Scan started successfully")
 	w.Header().Set("X-Toast-Type", "info")
-	respondSuccess(w, "Scan started", map[string]interface{}{
-		"incremental": incremental,
-	})
+
+	response := ScanStartResponse{
+		Status:      "success",
+		Message:     "Scan started",
+		Incremental: incremental,
+	}
+	respondJSON(w, http.StatusOK, response)
 }
 
 // HandleScanProgress returns the current scan progress
 func (s *Server) HandleScanProgress(w http.ResponseWriter, r *http.Request) {
 	progress := s.scanner.GetProgress()
-	if progress == nil {
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"running": false,
-		})
-		return
+
+	response := ScanProgressResponse{Running: false}
+
+	if progress != nil {
+		snapshot := progress.GetSnapshot()
+		response.Running = true
+		response.TotalFiles = snapshot.TotalFiles
+		response.ProcessedFiles = snapshot.ProcessedFiles
+		response.PercentComplete = snapshot.PercentComplete
+		response.CurrentPhase = snapshot.CurrentPhase
+		response.ETA = stats.FormatDuration(snapshot.ETA)
 	}
 
-	snapshot := progress.GetSnapshot()
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(snapshot)
+	json.NewEncoder(w).Encode(response)
 }
 
 // HandleScanProgressHTML returns HTML for scan progress (HTMX endpoint)
@@ -432,26 +529,73 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 
 	snapshot := progress.GetSnapshot()
 
+	// Calculate files per second
+	elapsed := time.Since(snapshot.StartTime)
+	var filesPerSec float64
+	if elapsed.Seconds() > 0 && snapshot.ProcessedFiles > 0 {
+		filesPerSec = float64(snapshot.ProcessedFiles) / elapsed.Seconds()
+	}
+
+	// Phase icons
+	phaseIcons := map[string]string{
+		"Initializing":             `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>`,
+		"Counting files":           `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path></svg>`,
+		"Scanning filesystem":      `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>`,
+		"Checking Plex":            `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>`,
+		"Checking Sonarr":          `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>`,
+		"Checking Radarr":          `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>`,
+		"Checking qBittorrent":     `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>`,
+		"Updating orphaned status": `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>`,
+		"Completed":                `<svg class="w-5 h-5 inline-block mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+	}
+
+	icon := phaseIcons[snapshot.CurrentPhase]
+	if icon == "" {
+		icon = phaseIcons["Initializing"]
+	}
+
 	html := fmt.Sprintf(`
-		<div class="space-y-2">
-			<div class="flex justify-between text-sm">
-				<span class="text-gray-400">%s</span>
-				<span class="text-gray-300">%.1f%%</span>
+		<div class="space-y-3">
+			<div class="flex items-center justify-between">
+				<div class="flex items-center text-sm text-gray-300">
+					%s
+					<span class="font-medium">%s</span>
+				</div>
+				<span class="text-lg font-bold text-blue-400">%.1f%%</span>
 			</div>
-			<div class="w-full bg-gray-700 rounded-full h-4">
-				<div class="bg-blue-600 h-4 rounded-full transition-all duration-300" style="width: %.1f%%"></div>
+
+			<div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+				<div class="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 shadow-lg" style="width: %.1f%%"></div>
 			</div>
-			<div class="flex justify-between text-sm text-gray-400">
-				<span>%d / %d files</span>
-				<span>ETA: %s</span>
+
+			<div class="grid grid-cols-2 gap-4 text-sm">
+				<div>
+					<div class="text-gray-500 text-xs">Files Processed</div>
+					<div class="text-gray-200 font-medium">%d / %d</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Speed</div>
+					<div class="text-gray-200 font-medium">%.1f files/sec</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Elapsed Time</div>
+					<div class="text-gray-200 font-medium">%s</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">ETA</div>
+					<div class="text-gray-200 font-medium">%s</div>
+				</div>
 			</div>
 		</div>
 	`,
+		icon,
 		snapshot.CurrentPhase,
 		snapshot.PercentComplete,
 		snapshot.PercentComplete,
 		snapshot.ProcessedFiles,
 		snapshot.TotalFiles,
+		filesPerSec,
+		stats.FormatDuration(elapsed),
 		stats.FormatDuration(snapshot.ETA),
 	)
 
@@ -484,6 +628,11 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 
 	// Subscribe to log messages
 	logChan := progress.Subscribe()
+	if logChan == nil {
+		fmt.Fprintf(w, "data: Failed to subscribe to scan logs\n\n")
+		flusher.Flush()
+		return
+	}
 	defer progress.Unsubscribe(logChan)
 
 	// Stream log messages
@@ -564,7 +713,12 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("X-Toast-Message", "Configuration saved successfully")
 	w.Header().Set("X-Toast-Type", "success")
-	respondSuccess(w, "Configuration saved", nil)
+
+	response := ConfigSaveResponse{
+		Status:  "success",
+		Message: "Configuration saved",
+	}
+	respondJSON(w, http.StatusOK, response)
 }
 
 // HandleTestService tests connection to a service
@@ -574,36 +728,13 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch service {
 	case "plex":
-		client := api.NewPlexClient(
-			s.config.Services.Plex.URL,
-			s.config.Services.Plex.Token,
-			s.config.APITimeout,
-		)
-		err = client.Test()
+		err = s.createPlexClient(s.config.APITimeout).Test()
 	case "sonarr":
-		client := api.NewSonarrClient(
-			s.config.Services.Sonarr.URL,
-			s.config.Services.Sonarr.APIKey,
-			s.config.APITimeout,
-		)
-		err = client.Test()
+		err = s.createSonarrClient(s.config.APITimeout).Test()
 	case "radarr":
-		client := api.NewRadarrClient(
-			s.config.Services.Radarr.URL,
-			s.config.Services.Radarr.APIKey,
-			s.config.APITimeout,
-		)
-		err = client.Test()
+		err = s.createRadarrClient(s.config.APITimeout).Test()
 	case "qbittorrent":
-		qbConfig := s.config.Services.QBittorrent
-		client := api.NewQBittorrentClient(
-			qbConfig.URL,
-			qbConfig.Username,
-			qbConfig.Password,
-			qbConfig.QuiProxyURL,
-			s.config.APITimeout,
-		)
-		err = client.Test()
+		err = s.createQBittorrentClient(s.config.APITimeout).Test()
 	default:
 		respondError(w, http.StatusBadRequest, "Unknown service", "unknown_service")
 		return
@@ -618,32 +749,100 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection successful", service))
 	w.Header().Set("X-Toast-Type", "success")
-	respondSuccess(w, "Connection successful", nil)
+
+	response := TestServiceResponse{
+		Status:  "success",
+		Message: "Connection successful",
+		Service: service,
+	}
+	respondJSON(w, http.StatusOK, response)
 }
 
-// HandleExport exports files list
+// HandleExport exports files list using streaming for memory efficiency
 func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 	format := r.URL.Query().Get("format")
 	orphanedOnly := r.URL.Query().Get("orphaned") == "true"
 
-	files, _, err := s.db.ListFiles(orphanedOnly, "", false, 100000, 0, "path")
-	if err != nil {
-		http.Error(w, "Failed to list files", http.StatusInternalServerError)
-		return
-	}
+	// Stream files in batches to avoid loading everything into memory
+	const batchSize = 1000
+	offset := 0
 
 	switch format {
 	case "json":
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Disposition", "attachment; filename=files.json")
-		json.NewEncoder(w).Encode(files)
+
+		// Write opening bracket
+		w.Write([]byte("["))
+
+		first := true
+		for {
+			files, _, err := s.db.ListFiles(orphanedOnly, "", false, batchSize, offset, "path")
+			if err != nil {
+				if offset == 0 {
+					http.Error(w, "Failed to list files", http.StatusInternalServerError)
+				}
+				return
+			}
+
+			if len(files) == 0 {
+				break
+			}
+
+			for _, file := range files {
+				if !first {
+					w.Write([]byte(","))
+				}
+				first = false
+
+				// Stream each file entry
+				json.NewEncoder(w).Encode(file)
+			}
+
+			offset += batchSize
+
+			// Flush to client
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+		}
+
+		// Write closing bracket
+		w.Write([]byte("]"))
+
 	case "csv":
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=files.csv")
+
+		// Write CSV header
 		w.Write([]byte("path,size,is_orphaned\n"))
-		for _, file := range files {
-			fmt.Fprintf(w, "%s,%d,%v\n", file.Path, file.Size, file.IsOrphaned)
+
+		for {
+			files, _, err := s.db.ListFiles(orphanedOnly, "", false, batchSize, offset, "path")
+			if err != nil {
+				if offset == 0 {
+					http.Error(w, "Failed to list files", http.StatusInternalServerError)
+				}
+				return
+			}
+
+			if len(files) == 0 {
+				break
+			}
+
+			// Stream CSV rows in batches
+			for _, file := range files {
+				fmt.Fprintf(w, "%s,%d,%v\n", file.Path, file.Size, file.IsOrphaned)
+			}
+
+			offset += batchSize
+
+			// Flush to client
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
 		}
+
 	default:
 		http.Error(w, "Invalid format", http.StatusBadRequest)
 	}
@@ -703,14 +902,78 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("X-Toast-Message", fmt.Sprintf("Deleted %d files", deleted))
 		w.Header().Set("X-Toast-Type", "success")
-		respondSuccess(w, "Bulk deletion completed", map[string]interface{}{
-			"deleted": deleted,
-			"errors":  errors,
-		})
+
+		response := BulkDeleteResponse{
+			Status:  "success",
+			Message: "Bulk deletion completed",
+			Deleted: deleted,
+			Errors:  errors,
+		}
+		respondJSON(w, http.StatusOK, response)
 		return
 	}
 
 	respondError(w, http.StatusBadRequest, "Must specify file ID or orphaned flag", "missing_parameter")
+}
+
+// HandleFileDetails returns detailed information about a specific file
+func (s *Server) HandleFileDetails(w http.ResponseWriter, r *http.Request) {
+	fileIDStr := r.URL.Query().Get("id")
+	if fileIDStr == "" {
+		respondError(w, http.StatusBadRequest, "File ID is required", "missing_file_id")
+		return
+	}
+
+	fileID, err := strconv.ParseInt(fileIDStr, 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid file ID", "invalid_file_id")
+		return
+	}
+
+	// Get file
+	file, err := s.db.GetFileByID(fileID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "File not found", "file_not_found")
+		return
+	}
+
+	// Get usage
+	usage, err := s.db.GetUsageByFileID(fileID)
+	if err != nil {
+		usage = []*database.Usage{} // Empty array on error
+	}
+
+	// Get hardlinks if applicable
+	var hardlinks []string
+	if file.Inode != 0 && file.DeviceID != 0 {
+		groups, err := s.db.GetHardlinkGroups()
+		if err == nil {
+			key := fmt.Sprintf("%d-%d", file.DeviceID, file.Inode)
+			if group, ok := groups[key]; ok && len(group) > 1 {
+				hardlinks = make([]string, 0, len(group))
+				for _, f := range group {
+					hardlinks = append(hardlinks, f.Path)
+				}
+			}
+		}
+	}
+
+	response := FileDetailsResponse{
+		ID:           file.ID,
+		Path:         file.Path,
+		Size:         file.Size,
+		Inode:        file.Inode,
+		DeviceID:     file.DeviceID,
+		ModifiedTime: file.ModifiedTime.Unix(),
+		LastVerified: file.LastVerified.Unix(),
+		IsOrphaned:   file.IsOrphaned,
+		CreatedAt:    file.CreatedAt.Unix(),
+		Usage:        usage,
+		Hardlinks:    hardlinks,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // HandleMarkRescan marks files for rescan
@@ -738,9 +1001,13 @@ func (s *Server) HandleMarkRescan(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("X-Toast-Message", "Marked for rescan")
 		w.Header().Set("X-Toast-Type", "success")
-		respondSuccess(w, "File marked for rescan", map[string]interface{}{
-			"count": 1,
-		})
+
+		response := BulkRescanResponse{
+			Status:  "success",
+			Message: "File marked for rescan",
+			Count:   1,
+		}
+		respondJSON(w, http.StatusOK, response)
 		return
 	}
 
@@ -754,9 +1021,13 @@ func (s *Server) HandleMarkRescan(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("X-Toast-Message", fmt.Sprintf("Marked %d files for rescan", count))
 		w.Header().Set("X-Toast-Type", "success")
-		respondSuccess(w, "Files marked for rescan", map[string]interface{}{
-			"count": count,
-		})
+
+		response := BulkRescanResponse{
+			Status:  "success",
+			Message: "Files marked for rescan",
+			Count:   count,
+		}
+		respondJSON(w, http.StatusOK, response)
 		return
 	}
 

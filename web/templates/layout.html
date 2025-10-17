@@ -5,17 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} - Media Usage Finder</title>
     <link href="/static/css/styles.css" rel="stylesheet">
+    <link href="/static/css/accessibility.css" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
+    <script src="/static/js/theme-toggle.js"></script>
+    <script src="/static/js/loading-states.js"></script>
+    <script src="/static/js/file-details-modal.js"></script>
+    <script src="/static/js/search-enhancements.js"></script>
+    <script src="/static/js/batch-selection.js"></script>
+    <script src="/static/js/keyboard-shortcuts.js"></script>
     <script src="/static/js/notifications.js"></script>
     <script src="/static/js/app.js"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
+    <!-- Skip to main content link for accessibility -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-600 focus:text-white focus:rounded">
+        Skip to main content
+    </a>
+
     <!-- Navigation -->
-    <nav class="bg-gray-800 border-b border-gray-700">
+    <nav class="bg-gray-800 border-b border-gray-700" role="navigation" aria-label="Main navigation">
         <div class="container mx-auto px-4">
             <div class="flex items-center justify-between h-16">
-                <div class="flex items-center space-x-8">
+                <div class="flex items-center space-x-8 flex-1">
                     <h1 class="text-xl font-bold text-blue-400">Media Usage Finder</h1>
                     <div class="hidden md:flex space-x-4">
                         <a href="/" class="px-3 py-2 rounded hover:bg-gray-700 transition {{if eq .Title "Dashboard"}}bg-gray-700 text-blue-400{{end}}">Dashboard</a>
@@ -26,17 +38,68 @@
                         <a href="/config" class="px-3 py-2 rounded hover:bg-gray-700 transition {{if eq .Title "Configuration"}}bg-gray-700 text-blue-400{{end}}">Configuration</a>
                     </div>
                 </div>
+                <div class="flex items-center space-x-2">
+                    <button
+                        onclick="toggleTheme()"
+                        aria-label="Toggle theme"
+                        class="p-2 rounded-lg hover:bg-gray-700 transition"
+                        title="Toggle dark/light theme">
+                        <svg class="w-5 h-5 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                        </svg>
+                        <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                    </button>
+                    <!-- Mobile menu button -->
+                    <button
+                        id="mobile-menu-button"
+                        onclick="toggleMobileMenu()"
+                        aria-label="Toggle menu"
+                        class="md:hidden p-2 rounded-lg hover:bg-gray-700 transition">
+                        <svg id="menu-icon-open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                        <svg id="menu-icon-close" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Mobile menu -->
+            <div id="mobile-menu" class="hidden md:hidden pb-4">
+                <div class="flex flex-col space-y-2">
+                    <a href="/" class="px-3 py-2 rounded hover:bg-gray-700 transition {{if eq .Title "Dashboard"}}bg-gray-700 text-blue-400{{end}}">Dashboard</a>
+                    <a href="/files" class="px-3 py-2 rounded hover:bg-gray-700 transition {{if eq .Title "Files"}}bg-gray-700 text-blue-400{{end}}">Files</a>
+                    <a href="/hardlinks" class="px-3 py-2 rounded hover:bg-gray-700 transition {{if eq .Title "Hardlink Groups"}}bg-gray-700 text-blue-400{{end}}">Hardlinks</a>
+                    <a href="/scans" class="px-3 py-2 rounded hover:bg-gray-700 transition {{if eq .Title "Scan History"}}bg-gray-700 text-blue-400{{end}}">Scans</a>
+                    <a href="/stats" class="px-3 py-2 rounded hover:bg-gray-700 transition {{if eq .Title "Statistics"}}bg-gray-700 text-blue-400{{end}}">Statistics</a>
+                    <a href="/config" class="px-3 py-2 rounded hover:bg-gray-700 transition {{if eq .Title "Configuration"}}bg-gray-700 text-blue-400{{end}}">Configuration</a>
+                </div>
             </div>
         </div>
     </nav>
 
+    <script>
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            const iconOpen = document.getElementById('menu-icon-open');
+            const iconClose = document.getElementById('menu-icon-close');
+
+            menu.classList.toggle('hidden');
+            iconOpen.classList.toggle('hidden');
+            iconClose.classList.toggle('hidden');
+        }
+    </script>
+
     <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8">
+    <main id="main-content" class="container mx-auto px-4 py-8" role="main" tabindex="-1">
         {{block "content" .}}{{end}}
     </main>
 
     <!-- Footer -->
-    <footer class="mt-auto py-6 text-center text-gray-500 text-sm">
+    <footer class="mt-auto py-6 text-center text-gray-500 text-sm" role="contentinfo">
         <p>Media Usage Finder &copy; 2025</p>
     </footer>
 </body>

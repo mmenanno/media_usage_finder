@@ -225,6 +225,7 @@ func (p *Progress) GetSnapshot() ProgressSnapshot {
 		PercentComplete: percentComplete,
 		IsRunning:       p.IsRunning,
 		CurrentPhase:    p.CurrentPhase,
+		StartTime:       p.StartTime,
 	}
 }
 
@@ -240,4 +241,5 @@ type ProgressSnapshot struct {
 	PercentComplete float64
 	IsRunning       bool
 	CurrentPhase    string
+	StartTime       time.Time
 }
