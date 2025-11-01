@@ -164,7 +164,7 @@ orphaned files and optimizes storage through hardlink detection.`,
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	srv := server.NewServer(db, cfg)
+	srv := server.NewServer(db, cfg, Version)
 
 	// Load templates from embedded FS
 	log.Println("Loading templates...")

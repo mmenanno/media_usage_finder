@@ -62,8 +62,8 @@ func (c *Calculator) calculateBasicStats(stats *Stats) error {
 			SELECT
 				COUNT(*) as total_files,
 				COALESCE(SUM(size), 0) as total_size,
-				SUM(CASE WHEN is_orphaned = 1 THEN 1 ELSE 0 END) as orphaned_files,
-				SUM(CASE WHEN is_orphaned = 1 THEN size ELSE 0 END) as orphaned_size
+				COALESCE(SUM(CASE WHEN is_orphaned = 1 THEN 1 ELSE 0 END), 0) as orphaned_files,
+				COALESCE(SUM(CASE WHEN is_orphaned = 1 THEN size ELSE 0 END), 0) as orphaned_size
 			FROM files
 		),
 		hardlinks AS (

@@ -8,7 +8,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,7 +35,7 @@ type Server struct {
 }
 
 // NewServer creates a new server instance
-func NewServer(db *database.DB, cfg *config.Config) *Server {
+func NewServer(db *database.DB, cfg *config.Config, version string) *Server {
 	cacheTTL := cfg.StatsCacheTTL
 	if cacheTTL == 0 {
 		cacheTTL = 30 * time.Second // Default fallback
@@ -46,7 +45,7 @@ func NewServer(db *database.DB, cfg *config.Config) *Server {
 		db:            db,
 		config:        cfg,
 		statsCache:    stats.NewCache(cacheTTL),
-		version:       loadVersion(),
+		version:       version,
 		clientFactory: api.NewClientFactory(cfg),
 	}
 
@@ -61,22 +60,6 @@ func NewServer(db *database.DB, cfg *config.Config) *Server {
 	})
 
 	return srv
-}
-
-// loadVersion loads the application version from VERSION file or returns default
-func loadVersion() string {
-	// Try to read from VERSION file
-	data, err := os.ReadFile("VERSION")
-	if err == nil {
-		version := strings.TrimSpace(string(data))
-		if version != "" {
-			return version
-		}
-	}
-
-	// Fallback to default version
-	log.Println("WARNING: VERSION file not found or empty, using default version 1.0.0")
-	return "1.0.0"
 }
 
 // LoadTemplates loads HTML templates
