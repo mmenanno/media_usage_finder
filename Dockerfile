@@ -1,14 +1,16 @@
 # Build stage
 FROM golang:1.25-alpine AS builder
 
-# Install git and wget for downloading Tailwind standalone CLI
-RUN apk add --no-cache git wget
+# Install Node.js and npm for Tailwind CSS
+RUN apk add --no-cache nodejs npm git
 
 WORKDIR /app
 
-# Download Tailwind CSS standalone CLI
-RUN wget -O /usr/local/bin/tailwindcss https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 && \
-    chmod +x /usr/local/bin/tailwindcss
+# Copy package files for npm
+COPY package*.json ./
+
+# Install npm dependencies
+RUN npm ci --only=production || npm install --production
 
 # Copy go mod files
 COPY go.mod go.sum ./
@@ -17,8 +19,8 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build Tailwind CSS
-RUN /usr/local/bin/tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --minify
+# Build Tailwind CSS using npm script
+RUN npm run build:css
 
 # Build Go binary
 RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-X main.Version=$(cat VERSION)" -o /app/bin/media-finder ./cmd/media-finder
