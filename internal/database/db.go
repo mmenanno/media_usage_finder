@@ -3,6 +3,8 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -31,6 +33,12 @@ func New(dbPath string) (*DB, error) {
 
 // NewWithConfig creates a new database connection with custom pool settings
 func NewWithConfig(dbPath string, cfg DBConfig) (*DB, error) {
+	// Ensure the database directory exists
+	dir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create database directory: %w", err)
+	}
+
 	conn, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=on", dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
