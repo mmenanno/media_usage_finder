@@ -27,7 +27,7 @@ type Server struct {
 	db            *database.DB
 	config        *config.Config
 	scanner       *scanner.Scanner
-	templates     *template.Template
+	templates     map[string]*template.Template // Map of template name to parsed template
 	statsCache    *stats.Cache
 	templateFuncs template.FuncMap   // Cached template functions
 	version       string             // Application version
@@ -63,12 +63,41 @@ func NewServer(db *database.DB, cfg *config.Config, version string) *Server {
 }
 
 // LoadTemplates loads HTML templates
+// Each page template is parsed separately to avoid block name collisions
 func (s *Server) LoadTemplates(pattern string) error {
-	tmpl, err := template.New("").Funcs(s.templateFuncs).ParseGlob(pattern)
-	if err != nil {
-		return err
+	s.templates = make(map[string]*template.Template)
+
+	// Extract base directory from pattern (e.g., "web/templates/*.html" -> "web/templates")
+	baseDir := "web/templates"
+	if idx := strings.LastIndex(pattern, "/"); idx > 0 {
+		baseDir = pattern[:idx]
 	}
-	s.templates = tmpl
+
+	// List of page templates that need to be loaded
+	pages := []string{
+		"dashboard.html",
+		"files.html",
+		"hardlinks.html",
+		"scans.html",
+		"stats.html",
+		"config.html",
+	}
+
+	layoutPath := baseDir + "/layout.html"
+
+	// Parse each page template with layout.html to avoid block name collisions
+	// This ensures each page gets its own "content" block without conflicts
+	for _, page := range pages {
+		tmpl, err := template.New("").Funcs(s.templateFuncs).ParseFiles(
+			layoutPath,
+			baseDir+"/"+page,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to parse %s: %w", page, err)
+		}
+		s.templates[page] = tmpl
+	}
+
 	return nil
 }
 
@@ -1031,7 +1060,15 @@ func (s *Server) renderTemplate(w http.ResponseWriter, name string, data interfa
 		return
 	}
 
-	if err := s.templates.ExecuteTemplate(w, name, data); err != nil {
+	tmpl, ok := s.templates[name]
+	if !ok {
+		http.Error(w, fmt.Sprintf("Template %s not found", name), http.StatusInternalServerError)
+		return
+	}
+
+	// Execute layout.html which will call the "content" block from the specific page template
+	if err := tmpl.ExecuteTemplate(w, "layout.html", data); err != nil {
+		log.Printf("ERROR: Failed to execute template %s: %v", name, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
