@@ -637,12 +637,6 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if port := r.FormValue("server_port"); port != "" {
-		if p, err := strconv.Atoi(port); err == nil && p > 0 && p <= 65535 {
-			s.config.ServerPort = p
-		}
-	}
-
 	// Update Plex config with validation
 	plexURL := r.FormValue("plex_url")
 	if err := ValidateURL(plexURL); err != nil {

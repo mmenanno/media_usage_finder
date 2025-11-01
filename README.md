@@ -28,10 +28,9 @@ services:
     image: ghcr.io/mmenanno/media-usage-finder:latest
     container_name: media-finder
     ports:
-      - "8080:8080"
+      - "8787:8787"
     volumes:
-      - ./config:/config
-      - ./data:/data
+      - ./appdata:/appdata
       - /mnt/user/data/media:/media:ro
       - /mnt/user/data/downloads/torrents:/downloads:ro
     environment:
@@ -39,13 +38,12 @@ services:
     restart: unless-stopped
 ```
 
-1. Create a configuration file at `./config/config.yaml`:
+1. Create a configuration file at `./appdata/config/config.yaml`:
 
 ```yaml
-database_path: /data/media-finder.db
+database_path: /appdata/data/media-finder.db
 scan_workers: 10
 api_timeout: 30s
-server_port: 8080
 
 local_path_mappings:
   - container: /media
@@ -93,13 +91,15 @@ scan_paths:
 docker-compose up -d
 ```
 
-1. Access the web UI at `http://localhost:8080`
+The application will automatically generate a default configuration file on first run if one doesn't exist.
+
+1. Access the web UI at `http://localhost:8787`
 
 ### Using CLI
 
 ```bash
-# Start web server
-media-finder serve --port 8080
+# Start web server (listens on port 8787)
+media-finder serve
 
 # Run a scan
 media-finder scan
@@ -132,8 +132,10 @@ media-finder config validate
 
 Path mappings are crucial for matching files across different Docker containers. There are two types:
 
-1. **Local Path Mappings** - How media-finder sees paths vs actual Unraid paths
-1. **Service Path Mappings** - How each service (Plex, Sonarr, etc.) sees paths vs actual Unraid paths
+1. **Local Path Mappings** - How media-finder sees paths vs actual host paths
+1. **Service Path Mappings** - How each service (Plex, Sonarr, etc.) sees paths vs actual host paths
+
+**Note:** The application stores its configuration and database in `/appdata` which should be mapped to a persistent volume on your host.
 
 Example:
 

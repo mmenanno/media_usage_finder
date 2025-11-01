@@ -53,6 +53,16 @@ orphaned files and optimizes storage through hardlink detection.`,
 				return fmt.Errorf("failed to load config: %w", err)
 			}
 
+			// Auto-generate config file if it doesn't exist
+			if _, err := os.Stat(configPath); os.IsNotExist(err) {
+				log.Printf("Config file not found, creating default at %s", configPath)
+				if err := cfg.Save(configPath); err != nil {
+					log.Printf("Warning: failed to save default config: %v", err)
+				} else {
+					log.Println("Default configuration file created successfully")
+				}
+			}
+
 			// Open database with config
 			db, err = database.NewWithConfig(cfg.DatabasePath, database.DBConfig{
 				MaxOpenConns:    cfg.DBMaxOpenConns,
@@ -73,15 +83,14 @@ orphaned files and optimizes storage through hardlink detection.`,
 		},
 	}
 
-	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "/config/config.yaml", "Path to configuration file")
+	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "/appdata/config/config.yaml", "Path to configuration file")
 
 	// Serve command
 	serveCmd := &cobra.Command{
 		Use:   "serve",
-		Short: "Start the web server",
+		Short: "Start the web server (listens on port 8787)",
 		RunE:  runServe,
 	}
-	serveCmd.Flags().IntP("port", "p", 8080, "Port to listen on")
 
 	// Scan command
 	scanCmd := &cobra.Command{
@@ -155,8 +164,6 @@ orphaned files and optimizes storage through hardlink detection.`,
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	port, _ := cmd.Flags().GetInt("port")
-
 	srv := server.NewServer(db, cfg)
 
 	// Load templates from embedded FS
@@ -165,8 +172,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load templates: %w", err)
 	}
 
-	log.Printf("Starting Media Usage Finder v%s", Version)
-	return srv.Run(port)
+	log.Printf("Starting Media Usage Finder v%s on port 8787", Version)
+	return srv.Run()
 }
 
 func runScan(cmd *cobra.Command, args []string) error {

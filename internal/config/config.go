@@ -16,7 +16,6 @@ type Config struct {
 	ScanWorkers       int           `yaml:"scan_workers"`
 	ScanBufferSize    int           `yaml:"scan_buffer_size"`
 	APITimeout        time.Duration `yaml:"api_timeout"`
-	ServerPort        int           `yaml:"server_port"`
 	CORSAllowedOrigin string        `yaml:"cors_allowed_origin"`
 	StatsCacheTTL     time.Duration `yaml:"stats_cache_ttl"`
 
@@ -77,12 +76,11 @@ type QBittorrentConfig struct {
 // Default returns a default configuration
 func Default() *Config {
 	return &Config{
-		DatabasePath:      "/data/media-finder.db",
+		DatabasePath:      "/appdata/data/media-finder.db",
 		ScanWorkers:       10,
 		ScanBufferSize:    100,
 		APITimeout:        30 * time.Second,
-		ServerPort:        8080,
-		CORSAllowedOrigin: "http://localhost:8080",
+		CORSAllowedOrigin: "http://localhost:8787",
 		StatsCacheTTL:     30 * time.Second,
 		DBMaxOpenConns:    25,
 		DBMaxIdleConns:    5,
@@ -293,10 +291,6 @@ func (c *Config) Validate() error {
 
 	if c.StatsCacheTTL < 0 {
 		return fmt.Errorf("stats_cache_ttl cannot be negative")
-	}
-
-	if c.ServerPort < 1 || c.ServerPort > 65535 {
-		return fmt.Errorf("server_port must be between 1 and 65535")
 	}
 
 	// Validate CORS origin if provided

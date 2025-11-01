@@ -11,8 +11,8 @@ import (
 	"time"
 )
 
-// Run starts the HTTP server with graceful shutdown
-func (s *Server) Run(port int) error {
+// Run starts the HTTP server with graceful shutdown on port 8787
+func (s *Server) Run() error {
 	// Setup routes
 	mux := http.NewServeMux()
 
@@ -62,8 +62,8 @@ func (s *Server) Run(port int) error {
 	// Apply middleware chain (order matters: Recovery -> RateLimit -> RequestID -> Logger -> RequestSizeLimit -> CORS -> handlers)
 	handler := Recovery(rateLimiter.Middleware(RequestID(Logger(RequestSizeLimit(CORS(s.config.CORSAllowedOrigin)(mux))))))
 
-	// Start server
-	addr := fmt.Sprintf(":%d", port)
+	// Start server on hardcoded port 8787
+	addr := ":8787"
 	log.Printf("Starting server on %s", addr)
 
 	server := &http.Server{

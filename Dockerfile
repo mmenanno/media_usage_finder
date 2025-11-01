@@ -39,17 +39,17 @@ COPY --from=builder /app/bin/media-finder /app/media-finder
 # Copy web assets
 COPY --from=builder /app/web /app/web
 
-# Create data directory
-RUN mkdir -p /data /config
+# Create appdata directories
+RUN mkdir -p /appdata/data /appdata/config
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8787
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8787/health || exit 1
 
 # Set default command
 ENTRYPOINT ["/app/media-finder"]
-CMD ["serve", "--port", "8080"]
+CMD ["serve"]
 

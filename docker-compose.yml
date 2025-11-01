@@ -6,20 +6,19 @@ services:
     image: ghcr.io/mmenanno/media-usage-finder:latest
     container_name: media-finder
     ports:
-      - "8080:8080"
+      - "8787:8787"
     volumes:
-      # Config and database
-      - ./config:/config
-      - ./data:/data
+      # Application data (config and database)
+      - ./appdata:/appdata
 
-      # Media paths (adjust these to match your Unraid setup)
+      # Media paths (adjust these to match your setup)
       - /mnt/user/data/media:/media:ro
       - /mnt/user/data/downloads/torrents:/downloads:ro
     environment:
       - TZ=America/New_York
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8787/health"]
       interval: 30s
       timeout: 3s
       retries: 3
