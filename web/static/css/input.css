@@ -1,12 +1,19 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* Custom dark theme colors */
-:root {
-  --bg-primary: #111827;
-  --bg-secondary: #1F2937;
-  --bg-tertiary: #374151;
+/* Tailwind v4 configuration */
+@source "../../../web/templates";
+@source "../../../web/static/js";
+
+@theme {
+  /* Custom gray scale colors */
+  --color-gray-750: #2D3748;
+  --color-gray-850: #1A202C;
+  --color-gray-950: #0D1117;
+
+  /* Custom dark theme colors */
+  --color-bg-primary: #111827;
+  --color-bg-secondary: #1F2937;
+  --color-bg-tertiary: #374151;
 }
 
 /* HTMX loading indicators */

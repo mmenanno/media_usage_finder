@@ -7,7 +7,7 @@ RUN apk add --no-cache nodejs npm git gcc musl-dev
 WORKDIR /app
 
 # Copy package files for npm
-COPY package*.json ./
+COPY package.json package-lock.json ./
 
 # Install npm dependencies (including devDependencies for tailwindcss)
 RUN npm ci || npm install
