@@ -27,6 +27,12 @@ class KeyboardShortcuts {
                 return;
             }
 
+            // Prevent Enter from submitting forms when in input fields
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT') {
+                e.preventDefault();
+                return;
+            }
+
             // Don't trigger shortcuts when typing in input fields
             if (e.target.tagName === 'INPUT' ||
                 e.target.tagName === 'TEXTAREA' ||

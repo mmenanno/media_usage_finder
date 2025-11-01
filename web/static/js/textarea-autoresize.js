@@ -3,6 +3,7 @@
 
 class TextareaAutoResize {
     constructor() {
+        this.observers = new Map(); // Track observers to prevent duplicates
         this.setupAutoResize();
     }
 
@@ -11,20 +12,29 @@ class TextareaAutoResize {
         const textareas = document.querySelectorAll('textarea[data-autoresize]');
 
         textareas.forEach(textarea => {
+            // Skip if already initialized
+            if (this.observers.has(textarea)) return;
+
             // Set initial height
             this.resize(textarea);
 
             // Add event listeners
-            textarea.addEventListener('input', () => this.resize(textarea));
-            textarea.addEventListener('change', () => this.resize(textarea));
+            const inputHandler = () => this.resize(textarea);
+            const changeHandler = () => this.resize(textarea);
+
+            textarea.addEventListener('input', inputHandler);
+            textarea.addEventListener('change', changeHandler);
 
             // Handle dynamic content loading (for HTMX updates)
+            // Don't watch attributes to avoid infinite loop when we modify style.height
             const observer = new MutationObserver(() => this.resize(textarea));
             observer.observe(textarea, {
-                attributes: true,
                 childList: true,
                 subtree: true
             });
+
+            // Store observer for cleanup
+            this.observers.set(textarea, { observer, inputHandler, changeHandler });
         });
     }
 
@@ -52,7 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
     window.textareaAutoResize = new TextareaAutoResize();
 });
 
-// Re-initialize after HTMX swaps
+// Setup new textareas after HTMX swaps (reuse existing instance)
 document.body.addEventListener('htmx:afterSwap', () => {
-    window.textareaAutoResize = new TextareaAutoResize();
+    if (window.textareaAutoResize) {
+        window.textareaAutoResize.setupAutoResize();
+    }
 });
