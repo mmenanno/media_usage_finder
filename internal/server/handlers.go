@@ -670,11 +670,19 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer progress.Unsubscribe(logChan)
 
+	// Create ticker for keep-alive heartbeat (every 10 seconds to prevent 15s write timeout)
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
 	// Stream log messages
 	for {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-ticker.C:
+			// Send keep-alive comment (ignored by SSE clients)
+			fmt.Fprintf(w, ": keep-alive\n\n")
+			flusher.Flush()
 		case msg, ok := <-logChan:
 			if !ok {
 				// Channel closed, scan finished
