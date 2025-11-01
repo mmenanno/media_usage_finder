@@ -23,8 +23,8 @@ COPY . .
 # Build Tailwind CSS using npm script
 RUN npm run build:css
 
-# Build Go binary
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-X main.Version=$(cat VERSION)" -o /app/bin/media-finder ./cmd/media-finder
+# Build Go binary with FTS5 support
+RUN CGO_ENABLED=1 GOOS=linux go build -tags "sqlite_fts5" -ldflags="-X main.Version=$(cat VERSION)" -o /app/bin/media-finder ./cmd/media-finder
 
 # Runtime stage
 FROM alpine:latest
