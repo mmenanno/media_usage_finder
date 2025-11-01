@@ -702,6 +702,67 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	s.config.Services.QBittorrent.Password = r.FormValue("qbittorrent_password")
 	s.config.Services.QBittorrent.QuiProxyURL = qbProxyURL
 
+	// Parse scan paths (one per line)
+	if scanPathsStr := r.FormValue("scan_paths"); scanPathsStr != "" {
+		lines := strings.Split(scanPathsStr, "\n")
+		s.config.ScanPaths = []string{}
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				s.config.ScanPaths = append(s.config.ScanPaths, line)
+			}
+		}
+	}
+
+	// Parse local path mappings (format: container=host, one per line)
+	if localMappingsStr := r.FormValue("local_path_mappings"); localMappingsStr != "" {
+		lines := strings.Split(localMappingsStr, "\n")
+		s.config.LocalPathMappings = []config.PathMapping{}
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				s.config.LocalPathMappings = append(s.config.LocalPathMappings, config.PathMapping{
+					Container: strings.TrimSpace(parts[0]),
+					Host:      strings.TrimSpace(parts[1]),
+				})
+			}
+		}
+	}
+
+	// Parse service path mappings (format: service:container=host, one per line)
+	if serviceMappingsStr := r.FormValue("service_path_mappings"); serviceMappingsStr != "" {
+		lines := strings.Split(serviceMappingsStr, "\n")
+		s.config.ServicePathMappings = make(map[string][]config.PathMapping)
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			// Split service:path=host
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			service := strings.TrimSpace(parts[0])
+			pathParts := strings.SplitN(parts[1], "=", 2)
+			if len(pathParts) != 2 {
+				continue
+			}
+			mapping := config.PathMapping{
+				Container: strings.TrimSpace(pathParts[0]),
+				Host:      strings.TrimSpace(pathParts[1]),
+			}
+			s.config.ServicePathMappings[service] = append(s.config.ServicePathMappings[service], mapping)
+		}
+	}
+
+	// Clear path cache after updating mappings
+	s.config.ClearPathCache()
+
 	// Validate config before saving
 	if err := s.config.Validate(); err != nil {
 		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid configuration: %v", err), "validation_failed")
@@ -709,7 +770,7 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Save config to file
-	if err := s.config.Save("/config/config.yaml"); err != nil {
+	if err := s.config.Save("/appdata/config/config.yaml"); err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to save configuration", "save_failed")
 		return
 	}

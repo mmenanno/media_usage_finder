@@ -17,23 +17,54 @@
                         value="{{.Config.DatabasePath}}"
                         class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                 </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-400 mb-2">Scan Workers</label>
-                        <input
-                            type="number"
-                            name="scan_workers"
-                            value="{{.Config.ScanWorkers}}"
-                            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-400 mb-2">Server Port</label>
-                        <input
-                            type="number"
-                            name="server_port"
-                            value="{{.Config.ServerPort}}"
-                            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
-                    </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Scan Workers</label>
+                    <input
+                        type="number"
+                        name="scan_workers"
+                        value="{{.Config.ScanWorkers}}"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Scan Paths Configuration -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h3 class="text-xl font-semibold mb-4">Scan Paths</h3>
+            <p class="text-sm text-gray-400 mb-4">Directories to scan for media files (one per line)</p>
+            <textarea
+                name="scan_paths"
+                rows="3"
+                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 font-mono text-sm"
+                placeholder="/media&#10;/downloads">{{range .Config.ScanPaths}}{{.}}&#10;{{end}}</textarea>
+        </div>
+
+        <!-- Path Mappings Configuration -->
+        <div class="bg-gray-800 rounded-lg p-6">
+            <h3 class="text-xl font-semibold mb-4">Path Mappings</h3>
+            <p class="text-sm text-gray-400 mb-4">Configure container-to-host path translations</p>
+
+            <div class="space-y-6">
+                <!-- Local Path Mappings -->
+                <div>
+                    <h4 class="text-lg font-medium mb-2">Local Path Mappings</h4>
+                    <p class="text-xs text-gray-500 mb-2">Format: container_path=host_path (one per line)</p>
+                    <textarea
+                        name="local_path_mappings"
+                        rows="3"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 font-mono text-sm"
+                        placeholder="/media=/mnt/user/data/media&#10;/downloads=/mnt/user/data/downloads/torrents">{{range .Config.LocalPathMappings}}{{.Container}}={{.Host}}&#10;{{end}}</textarea>
+                </div>
+
+                <!-- Service Path Mappings -->
+                <div>
+                    <h4 class="text-lg font-medium mb-2">Service-Specific Path Mappings</h4>
+                    <p class="text-xs text-gray-500 mb-4">Format: service:container_path=host_path (one per line)</p>
+                    <textarea
+                        name="service_path_mappings"
+                        rows="8"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 font-mono text-sm"
+                        placeholder="plex:/media=/mnt/user/data/media&#10;sonarr:/tv=/mnt/user/data/media/tv&#10;sonarr:/downloads=/mnt/user/data/downloads/torrents&#10;radarr:/movies=/mnt/user/data/media/movies&#10;radarr:/downloads=/mnt/user/data/downloads/torrents&#10;qbittorrent:/downloads=/mnt/user/data/downloads/torrents">{{range $service, $mappings := .Config.ServicePathMappings}}{{range $mappings}}{{$service}}:{{.Container}}={{.Host}}&#10;{{end}}{{end}}</textarea>
                 </div>
             </div>
         </div>
@@ -46,7 +77,7 @@
                     type="button"
                     hx-get="/api/config/test?service=plex"
                     hx-indicator="#plex-test-indicator"
-                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative">
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative cursor-pointer">
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="plex-test-indicator">
                         <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -85,7 +116,7 @@
                     type="button"
                     hx-get="/api/config/test?service=sonarr"
                     hx-indicator="#sonarr-test-indicator"
-                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative">
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative cursor-pointer">
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="sonarr-test-indicator">
                         <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -124,7 +155,7 @@
                     type="button"
                     hx-get="/api/config/test?service=radarr"
                     hx-indicator="#radarr-test-indicator"
-                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative">
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative cursor-pointer">
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="radarr-test-indicator">
                         <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -163,7 +194,7 @@
                     type="button"
                     hx-get="/api/config/test?service=qbittorrent"
                     hx-indicator="#qbit-test-indicator"
-                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative">
+                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative cursor-pointer">
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="qbit-test-indicator">
                         <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -217,7 +248,7 @@
         <div class="flex justify-end space-x-4">
             <button
                 type="submit"
-                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
+                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded transition cursor-pointer">
                 Save Configuration
             </button>
         </div>
