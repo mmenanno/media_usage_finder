@@ -9,9 +9,9 @@ class ToastManager {
     createContainer() {
         const container = document.createElement('div');
         container.id = 'toast-container';
-        container.className = 'fixed top-4 right-4 z-50 space-y-2 pr-4';
+        container.className = 'fixed top-4 z-50 space-y-2';
+        container.style.right = '1rem';
         container.style.maxWidth = '400px';
-        container.style.marginRight = '1rem';
         document.body.appendChild(container);
         return container;
     }

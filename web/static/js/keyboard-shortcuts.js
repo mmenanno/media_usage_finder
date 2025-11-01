@@ -24,8 +24,8 @@ class KeyboardShortcuts {
             if (e.target.tagName === 'INPUT' ||
                 e.target.tagName === 'TEXTAREA' ||
                 e.target.isContentEditable) {
-                // Exception: allow '/' to focus search even from input
-                if (e.key === '/' && e.target.id !== 'search-input') {
+                // Exception: allow '/' to focus search from input fields (but not textareas)
+                if (e.key === '/' && e.target.tagName !== 'TEXTAREA' && e.target.id !== 'search-input') {
                     e.preventDefault();
                     this.focusSearch();
                 }

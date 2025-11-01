@@ -98,7 +98,7 @@ type DashboardData struct {
 type FilesData struct {
 	Files      interface{}
 	Total      int
-	Page       int
+	Page       int64
 	Limit      int
 	TotalPages int
 	Title      string
@@ -124,7 +124,7 @@ type StatsData struct {
 type HardlinksData struct {
 	Groups     interface{}
 	Total      int
-	Page       int
+	Page       int64
 	TotalPages int
 	Title      string
 }
@@ -133,7 +133,7 @@ type HardlinksData struct {
 type ScansData struct {
 	Scans      interface{}
 	Total      int
-	Page       int
+	Page       int64
 	TotalPages int
 	Title      string
 }

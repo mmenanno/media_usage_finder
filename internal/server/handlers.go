@@ -193,7 +193,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	data := FilesData{
 		Files:      filesWithUsage,
 		Total:      total,
-		Page:       page,
+		Page:       int64(page),
 		Limit:      limit,
 		TotalPages: CalculateTotalPages(total, limit),
 		Title:      "Files",
@@ -303,7 +303,7 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 	data := HardlinksData{
 		Groups:     paginatedGroups,
 		Total:      total,
-		Page:       page,
+		Page:       int64(page),
 		TotalPages: CalculateTotalPages(total, limit),
 		Title:      "Hardlink Groups",
 	}
@@ -329,7 +329,7 @@ func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
 	data := ScansData{
 		Scans:      scans,
 		Total:      total,
-		Page:       page,
+		Page:       int64(page),
 		TotalPages: CalculateTotalPages(total, limit),
 		Title:      "Scan History",
 	}
@@ -860,6 +860,188 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 		Service: serviceName,
 	}
 	respondJSON(w, http.StatusOK, response)
+}
+
+// HandleTestScanPaths tests if configured scan paths exist and are accessible
+func (s *Server) HandleTestScanPaths(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Parse scan paths from form data
+	scanPathsStr := r.FormValue("scan_paths")
+	if scanPathsStr == "" {
+		w.Header().Set("X-Toast-Message", "No scan paths provided")
+		w.Header().Set("X-Toast-Type", "warning")
+		respondSuccess(w, "No paths to test", nil)
+		return
+	}
+
+	lines := strings.Split(scanPathsStr, "\n")
+	var paths []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			paths = append(paths, line)
+		}
+	}
+
+	if len(paths) == 0 {
+		w.Header().Set("X-Toast-Message", "No valid scan paths found")
+		w.Header().Set("X-Toast-Type", "warning")
+		respondSuccess(w, "No paths to test", nil)
+		return
+	}
+
+	// Test each path
+	var results []string
+	var errors []string
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				errors = append(errors, fmt.Sprintf("%s: does not exist", path))
+			} else if os.IsPermission(err) {
+				errors = append(errors, fmt.Sprintf("%s: permission denied", path))
+			} else {
+				errors = append(errors, fmt.Sprintf("%s: %v", path, err))
+			}
+		} else if !info.IsDir() {
+			errors = append(errors, fmt.Sprintf("%s: not a directory", path))
+		} else {
+			results = append(results, fmt.Sprintf("%s: OK (accessible directory)", path))
+		}
+	}
+
+	// Send response
+	if len(errors) > 0 {
+		message := fmt.Sprintf("Found %d issue(s): %s", len(errors), strings.Join(errors, "; "))
+		w.Header().Set("X-Toast-Message", message)
+		w.Header().Set("X-Toast-Type", "error")
+		respondError(w, http.StatusBadRequest, message, "path_test_failed")
+		return
+	}
+
+	message := fmt.Sprintf("All %d scan path(s) validated successfully", len(results))
+	w.Header().Set("X-Toast-Message", message)
+	w.Header().Set("X-Toast-Type", "success")
+	respondSuccess(w, message, nil)
+}
+
+// HandleTestPathMappings validates path mapping syntax and tests paths
+func (s *Server) HandleTestPathMappings(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	localMappingsStr := r.FormValue("local_path_mappings")
+	serviceMappingsStr := r.FormValue("service_path_mappings")
+
+	if localMappingsStr == "" && serviceMappingsStr == "" {
+		w.Header().Set("X-Toast-Message", "No path mappings provided")
+		w.Header().Set("X-Toast-Type", "warning")
+		respondSuccess(w, "No mappings to test", nil)
+		return
+	}
+
+	var errors []string
+	var successes []string
+	mappingCount := 0
+
+	// Test local path mappings
+	if localMappingsStr != "" {
+		lines := strings.Split(localMappingsStr, "\n")
+		for i, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			mappingCount++
+
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) != 2 {
+				errors = append(errors, fmt.Sprintf("Line %d: invalid format (expected 'container=host')", i+1))
+				continue
+			}
+
+			container := strings.TrimSpace(parts[0])
+			host := strings.TrimSpace(parts[1])
+
+			if container == "" || host == "" {
+				errors = append(errors, fmt.Sprintf("Line %d: empty container or host path", i+1))
+				continue
+			}
+
+			// Test host path
+			if _, err := os.Stat(host); err != nil {
+				errors = append(errors, fmt.Sprintf("%s=%s: host path error: %v", container, host, err))
+			} else {
+				successes = append(successes, fmt.Sprintf("%s=%s: OK", container, host))
+			}
+		}
+	}
+
+	// Test service path mappings
+	if serviceMappingsStr != "" {
+		lines := strings.Split(serviceMappingsStr, "\n")
+		for i, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			mappingCount++
+
+			// Split service:path=host
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) != 2 {
+				errors = append(errors, fmt.Sprintf("Service line %d: invalid format (expected 'service:container=host')", i+1))
+				continue
+			}
+
+			service := strings.TrimSpace(parts[0])
+			pathParts := strings.SplitN(parts[1], "=", 2)
+			if len(pathParts) != 2 {
+				errors = append(errors, fmt.Sprintf("Service line %d: invalid format (expected 'service:container=host')", i+1))
+				continue
+			}
+
+			container := strings.TrimSpace(pathParts[0])
+			host := strings.TrimSpace(pathParts[1])
+
+			if service == "" || container == "" || host == "" {
+				errors = append(errors, fmt.Sprintf("Service line %d: empty service, container, or host path", i+1))
+				continue
+			}
+
+			// Test host path
+			if _, err := os.Stat(host); err != nil {
+				errors = append(errors, fmt.Sprintf("%s:%s=%s: host path error: %v", service, container, host, err))
+			} else {
+				successes = append(successes, fmt.Sprintf("%s:%s=%s: OK", service, container, host))
+			}
+		}
+	}
+
+	// Send response
+	if len(errors) > 0 {
+		message := fmt.Sprintf("Found %d issue(s) in %d mapping(s): %s", len(errors), mappingCount, strings.Join(errors, "; "))
+		w.Header().Set("X-Toast-Message", message)
+		w.Header().Set("X-Toast-Type", "error")
+		respondError(w, http.StatusBadRequest, message, "mapping_test_failed")
+		return
+	}
+
+	if mappingCount == 0 {
+		w.Header().Set("X-Toast-Message", "No valid mappings found")
+		w.Header().Set("X-Toast-Type", "warning")
+		respondSuccess(w, "No mappings to test", nil)
+		return
+	}
+
+	message := fmt.Sprintf("All %d path mapping(s) validated successfully", len(successes))
+	w.Header().Set("X-Toast-Message", message)
+	w.Header().Set("X-Toast-Type", "success")
+	respondSuccess(w, message, nil)
 }
 
 // HandleExport exports files list using streaming for memory efficiency

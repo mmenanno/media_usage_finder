@@ -266,6 +266,17 @@ func (db *DB) GetCurrentScan() (*Scan, error) {
 		scan.Errors = &errors.String
 	}
 
+	// Check if scan is stale (running for more than 24 hours)
+	// This handles cases where the app crashed before updating scan status
+	if time.Since(scan.StartedAt) > 24*time.Hour {
+		log.Printf("Found stale running scan (ID: %d, started: %v), marking as interrupted", scan.ID, scan.StartedAt)
+		errMsg := "Scan interrupted - exceeded maximum runtime of 24 hours"
+		if err := db.UpdateScan(scan.ID, "interrupted", scan.FilesScanned, &errMsg); err != nil {
+			log.Printf("Failed to update stale scan status: %v", err)
+		}
+		return nil, nil // Return no current scan
+	}
+
 	return scan, nil
 }
 
