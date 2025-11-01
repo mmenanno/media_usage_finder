@@ -6,6 +6,6 @@
     "build:css": "tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --minify"
   },
   "devDependencies": {
-    "tailwindcss": "^4.1.16"
+    "@tailwindcss/cli": "^4.1.16"
   }
 }
