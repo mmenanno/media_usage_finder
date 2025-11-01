@@ -24,6 +24,11 @@ func Logger(next http.Handler) http.Handler {
 
 		next.ServeHTTP(wrapped, r)
 
+		// Skip logging successful health checks to reduce log noise
+		if r.RequestURI == "/health" && wrapped.statusCode == http.StatusOK {
+			return
+		}
+
 		requestID := GetRequestID(r.Context())
 		log.Printf(
 			"[%s] %s %s %d %s",
