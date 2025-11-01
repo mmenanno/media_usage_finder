@@ -48,6 +48,3 @@ web/static/css/styles.css
 tmp/
 temp/
 
-# Package files
-package-lock.json
-
