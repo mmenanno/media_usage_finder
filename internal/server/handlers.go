@@ -474,6 +474,36 @@ func (s *Server) HandleStartScan(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, response)
 }
 
+// HandleCancelScan gracefully cancels the current scan
+func (s *Server) HandleCancelScan(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	if s.scanner.Cancel() {
+		w.Header().Set("X-Toast-Message", "Scan cancelled successfully")
+		w.Header().Set("X-Toast-Type", "info")
+		respondSuccess(w, "Scan cancelled", nil)
+	} else {
+		respondError(w, http.StatusConflict, "No scan is currently running", "no_scan_running")
+	}
+}
+
+// HandleForceStopScan immediately terminates the current scan
+func (s *Server) HandleForceStopScan(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	if s.scanner.ForceStop() {
+		w.Header().Set("X-Toast-Message", "Scan force stopped")
+		w.Header().Set("X-Toast-Type", "warning")
+		respondSuccess(w, "Scan force stopped", nil)
+	} else {
+		respondError(w, http.StatusConflict, "No scan is currently running", "no_scan_running")
+	}
+}
+
 // HandleScanProgress returns the current scan progress
 func (s *Server) HandleScanProgress(w http.ResponseWriter, r *http.Request) {
 	progress := s.scanner.GetProgress()
@@ -560,6 +590,23 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 					<div class="text-gray-500 text-xs">ETA</div>
 					<div class="text-gray-200 font-medium">%s</div>
 				</div>
+			</div>
+
+			<div class="flex justify-end space-x-2 pt-2 border-t border-gray-700">
+				<button
+					hx-post="/api/scan/cancel"
+					hx-swap="none"
+					hx-confirm="Cancel the current scan gracefully? The scan will finish processing the current file before stopping."
+					class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm transition cursor-pointer">
+					Cancel Scan
+				</button>
+				<button
+					hx-post="/api/scan/force-stop"
+					hx-swap="none"
+					hx-confirm="Force stop the scan immediately? This may leave the database in an inconsistent state."
+					class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition cursor-pointer">
+					Force Stop
+				</button>
 			</div>
 		</div>
 	`,

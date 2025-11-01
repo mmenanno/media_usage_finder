@@ -32,6 +32,8 @@ func (s *Server) Run() error {
 
 	// API routes
 	mux.HandleFunc("/api/scan/start", s.HandleStartScan)
+	mux.HandleFunc("/api/scan/cancel", s.HandleCancelScan)
+	mux.HandleFunc("/api/scan/force-stop", s.HandleForceStopScan)
 	mux.HandleFunc("/api/scan/progress", s.HandleScanProgress)
 	mux.HandleFunc("/api/scan/progress-html", s.HandleScanProgressHTML)
 	mux.HandleFunc("/api/scan/logs", s.HandleScanLogs)

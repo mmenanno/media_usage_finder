@@ -36,6 +36,36 @@ func (s *Scanner) SetOnScanComplete(callback func()) {
 	s.onScanComplete = callback
 }
 
+// Cancel gracefully stops the current scan
+func (s *Scanner) Cancel() bool {
+	if s.cancel != nil {
+		log.Println("Gracefully cancelling scan...")
+		if s.progress != nil {
+			s.progress.SetPhase("Cancelling")
+			s.progress.Log("Scan cancelled by user")
+		}
+		s.cancel()
+		return true
+	}
+	return false
+}
+
+// ForceStop immediately terminates the current scan
+func (s *Scanner) ForceStop() bool {
+	if s.cancel != nil {
+		log.Println("Force stopping scan...")
+		if s.progress != nil {
+			s.progress.SetPhase("Force Stopped")
+			s.progress.Log("Scan force stopped by user")
+		}
+		s.cancel()
+		// For force stop, we call cancel immediately without grace period
+		// The context cancellation will propagate and stop all operations
+		return true
+	}
+	return false
+}
+
 // Scan performs a full or incremental scan
 func (s *Scanner) Scan(ctx context.Context, incremental bool) error {
 	// Check if there's already a running scan
@@ -418,11 +448,4 @@ func (s *Scanner) updateServiceUsageWithTimeout(serviceName string, getFiles fun
 // GetProgress returns the current scan progress
 func (s *Scanner) GetProgress() *Progress {
 	return s.progress
-}
-
-// Cancel cancels the current scan
-func (s *Scanner) Cancel() {
-	if s.cancel != nil {
-		s.cancel()
-	}
 }
