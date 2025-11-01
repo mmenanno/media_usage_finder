@@ -49,6 +49,3 @@ Thumbs.db
 tmp/
 temp/
 
-# Package manager
-package-lock.json
-
