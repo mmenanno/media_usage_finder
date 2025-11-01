@@ -20,6 +20,13 @@ class KeyboardShortcuts {
 
     setupListeners() {
         document.addEventListener('keydown', (e) => {
+            // Prevent Enter from submitting form when in textarea
+            if (e.key === 'Enter' && e.target.tagName === 'TEXTAREA') {
+                // Allow normal Enter behavior (newline) in textarea
+                // Don't preventDefault - let it insert newline
+                return;
+            }
+
             // Don't trigger shortcuts when typing in input fields
             if (e.target.tagName === 'INPUT' ||
                 e.target.tagName === 'TEXTAREA' ||
