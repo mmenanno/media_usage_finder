@@ -18,7 +18,7 @@ RUN go mod download
 COPY . .
 
 # Build Tailwind CSS
-RUN tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --minify
+RUN /usr/local/bin/tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --minify
 
 # Build Go binary
 RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-X main.Version=$(cat VERSION)" -o /app/bin/media-finder ./cmd/media-finder
