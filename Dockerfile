@@ -2,7 +2,8 @@
 FROM golang:1.25-alpine AS builder
 
 # Install Node.js, npm, and build tools for Tailwind CSS and CGO
-RUN apk add --no-cache nodejs npm git gcc musl-dev
+# sqlite-dev is required for FTS5 support in go-sqlite3
+RUN apk add --no-cache nodejs npm git gcc musl-dev sqlite-dev
 
 WORKDIR /app
 
