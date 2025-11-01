@@ -1,8 +1,8 @@
 # Build stage
 FROM golang:1.25-alpine AS builder
 
-# Install Node.js and npm for Tailwind CSS
-RUN apk add --no-cache nodejs npm git
+# Install Node.js, npm, and build tools for Tailwind CSS and CGO
+RUN apk add --no-cache nodejs npm git gcc musl-dev
 
 WORKDIR /app
 
