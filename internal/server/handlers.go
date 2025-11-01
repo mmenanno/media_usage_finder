@@ -104,6 +104,10 @@ func (s *Server) LoadTemplates(pattern string) error {
 
 // HandleIndex serves the dashboard page
 func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
+	// Trigger stale scan cleanup by calling GetCurrentScan
+	// This will mark any stale running scans as interrupted
+	_, _ = s.db.GetCurrentScan()
+
 	statistics := s.getStats()
 	if statistics == nil {
 		log.Println("ERROR: Failed to calculate dashboard stats")
@@ -111,9 +115,13 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if there's an active scan to conditionally render SSE connection
+	hasActiveScan := s.scanner.GetProgress() != nil
+
 	data := DashboardData{
-		Stats: statistics,
-		Title: "Dashboard",
+		Stats:         statistics,
+		Title:         "Dashboard",
+		HasActiveScan: hasActiveScan,
 	}
 
 	s.renderTemplate(w, "dashboard.html", data)
@@ -314,6 +322,10 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 
 // HandleScans serves the scan history page
 func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
+	// Trigger stale scan cleanup by calling GetCurrentScan
+	// This will mark any stale running scans as interrupted
+	_, _ = s.db.GetCurrentScan()
+
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	page = ValidatePage(page)
 
