@@ -9,8 +9,8 @@ WORKDIR /app
 # Copy package files for npm
 COPY package*.json ./
 
-# Install npm dependencies
-RUN npm ci --only=production || npm install --production
+# Install npm dependencies (including devDependencies for tailwindcss)
+RUN npm ci || npm install
 
 # Copy go mod files
 COPY go.mod go.sum ./
