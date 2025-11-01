@@ -1063,10 +1063,10 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"formatSize":     stats.FormatSize,
 		"formatDuration": stats.FormatDuration,
-		"add": func(a, b int) int {
+		"add": func(a, b int64) int64 {
 			return a + b
 		},
-		"sub": func(a, b int) int {
+		"sub": func(a, b int64) int64 {
 			return a - b
 		},
 		"mul": func(a, b interface{}) float64 {
