@@ -24,7 +24,7 @@ class BatchSelection {
         document.body.addEventListener('htmx:beforeRequest', (event) => {
             // Clear selection when navigating away from files page
             const url = event.detail.path;
-            if (!url.includes('/files') && this.selectedFiles.size > 0) {
+            if (url && !url.includes('/files') && this.selectedFiles.size > 0) {
                 this.clearSelection();
             }
         });
