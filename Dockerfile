@@ -28,8 +28,8 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-X main.Version=$(cat VERSION)" 
 # Runtime stage
 FROM alpine:latest
 
-# Install ca-certificates, sqlite libs, and wget for healthcheck
-RUN apk --no-cache add ca-certificates sqlite-libs wget
+# Install ca-certificates, sqlite (full package with FTS5), and wget for healthcheck
+RUN apk --no-cache add ca-certificates sqlite wget
 
 WORKDIR /app
 
