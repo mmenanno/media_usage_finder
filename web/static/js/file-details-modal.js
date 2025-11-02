@@ -164,19 +164,19 @@ class FileDetailsModal {
                         <div class="flex space-x-2">
                             <button
                                 hx-post="/api/files/mark-rescan?id=${fileData.id}"
-                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition cursor-pointer">
                                 Mark for Rescan
                             </button>
                             <button
                                 hx-delete="/api/files/delete?id=${fileData.id}"
                                 hx-confirm="Are you sure you want to delete this file? This action cannot be undone."
-                                class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition">
+                                class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition cursor-pointer">
                                 Delete File
                             </button>
                         </div>
                         <button
                             onclick="fileDetailsModal.hide()"
-                            class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded transition">
+                            class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded transition cursor-pointer">
                             Close
                         </button>
                     </div>

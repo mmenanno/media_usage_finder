@@ -190,13 +190,13 @@
                                     data-file-id="{{.File.ID}}"
                                     data-action="show-details"
                                     aria-label="View file details"
-                                    class="text-green-400 hover:text-green-300 whitespace-nowrap text-left sm:text-center">
+                                    class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm transition cursor-pointer whitespace-nowrap">
                                     Details
                                 </button>
                                 <button
                                     hx-post="/api/files/mark-rescan?id={{.File.ID}}"
                                     aria-label="Mark file for rescan"
-                                    class="text-blue-400 hover:text-blue-300 whitespace-nowrap text-left sm:text-center">
+                                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer whitespace-nowrap">
                                     Rescan
                                 </button>
                                 <button
@@ -205,7 +205,7 @@
                                     hx-target="closest tr"
                                     hx-swap="outerHTML"
                                     aria-label="Delete file"
-                                    class="text-red-400 hover:text-red-300 whitespace-nowrap text-left sm:text-center">
+                                    class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition cursor-pointer whitespace-nowrap">
                                     Delete
                                 </button>
                             </div>
