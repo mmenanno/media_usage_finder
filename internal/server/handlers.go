@@ -1017,6 +1017,16 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		validationErrors = append(validationErrors, fmt.Sprintf("qBittorrent proxy URL: %v", err))
 	}
 
+	// Validate Stash config
+	stashURL := r.FormValue("stash_url")
+	if err := ValidateURL(stashURL); err != nil {
+		validationErrors = append(validationErrors, fmt.Sprintf("Stash URL: %v", err))
+	}
+	stashAPIKey := r.FormValue("stash_api_key")
+	if err := ValidateAPIKey(stashAPIKey); err != nil {
+		validationErrors = append(validationErrors, fmt.Sprintf("Stash API key: %v", err))
+	}
+
 	// If there are validation errors, show them in the error panel
 	if len(validationErrors) > 0 {
 		s.renderValidationErrors(w, "Configuration Validation Failed", validationErrors)
@@ -1037,6 +1047,9 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	s.config.Services.QBittorrent.Username = r.FormValue("qbittorrent_username")
 	s.config.Services.QBittorrent.Password = r.FormValue("qbittorrent_password")
 	s.config.Services.QBittorrent.QuiProxyURL = qbProxyURL
+
+	s.config.Services.Stash.URL = stashURL
+	s.config.Services.Stash.APIKey = stashAPIKey
 
 	// Parse scan paths (one per line)
 	if scanPathsStr := r.FormValue("scan_paths"); scanPathsStr != "" {
@@ -1131,6 +1144,8 @@ func getServiceDisplayName(serviceName string) string {
 		return "Radarr"
 	case "qbittorrent":
 		return "qBittorrent"
+	case "stash":
+		return "Stash"
 	default:
 		return serviceName
 	}
@@ -1193,6 +1208,17 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 			testConfig.Services.QBittorrent.Username = strings.TrimSpace(r.FormValue("qbittorrent_username"))
 			testConfig.Services.QBittorrent.Password = strings.TrimSpace(r.FormValue("qbittorrent_password"))
 			testConfig.Services.QBittorrent.QuiProxyURL = strings.TrimSpace(r.FormValue("qbittorrent_qui_proxy_url"))
+		}
+	case "stash":
+		url := strings.TrimSpace(r.FormValue("stash_url"))
+		apiKey := strings.TrimSpace(r.FormValue("stash_api_key"))
+		if url == "" {
+			missingField = "Stash URL"
+		} else if apiKey == "" {
+			missingField = "Stash API Key"
+		} else {
+			testConfig.Services.Stash.URL = url
+			testConfig.Services.Stash.APIKey = apiKey
 		}
 	}
 

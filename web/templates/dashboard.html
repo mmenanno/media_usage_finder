@@ -197,6 +197,13 @@
                 <div class="text-sm text-gray-400 mt-1">Check qBittorrent only</div>
             </button>
             <button
+                hx-post="/api/scan/update-service?service=stash"
+                hx-swap="none"
+                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer">
+                <div class="text-lg font-medium">Update Stash</div>
+                <div class="text-sm text-gray-400 mt-1">Check Stash only</div>
+            </button>
+            <button
                 hx-post="/api/scan/recalculate-orphaned"
                 hx-swap="none"
                 class="p-4 bg-orange-600 hover:bg-orange-700 rounded transition text-center cursor-pointer">
