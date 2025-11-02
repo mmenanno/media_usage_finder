@@ -1337,10 +1337,11 @@ func (s *Server) getSampleArrFilePath(url, apiKey, pathPrefix, serviceType strin
 	// Create temporary config for testing
 	testConfig := *s.config
 
-	if serviceType == "sonarr" {
+	switch serviceType {
+	case "sonarr":
 		testConfig.Services.Sonarr.URL = url
 		testConfig.Services.Sonarr.APIKey = apiKey
-	} else if serviceType == "radarr" {
+	case "radarr":
 		testConfig.Services.Radarr.URL = url
 		testConfig.Services.Radarr.APIKey = apiKey
 	}
@@ -1353,7 +1354,8 @@ func (s *Server) getSampleArrFilePath(url, apiKey, pathPrefix, serviceType strin
 	}
 
 	// Cast to appropriate client type to access GetAllFiles
-	if serviceType == "sonarr" {
+	switch serviceType {
+	case "sonarr":
 		sonarrClient, ok := client.(*api.SonarrClient)
 		if !ok {
 			return "", fmt.Errorf("failed to cast to SonarrClient")
@@ -1369,7 +1371,7 @@ func (s *Server) getSampleArrFilePath(url, apiKey, pathPrefix, serviceType strin
 				return file.Path, nil
 			}
 		}
-	} else if serviceType == "radarr" {
+	case "radarr":
 		radarrClient, ok := client.(*api.RadarrClient)
 		if !ok {
 			return "", fmt.Errorf("failed to cast to RadarrClient")
