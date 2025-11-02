@@ -25,10 +25,23 @@ class ModalManager {
             event.preventDefault();
 
             const question = event.detail.question;
+            const target = event.target;
 
             this.confirm(question).then((result) => {
                 if (result) {
+                    // Temporarily remove hx-confirm to prevent double confirmation
+                    const confirmValue = target.getAttribute('hx-confirm');
+                    target.removeAttribute('hx-confirm');
+
+                    // Issue the request
                     event.detail.issueRequest();
+
+                    // Restore hx-confirm after a brief delay
+                    setTimeout(() => {
+                        if (confirmValue) {
+                            target.setAttribute('hx-confirm', confirmValue);
+                        }
+                    }, 0);
                 }
             });
         });

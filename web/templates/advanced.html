@@ -146,6 +146,7 @@
                 <p class="text-sm text-gray-400 mb-4">Run VACUUM and ANALYZE to reclaim space and update statistics</p>
                 <button
                     hx-post="/api/admin/vacuum"
+                    hx-swap="none"
                     class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors w-full cursor-pointer">
                     Optimize Database
                 </button>
@@ -157,6 +158,7 @@
                 <p class="text-sm text-gray-400 mb-4">Recreate the full-text search index for file paths</p>
                 <button
                     hx-post="/api/admin/rebuild-fts"
+                    hx-swap="none"
                     class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors w-full cursor-pointer">
                     Rebuild Search Index
                 </button>
@@ -168,6 +170,7 @@
                 <p class="text-sm text-gray-400 mb-4">Update orphaned flags for all files based on current usage</p>
                 <button
                     hx-post="/api/admin/recalculate-orphaned"
+                    hx-swap="none"
                     class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors w-full cursor-pointer">
                     Recalculate Orphaned
                 </button>
@@ -179,6 +182,7 @@
                 <p class="text-sm text-gray-400 mb-4">Mark old running scans as interrupted (>1 hour old)</p>
                 <button
                     hx-post="/api/admin/clean-stale-scans"
+                    hx-swap="none"
                     class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors w-full cursor-pointer">
                     Clean Stale Scans
                 </button>
@@ -193,7 +197,7 @@
             <div class="bg-gray-700 rounded-lg p-4">
                 <h4 class="font-medium mb-2">Export All Data</h4>
                 <p class="text-sm text-gray-400 mb-4">Download complete database as JSON</p>
-                <a href="/api/export" download="media-usage-finder-export.json"
+                <a href="/api/export?format=json" download="media-usage-finder-export.json"
                    class="inline-block px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors w-full text-center no-underline hover:no-underline cursor-pointer">
                     Export to JSON
                 </a>
