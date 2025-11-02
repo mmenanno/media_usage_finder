@@ -76,7 +76,10 @@ CREATE TABLE IF NOT EXISTS scans (
 	errors TEXT,
 	scan_type TEXT NOT NULL DEFAULT 'full' CHECK(scan_type IN ('full', 'incremental')),
 	current_phase TEXT,
-	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+	last_processed_path TEXT,
+	resume_from_scan_id INTEGER,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (resume_from_scan_id) REFERENCES scans(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_scans_status ON scans(status);
@@ -177,4 +180,13 @@ END;
 const migrateAddCurrentPhase = `
 -- Add current_phase column to scans table
 ALTER TABLE scans ADD COLUMN current_phase TEXT;
+`
+
+// Migration to add resume tracking columns to scans table
+const migrateAddResumeTracking = `
+-- Add last_processed_path column to scans table
+ALTER TABLE scans ADD COLUMN last_processed_path TEXT;
+
+-- Add resume_from_scan_id column to scans table
+ALTER TABLE scans ADD COLUMN resume_from_scan_id INTEGER REFERENCES scans(id);
 `

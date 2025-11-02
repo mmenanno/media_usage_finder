@@ -127,6 +127,26 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 3: Add resume tracking columns to scans table if they don't exist
+	var hasLastProcessedPath int
+	err = db.conn.QueryRow(`
+		SELECT COUNT(*)
+		FROM pragma_table_info('scans')
+		WHERE name = 'last_processed_path'
+	`).Scan(&hasLastProcessedPath)
+
+	if err != nil {
+		return fmt.Errorf("failed to check for last_processed_path column: %w", err)
+	}
+
+	// If last_processed_path column doesn't exist, add both resume tracking columns
+	if hasLastProcessedPath == 0 {
+		_, err = db.conn.Exec(migrateAddResumeTracking)
+		if err != nil {
+			return fmt.Errorf("failed to add resume tracking columns: %w", err)
+		}
+	}
+
 	return nil
 }
 

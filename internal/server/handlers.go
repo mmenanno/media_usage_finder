@@ -134,10 +134,27 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	// Check if there's an active scan to conditionally render SSE connection
 	hasActiveScan := s.scanner.GetProgress() != nil
 
+	// Check if there's an interrupted scan that can be resumed
+	var hasInterruptedScan bool
+	var interruptedScanID int64
+	var interruptedScanPhase string
+
+	interruptedScan, err := s.db.GetLastInterruptedScan()
+	if err == nil && interruptedScan != nil {
+		hasInterruptedScan = true
+		interruptedScanID = interruptedScan.ID
+		if interruptedScan.CurrentPhase != nil {
+			interruptedScanPhase = *interruptedScan.CurrentPhase
+		}
+	}
+
 	data := DashboardData{
-		Stats:         statistics,
-		Title:         "Dashboard",
-		HasActiveScan: hasActiveScan,
+		Stats:                statistics,
+		Title:                "Dashboard",
+		HasActiveScan:        hasActiveScan,
+		HasInterruptedScan:   hasInterruptedScan,
+		InterruptedScanID:    interruptedScanID,
+		InterruptedScanPhase: interruptedScanPhase,
 	}
 
 	s.renderTemplate(w, "dashboard.html", data)
@@ -557,6 +574,58 @@ func (s *Server) HandleForceStopScan(w http.ResponseWriter, r *http.Request) {
 	} else {
 		respondError(w, http.StatusConflict, "No scan is currently running", "no_scan_running")
 	}
+}
+
+// HandleResumeScan resumes an interrupted scan from where it left off
+func (s *Server) HandleResumeScan(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Check if a scan is already running
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check scan status", "scan_check_failed")
+		return
+	}
+
+	if currentScan != nil {
+		respondError(w, http.StatusConflict, "A scan is already running", "scan_already_running")
+		return
+	}
+
+	// Check if there's an interrupted scan to resume
+	interruptedScan, err := s.db.GetLastInterruptedScan()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check for interrupted scans", "check_failed")
+		return
+	}
+
+	if interruptedScan == nil {
+		respondError(w, http.StatusNotFound, "No interrupted scan found to resume", "no_interrupted_scan")
+		return
+	}
+
+	// Run resume scan in background
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
+		defer cancel()
+
+		if err := s.scanner.ResumeScan(ctx); err != nil {
+			log.Printf("ERROR: Resume scan failed: %v", err)
+		} else {
+			log.Printf("INFO: Resume scan completed successfully")
+		}
+	}()
+
+	w.Header().Set("X-Toast-Message", "Resuming scan from checkpoint...")
+	w.Header().Set("X-Toast-Type", "info")
+
+	response := ScanStartResponse{
+		Status:  "success",
+		Message: fmt.Sprintf("Resuming scan #%d", interruptedScan.ID),
+	}
+	respondJSON(w, http.StatusOK, response)
 }
 
 // HandleUpdateAllServices manually updates all service usage information

@@ -90,9 +90,12 @@ type TestServiceResponse struct {
 
 // DashboardData represents data for the dashboard template
 type DashboardData struct {
-	Stats         interface{}
-	Title         string
-	HasActiveScan bool
+	Stats                interface{}
+	Title                string
+	HasActiveScan        bool
+	HasInterruptedScan   bool
+	InterruptedScanID    int64
+	InterruptedScanPhase string
 }
 
 // FilesData represents data for the files list template

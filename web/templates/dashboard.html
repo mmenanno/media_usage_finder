@@ -5,6 +5,17 @@
     <div class="flex justify-between items-center">
         <h2 class="text-3xl font-bold">Dashboard</h2>
         <div class="space-x-2">
+            {{if .HasInterruptedScan}}
+            <div class="inline-block mr-2">
+                <button
+                    hx-post="/api/scan/resume"
+                    hx-swap="none"
+                    class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded transition cursor-pointer">
+                    Resume Scan #{{.InterruptedScanID}}
+                </button>
+                <div class="text-xs text-yellow-300 mt-1 text-center">Last phase: {{.InterruptedScanPhase}}</div>
+            </div>
+            {{end}}
             <button
                 hx-post="/api/scan/start"
                 hx-swap="none"

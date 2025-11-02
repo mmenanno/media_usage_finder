@@ -66,15 +66,17 @@ type Usage struct {
 
 // Scan represents a scan operation
 type Scan struct {
-	ID           int64
-	StartedAt    time.Time
-	CompletedAt  *time.Time
-	Status       string
-	FilesScanned int64
-	Errors       *string
-	ScanType     string
-	CurrentPhase *string
-	CreatedAt    time.Time
+	ID                int64
+	StartedAt         time.Time
+	CompletedAt       *time.Time
+	Status            string
+	FilesScanned      int64
+	Errors            *string
+	ScanType          string
+	CurrentPhase      *string
+	LastProcessedPath *string
+	ResumeFromScanID  *int64
+	CreatedAt         time.Time
 }
 
 // UpsertFile inserts or updates a file record
@@ -204,6 +206,29 @@ func (db *DB) CreateScan(scanType string) (*Scan, error) {
 	return scan, nil
 }
 
+// CreateResumeScan creates a new scan that resumes from an interrupted scan
+func (db *DB) CreateResumeScan(scanType string, resumeFromScanID int64) (*Scan, error) {
+	query := `
+		INSERT INTO scans (started_at, status, scan_type, resume_from_scan_id)
+		VALUES (?, 'running', ?, ?)
+		RETURNING id
+	`
+
+	scan := &Scan{
+		StartedAt:        time.Now(),
+		Status:           "running",
+		ScanType:         scanType,
+		ResumeFromScanID: &resumeFromScanID,
+	}
+
+	err := db.conn.QueryRow(query, scan.StartedAt.Unix(), scanType, resumeFromScanID).Scan(&scan.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return scan, nil
+}
+
 // UpdateScan updates a scan record
 func (db *DB) UpdateScan(scanID int64, status string, filesScanned int64, errors *string) error {
 	completedAt := time.Now().Unix()
@@ -231,12 +256,19 @@ func (db *DB) UpdateScanPhase(scanID int64, phase string) error {
 	return err
 }
 
-// GetCurrentScan returns the currently running scan, if any
-func (db *DB) GetCurrentScan() (*Scan, error) {
+// UpdateScanCheckpoint updates the last_processed_path checkpoint for resume functionality
+func (db *DB) UpdateScanCheckpoint(scanID int64, lastPath string) error {
+	query := `UPDATE scans SET last_processed_path = ? WHERE id = ?`
+	_, err := db.conn.Exec(query, lastPath, scanID)
+	return err
+}
+
+// GetLastInterruptedScan returns the most recent interrupted scan that can be resumed
+func (db *DB) GetLastInterruptedScan() (*Scan, error) {
 	query := `
-		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, created_at
+		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, last_processed_path, resume_from_scan_id, created_at
 		FROM scans
-		WHERE status = 'running'
+		WHERE status = 'interrupted' AND current_phase = 'Scanning filesystem'
 		ORDER BY started_at DESC
 		LIMIT 1
 	`
@@ -246,6 +278,8 @@ func (db *DB) GetCurrentScan() (*Scan, error) {
 	var completedAt sql.NullInt64
 	var errors sql.NullString
 	var currentPhase sql.NullString
+	var lastProcessedPath sql.NullString
+	var resumeFromScanID sql.NullInt64
 
 	err := db.conn.QueryRow(query).Scan(
 		&scan.ID,
@@ -256,6 +290,8 @@ func (db *DB) GetCurrentScan() (*Scan, error) {
 		&errors,
 		&scan.ScanType,
 		&currentPhase,
+		&lastProcessedPath,
+		&resumeFromScanID,
 		&createdAt,
 	)
 
@@ -279,6 +315,74 @@ func (db *DB) GetCurrentScan() (*Scan, error) {
 	if currentPhase.Valid {
 		scan.CurrentPhase = &currentPhase.String
 	}
+	if lastProcessedPath.Valid {
+		scan.LastProcessedPath = &lastProcessedPath.String
+	}
+	if resumeFromScanID.Valid {
+		scan.ResumeFromScanID = &resumeFromScanID.Int64
+	}
+
+	return scan, nil
+}
+
+// GetCurrentScan returns the currently running scan, if any
+func (db *DB) GetCurrentScan() (*Scan, error) {
+	query := `
+		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, last_processed_path, resume_from_scan_id, created_at
+		FROM scans
+		WHERE status = 'running'
+		ORDER BY started_at DESC
+		LIMIT 1
+	`
+
+	scan := &Scan{}
+	var startedAt, createdAt int64
+	var completedAt sql.NullInt64
+	var errors sql.NullString
+	var currentPhase sql.NullString
+	var lastProcessedPath sql.NullString
+	var resumeFromScanID sql.NullInt64
+
+	err := db.conn.QueryRow(query).Scan(
+		&scan.ID,
+		&startedAt,
+		&completedAt,
+		&scan.Status,
+		&scan.FilesScanned,
+		&errors,
+		&scan.ScanType,
+		&currentPhase,
+		&lastProcessedPath,
+		&resumeFromScanID,
+		&createdAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	scan.StartedAt = time.Unix(startedAt, 0)
+	scan.CreatedAt = time.Unix(createdAt, 0)
+
+	if completedAt.Valid {
+		t := time.Unix(completedAt.Int64, 0)
+		scan.CompletedAt = &t
+	}
+	if errors.Valid {
+		scan.Errors = &errors.String
+	}
+	if currentPhase.Valid {
+		scan.CurrentPhase = &currentPhase.String
+	}
+	if lastProcessedPath.Valid {
+		scan.LastProcessedPath = &lastProcessedPath.String
+	}
+	if resumeFromScanID.Valid {
+		scan.ResumeFromScanID = &resumeFromScanID.Int64
+	}
 
 	return scan, nil
 }
@@ -294,7 +398,7 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 
 	// Get scans
 	query := `
-		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, created_at
+		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, last_processed_path, resume_from_scan_id, created_at
 		FROM scans
 		ORDER BY started_at DESC
 		LIMIT ? OFFSET ?
@@ -313,6 +417,8 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 		var completedAt sql.NullInt64
 		var errors sql.NullString
 		var currentPhase sql.NullString
+		var lastProcessedPath sql.NullString
+		var resumeFromScanID sql.NullInt64
 
 		err := rows.Scan(
 			&scan.ID,
@@ -323,6 +429,8 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 			&errors,
 			&scan.ScanType,
 			&currentPhase,
+			&lastProcessedPath,
+			&resumeFromScanID,
 			&createdAt,
 		)
 		if err != nil {
@@ -341,6 +449,12 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 		}
 		if currentPhase.Valid {
 			scan.CurrentPhase = &currentPhase.String
+		}
+		if lastProcessedPath.Valid {
+			scan.LastProcessedPath = &lastProcessedPath.String
+		}
+		if resumeFromScanID.Valid {
+			scan.ResumeFromScanID = &resumeFromScanID.Int64
 		}
 
 		scans = append(scans, scan)
