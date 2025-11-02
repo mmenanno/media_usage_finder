@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} - Media Usage Finder</title>
+    <link rel="icon" type="image/png" href="/static/logo.png">
     <link href="/static/css/styles.css" rel="stylesheet">
     <link href="/static/css/accessibility.css" rel="stylesheet">
 </head>
@@ -18,7 +19,10 @@
         <div class="container mx-auto px-4">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center space-x-8 flex-1">
-                    <h1 class="text-xl font-bold text-blue-400">Media Usage Finder</h1>
+                    <div class="flex items-center space-x-3">
+                        <img src="/static/logo.png" alt="Media Usage Finder Logo" class="w-10 h-10 rounded-lg">
+                        <h1 class="text-xl font-bold text-blue-400">Media Usage Finder</h1>
+                    </div>
                     <div class="hidden md:flex space-x-4">
                         <a href="/" class="px-3 py-2 rounded hover:bg-gray-700 transition {{if eq .Title "Dashboard"}}bg-gray-700 text-blue-400{{end}}">Dashboard</a>
                         <a href="/files" class="px-3 py-2 rounded hover:bg-gray-700 transition {{if eq .Title "Files"}}bg-gray-700 text-blue-400{{end}}">Files</a>
