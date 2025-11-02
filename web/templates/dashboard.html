@@ -89,14 +89,61 @@
     <div class="bg-gray-800 rounded-lg p-6">
         <h3 class="text-xl font-semibold mb-4">Scan Logs</h3>
         <div
+            id="scan-logs-container"
             class="bg-gray-900 rounded p-4 font-mono text-sm h-64 overflow-y-auto"
-            {{if .HasActiveScan}}hx-ext="sse"
+            hx-ext="sse"
             sse-connect="/api/scan/logs"
             sse-swap="message"
-            hx-swap="beforeend"{{else}}{{end}}>
-            <div class="text-gray-500">Waiting for scan activity...</div>
+            hx-swap="beforeend">
+            <div id="scan-logs-placeholder" class="text-gray-500">Waiting for scan activity...</div>
         </div>
     </div>
+
+    <script>
+    // Scan logs management
+    (function() {
+        const logsContainer = document.getElementById('scan-logs-container');
+        const placeholder = document.getElementById('scan-logs-placeholder');
+        let hasReceivedLogs = {{.HasActiveScan}};
+
+        if (logsContainer) {
+            // Clear placeholder when first log arrives
+            logsContainer.addEventListener('htmx:sseMessage', function(event) {
+                if (placeholder && !hasReceivedLogs) {
+                    placeholder.remove();
+                    hasReceivedLogs = true;
+                }
+
+                // Auto-scroll to bottom when new logs arrive
+                logsContainer.scrollTop = logsContainer.scrollHeight;
+            });
+
+            // Handle SSE connection errors
+            logsContainer.addEventListener('htmx:sseError', function(event) {
+                console.log('SSE connection error, will retry automatically');
+            });
+
+            // Monitor scan status changes to show/hide placeholder
+            const progressContainer = document.getElementById('progress-container');
+            if (progressContainer) {
+                progressContainer.addEventListener('htmx:afterSwap', function() {
+                    const scanningText = progressContainer.textContent;
+                    const isScanning = scanningText.includes('Scanning') || scanningText.includes('Checking');
+
+                    if (isScanning && placeholder && placeholder.parentNode) {
+                        // Scan started, ensure placeholder shows connecting message
+                        placeholder.textContent = 'Connecting to scan logs...';
+                        placeholder.className = 'text-blue-400';
+                    } else if (!isScanning && !hasReceivedLogs && placeholder && placeholder.parentNode) {
+                        // No scan running
+                        placeholder.textContent = 'Waiting for scan activity...';
+                        placeholder.className = 'text-gray-500';
+                    }
+                });
+            }
+        }
+    })();
+    </script>
 
     <!-- Quick Actions -->
     <div class="bg-gray-800 rounded-lg p-6">
