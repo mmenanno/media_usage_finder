@@ -1,0 +1,213 @@
+{{template "layout.html" .}}
+
+{{define "content"}}
+<div class="space-y-8">
+    <div class="flex justify-between items-center">
+        <h2 class="text-3xl font-bold">Advanced Settings</h2>
+    </div>
+
+    <!-- Warning Banner -->
+    <div class="bg-yellow-900/30 border-2 border-yellow-600 rounded-lg p-4 backdrop-blur-sm">
+        <div class="flex items-start space-x-3">
+            <svg class="w-6 h-6 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <div>
+                <h3 class="text-yellow-300 font-semibold">Caution: Advanced Operations</h3>
+                <p class="text-yellow-200 text-sm mt-1">These functions perform powerful operations on your database. Use with caution. Destructive operations cannot be undone.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Statistics -->
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-xl font-semibold mb-6">Database Statistics</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">Total Files</div>
+                <div class="text-2xl font-bold mt-1">{{.Stats.FileCount}}</div>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">Orphaned Files</div>
+                <div class="text-2xl font-bold mt-1 text-yellow-400">{{.Stats.OrphanedCount}}</div>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">Usage Records</div>
+                <div class="text-2xl font-bold mt-1">{{.Stats.UsageCount}}</div>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">Scan History</div>
+                <div class="text-2xl font-bold mt-1">{{.Stats.ScanCount}}</div>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">Hardlink Groups</div>
+                <div class="text-2xl font-bold mt-1 text-blue-400">{{.Stats.HardlinkGroups}}</div>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">Audit Log Entries</div>
+                <div class="text-2xl font-bold mt-1">{{.Stats.AuditLogCount}}</div>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">Database Size</div>
+                <div class="text-2xl font-bold mt-1">{{div .Stats.DatabaseSizeKB 1024}} MB</div>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="text-gray-400 text-sm">Space Saved</div>
+                <div class="text-2xl font-bold mt-1 text-green-400">{{formatSize .Stats.HardlinkSavings}}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Management (Destructive) -->
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-xl font-semibold mb-6 text-red-400">Data Management (Destructive)</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Clear Orphaned Files -->
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2">Clear Orphaned Files</h4>
+                <p class="text-sm text-gray-400 mb-4">Remove all files marked as orphaned ({{.Stats.OrphanedCount}} files)</p>
+                <button
+                    hx-post="/api/admin/clear-files?orphaned=true"
+                    hx-confirm="Clear {{.Stats.OrphanedCount}} orphaned files? This cannot be undone."
+                    class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors w-full">
+                    Clear Orphaned Files
+                </button>
+            </div>
+
+            <!-- Clear All Files -->
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2 text-red-400">Clear All Files</h4>
+                <p class="text-sm text-gray-400 mb-4">Remove ALL file records from database ({{.Stats.FileCount}} files)</p>
+                <button
+                    hx-post="/api/admin/clear-files"
+                    hx-confirm="⚠️ Clear ALL {{.Stats.FileCount}} files? This will delete all file and usage data. This cannot be undone!"
+                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors w-full">
+                    Clear All Files
+                </button>
+            </div>
+
+            <!-- Clear Scan History -->
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2">Clear Scan History</h4>
+                <p class="text-sm text-gray-400 mb-4">Remove completed scan records ({{.Stats.ScanCount}} scans)</p>
+                <button
+                    hx-post="/api/admin/clear-scans"
+                    hx-confirm="Clear scan history? This will delete {{.Stats.ScanCount}} scan records."
+                    class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors w-full">
+                    Clear Scan History
+                </button>
+            </div>
+
+            <!-- Clear All Usage -->
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2">Clear Service Usage</h4>
+                <p class="text-sm text-gray-400 mb-4">Remove all usage tracking data ({{.Stats.UsageCount}} records)</p>
+                <button
+                    hx-post="/api/admin/clear-usage"
+                    hx-confirm="Clear all usage records? Files will be marked orphaned until next scan."
+                    class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors w-full">
+                    Clear All Usage
+                </button>
+            </div>
+
+            <!-- Clear Configuration -->
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2 text-red-400">Reset Configuration</h4>
+                <p class="text-sm text-gray-400 mb-4">Remove all configuration settings</p>
+                <button
+                    hx-post="/api/admin/clear-config"
+                    hx-confirm="⚠️ Reset ALL configuration? You will need to reconfigure all services."
+                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors w-full">
+                    Reset Configuration
+                </button>
+            </div>
+
+            <!-- Clear Old Audit Logs -->
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2">Clear Old Audit Logs</h4>
+                <p class="text-sm text-gray-400 mb-4">Remove audit entries older than 90 days</p>
+                <button
+                    hx-post="/api/admin/clear-audit-log?days=90"
+                    hx-confirm="Clear audit log entries older than 90 days?"
+                    class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors w-full">
+                    Clear Old Logs
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Maintenance (Safe) -->
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-xl font-semibold mb-6 text-blue-400">Database Maintenance</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Optimize Database -->
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2">Optimize Database</h4>
+                <p class="text-sm text-gray-400 mb-4">Run VACUUM and ANALYZE to reclaim space and update statistics</p>
+                <button
+                    hx-post="/api/admin/vacuum"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors w-full">
+                    Optimize Database
+                </button>
+            </div>
+
+            <!-- Rebuild Search Index -->
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2">Rebuild Search Index</h4>
+                <p class="text-sm text-gray-400 mb-4">Recreate the full-text search index for file paths</p>
+                <button
+                    hx-post="/api/admin/rebuild-fts"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors w-full">
+                    Rebuild Search Index
+                </button>
+            </div>
+
+            <!-- Recalculate Orphaned Status -->
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2">Recalculate Orphaned Status</h4>
+                <p class="text-sm text-gray-400 mb-4">Update orphaned flags for all files based on current usage</p>
+                <button
+                    hx-post="/api/admin/recalculate-orphaned"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors w-full">
+                    Recalculate Orphaned
+                </button>
+            </div>
+
+            <!-- Clean Stale Scans -->
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2">Clean Stale Scans</h4>
+                <p class="text-sm text-gray-400 mb-4">Mark old running scans as interrupted (>1 hour old)</p>
+                <button
+                    hx-post="/api/admin/clean-stale-scans"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors w-full">
+                    Clean Stale Scans
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export/Backup -->
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-xl font-semibold mb-6 text-green-400">Export & Backup</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium mb-2">Export All Data</h4>
+                <p class="text-sm text-gray-400 mb-4">Download complete database as JSON</p>
+                <a href="/api/export" download="media-usage-finder-export.json"
+                   class="inline-block px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors w-full text-center">
+                    Export to JSON
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Loading state for buttons */
+    button[hx-post].htmx-request {
+        opacity: 0.6;
+        cursor: wait !important;
+        pointer-events: none;
+    }
+</style>
+{{end}}

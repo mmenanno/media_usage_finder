@@ -850,3 +850,349 @@ func (db *DB) GetConfig(key string) (string, error) {
 	}
 	return value, err
 }
+
+// Admin/Maintenance Operations
+
+// ClearAllFiles deletes all file records (cascades to usage via foreign key)
+func (db *DB) ClearAllFiles() (int64, error) {
+	result, err := db.conn.Exec(`DELETE FROM files`)
+	if err != nil {
+		return 0, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	// Log the action
+	_, _ = db.conn.Exec(
+		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('delete', 'files', 0, ?)`,
+		fmt.Sprintf("Cleared all files (%d records)", count),
+	)
+
+	return count, nil
+}
+
+// ClearOrphanedFiles deletes only orphaned file records
+func (db *DB) ClearOrphanedFiles() (int64, error) {
+	result, err := db.conn.Exec(`DELETE FROM files WHERE is_orphaned = 1`)
+	if err != nil {
+		return 0, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	// Log the action
+	_, _ = db.conn.Exec(
+		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('delete', 'files', 0, ?)`,
+		fmt.Sprintf("Cleared orphaned files (%d records)", count),
+	)
+
+	return count, nil
+}
+
+// ClearScans deletes completed scan history (preserves running scans)
+func (db *DB) ClearScans() (int64, error) {
+	result, err := db.conn.Exec(`DELETE FROM scans WHERE status != 'running'`)
+	if err != nil {
+		return 0, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	// Log the action
+	_, _ = db.conn.Exec(
+		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('delete', 'scans', 0, ?)`,
+		fmt.Sprintf("Cleared scan history (%d records)", count),
+	)
+
+	return count, nil
+}
+
+// ClearAllUsage deletes all service usage records
+func (db *DB) ClearAllUsage() (int64, error) {
+	result, err := db.conn.Exec(`DELETE FROM usage`)
+	if err != nil {
+		return 0, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	// Log the action
+	_, _ = db.conn.Exec(
+		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('delete', 'usage', 0, ?)`,
+		fmt.Sprintf("Cleared all usage records (%d records)", count),
+	)
+
+	return count, nil
+}
+
+// VacuumDatabase performs VACUUM and ANALYZE operations
+func (db *DB) VacuumDatabase() error {
+	// VACUUM must be run outside a transaction
+	if _, err := db.conn.Exec(`VACUUM`); err != nil {
+		return fmt.Errorf("failed to vacuum database: %w", err)
+	}
+
+	if _, err := db.conn.Exec(`ANALYZE`); err != nil {
+		return fmt.Errorf("failed to analyze database: %w", err)
+	}
+
+	// Log the action
+	_, _ = db.conn.Exec(
+		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('config_change', 'database', 0, 'Vacuumed and analyzed database')`,
+	)
+
+	return nil
+}
+
+// RebuildFTSIndex rebuilds the full-text search index
+func (db *DB) RebuildFTSIndex() error {
+	// Rebuild by inserting into the special fts table with 'rebuild' command
+	if _, err := db.conn.Exec(`INSERT INTO files_fts(files_fts) VALUES('rebuild')`); err != nil {
+		return fmt.Errorf("failed to rebuild FTS index: %w", err)
+	}
+
+	// Log the action
+	_, _ = db.conn.Exec(
+		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('config_change', 'database', 0, 'Rebuilt FTS search index')`,
+	)
+
+	return nil
+}
+
+// CleanStaleScans marks old running scans as interrupted
+func (db *DB) CleanStaleScans() (int64, error) {
+	oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
+	errMsg := "Scan interrupted - exceeded maximum runtime"
+
+	result, err := db.conn.Exec(
+		`UPDATE scans SET status = 'interrupted', errors = ?, completed_at = ? WHERE status = 'running' AND started_at < ?`,
+		errMsg, time.Now().Unix(), oneHourAgo,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	if count > 0 {
+		// Log the action
+		_, _ = db.conn.Exec(
+			`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('config_change', 'scans', 0, ?)`,
+			fmt.Sprintf("Cleaned %d stale running scans", count),
+		)
+	}
+
+	return count, nil
+}
+
+// DatabaseStats holds database statistics
+type DatabaseStats struct {
+	FileCount       int64
+	OrphanedCount   int64
+	UsageCount      int64
+	ScanCount       int64
+	AuditLogCount   int64
+	HardlinkGroups  int64
+	TotalSize       int64
+	OrphanedSize    int64
+	HardlinkSavings int64
+	DatabaseSizeKB  int64
+	LastVacuum      *time.Time
+}
+
+// GetDatabaseStats retrieves comprehensive database statistics
+func (db *DB) GetDatabaseStats() (*DatabaseStats, error) {
+	stats := &DatabaseStats{}
+
+	// File counts
+	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM files`).Scan(&stats.FileCount); err != nil {
+		return nil, err
+	}
+	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM files WHERE is_orphaned = 1`).Scan(&stats.OrphanedCount); err != nil {
+		return nil, err
+	}
+
+	// Usage count
+	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM usage`).Scan(&stats.UsageCount); err != nil {
+		return nil, err
+	}
+
+	// Scan count
+	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM scans`).Scan(&stats.ScanCount); err != nil {
+		return nil, err
+	}
+
+	// Audit log count
+	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM audit_log`).Scan(&stats.AuditLogCount); err != nil {
+		return nil, err
+	}
+
+	// Hardlink groups
+	if err := db.conn.QueryRow(`
+		SELECT COUNT(DISTINCT device_id || '-' || inode)
+		FROM files
+		WHERE (device_id, inode) IN (
+			SELECT device_id, inode
+			FROM files
+			GROUP BY device_id, inode
+			HAVING COUNT(*) > 1
+		)
+	`).Scan(&stats.HardlinkGroups); err != nil {
+		return nil, err
+	}
+
+	// Total size
+	if err := db.conn.QueryRow(`SELECT COALESCE(SUM(size), 0) FROM files`).Scan(&stats.TotalSize); err != nil {
+		return nil, err
+	}
+
+	// Orphaned size
+	if err := db.conn.QueryRow(`SELECT COALESCE(SUM(size), 0) FROM files WHERE is_orphaned = 1`).Scan(&stats.OrphanedSize); err != nil {
+		return nil, err
+	}
+
+	// Hardlink savings
+	var totalSizeWithDupes int64
+	err := db.conn.QueryRow(`
+		SELECT COALESCE(SUM(size * (cnt - 1)), 0)
+		FROM (
+			SELECT size, COUNT(*) as cnt
+			FROM files
+			GROUP BY device_id, inode
+			HAVING COUNT(*) > 1
+		)
+	`).Scan(&totalSizeWithDupes)
+	if err != nil {
+		return nil, err
+	}
+	stats.HardlinkSavings = totalSizeWithDupes
+
+	// Database size (page_count * page_size / 1024 for KB)
+	var pageCount, pageSize int64
+	if err := db.conn.QueryRow(`PRAGMA page_count`).Scan(&pageCount); err != nil {
+		return nil, err
+	}
+	if err := db.conn.QueryRow(`PRAGMA page_size`).Scan(&pageSize); err != nil {
+		return nil, err
+	}
+	stats.DatabaseSizeKB = (pageCount * pageSize) / 1024
+
+	return stats, nil
+}
+
+// AuditLogEntry represents a single audit log entry
+type AuditLogEntry struct {
+	ID         int64
+	Action     string
+	EntityType string
+	EntityID   *int64
+	Details    string
+	CreatedAt  time.Time
+}
+
+// GetAuditLog retrieves paginated audit log entries
+func (db *DB) GetAuditLog(limit, offset int) ([]*AuditLogEntry, int, error) {
+	// Count total
+	var total int
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM audit_log`).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Get entries
+	query := `
+		SELECT id, action, entity_type, entity_id, details, created_at
+		FROM audit_log
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := db.conn.Query(query, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var entries []*AuditLogEntry
+	for rows.Next() {
+		entry := &AuditLogEntry{}
+		var createdAt int64
+		var entityID sql.NullInt64
+
+		err := rows.Scan(
+			&entry.ID,
+			&entry.Action,
+			&entry.EntityType,
+			&entityID,
+			&entry.Details,
+			&createdAt,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		if entityID.Valid {
+			entry.EntityID = &entityID.Int64
+		}
+		entry.CreatedAt = time.Unix(createdAt, 0)
+
+		entries = append(entries, entry)
+	}
+
+	return entries, total, rows.Err()
+}
+
+// ClearConfig deletes all configuration values
+func (db *DB) ClearConfig() (int64, error) {
+	result, err := db.conn.Exec(`DELETE FROM config`)
+	if err != nil {
+		return 0, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	// Log the action
+	_, _ = db.conn.Exec(
+		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('config_change', 'config', 0, ?)`,
+		fmt.Sprintf("Cleared all configuration (%d records)", count),
+	)
+
+	return count, nil
+}
+
+// ClearAuditLog deletes old audit log entries (older than specified days)
+func (db *DB) ClearAuditLog(olderThanDays int) (int64, error) {
+	cutoff := time.Now().AddDate(0, 0, -olderThanDays).Unix()
+
+	result, err := db.conn.Exec(`DELETE FROM audit_log WHERE created_at < ?`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	if count > 0 {
+		// Log the action
+		_, _ = db.conn.Exec(
+			`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('delete', 'audit_log', 0, ?)`,
+			fmt.Sprintf("Cleared old audit log entries (%d records older than %d days)", count, olderThanDays),
+		)
+	}
+
+	return count, nil
+}

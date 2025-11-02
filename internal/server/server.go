@@ -27,8 +27,9 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/files", s.HandleFiles)
 	mux.HandleFunc("/hardlinks", s.HandleHardlinks)
 	mux.HandleFunc("/scans", s.HandleScans)
-	mux.HandleFunc("/config", s.HandleConfig)
 	mux.HandleFunc("/stats", s.HandleStats)
+	mux.HandleFunc("/advanced", s.HandleAdvanced)
+	mux.HandleFunc("/config", s.HandleConfig)
 
 	// API routes
 	mux.HandleFunc("/api/scan/start", s.HandleStartScan)
@@ -44,6 +45,19 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/export", s.HandleExport)
 	mux.HandleFunc("/api/files/delete", s.HandleDeleteFile)
 	mux.HandleFunc("/api/files/mark-rescan", s.HandleMarkRescan)
+
+	// Admin API routes
+	mux.HandleFunc("/api/admin/clear-files", s.HandleAdminClearFiles)
+	mux.HandleFunc("/api/admin/clear-scans", s.HandleAdminClearScans)
+	mux.HandleFunc("/api/admin/clear-usage", s.HandleAdminClearUsage)
+	mux.HandleFunc("/api/admin/vacuum", s.HandleAdminVacuum)
+	mux.HandleFunc("/api/admin/rebuild-fts", s.HandleAdminRebuildFTS)
+	mux.HandleFunc("/api/admin/clean-stale-scans", s.HandleAdminCleanStaleScans)
+	mux.HandleFunc("/api/admin/recalculate-orphaned", s.HandleAdminRecalculateOrphaned)
+	mux.HandleFunc("/api/admin/database-stats", s.HandleAdminDatabaseStats)
+	mux.HandleFunc("/api/admin/audit-log", s.HandleAdminAuditLog)
+	mux.HandleFunc("/api/admin/clear-config", s.HandleAdminClearConfig)
+	mux.HandleFunc("/api/admin/clear-audit-log", s.HandleAdminClearAuditLog)
 
 	// File details endpoint (with dynamic ID in query param)
 	mux.HandleFunc("/api/files/", func(w http.ResponseWriter, r *http.Request) {

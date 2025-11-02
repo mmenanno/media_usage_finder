@@ -138,3 +138,9 @@ type ScansData struct {
 	TotalPages int
 	Title      string
 }
+
+// AdvancedData represents data for the advanced settings template
+type AdvancedData struct {
+	Stats interface{}
+	Title string
+}
