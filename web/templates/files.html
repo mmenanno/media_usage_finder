@@ -300,16 +300,26 @@
 
                 {{if lt .Page .TotalPages}}
                 <a id="next-page-btn"
-                   href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                   href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition"
-                   hx-get="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                   hx-get="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    hx-trigger="revealed"
                    hx-target="#files-table tbody"
                    hx-swap="beforeend"
-                   hx-select="tbody tr"
+                   hx-select="#files-table tbody > tr"
+                   hx-indicator="#infinite-scroll-loading"
+                   data-current-page="{{.Page}}"
+                   data-total-pages="{{.TotalPages}}"
                    hx-disabled>
                     Next
                 </a>
+                <div id="infinite-scroll-loading" class="htmx-indicator px-3 py-1 text-sm text-gray-400">
+                    <svg class="animate-spin h-4 w-4 inline-block mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading more...
+                </div>
                 {{end}}
             </div>
         </div>
@@ -333,6 +343,34 @@
                 nextPageBtn.setAttribute('hx-disabled', '');
                 nextPageBtn.classList.remove('hidden');
                 document.getElementById('pagination-container').classList.remove('border-t-2', 'border-blue-500');
+            }
+        });
+
+        // Update next page URL after each infinite scroll load
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            if (event.detail.target.id === 'files-table' || event.target.matches('#files-table tbody')) {
+                const btn = document.getElementById('next-page-btn');
+                if (!btn) return;
+
+                const currentPage = parseInt(btn.getAttribute('data-current-page') || '1');
+                const totalPages = parseInt(btn.getAttribute('data-total-pages') || '1');
+                const nextPage = currentPage + 1;
+
+                if (nextPage < totalPages) {
+                    // Update page number in data attribute
+                    btn.setAttribute('data-current-page', nextPage);
+
+                    // Update URLs
+                    const currentUrl = new URL(btn.getAttribute('hx-get'), window.location.origin);
+                    currentUrl.searchParams.set('page', nextPage + 1);
+
+                    btn.setAttribute('hx-get', currentUrl.pathname + currentUrl.search);
+                    btn.setAttribute('href', currentUrl.pathname + currentUrl.search);
+                } else if (nextPage >= totalPages) {
+                    // No more pages, disable infinite scroll
+                    btn.setAttribute('hx-disabled', '');
+                    btn.classList.add('hidden');
+                }
             }
         });
     }
