@@ -173,6 +173,11 @@ type mediaContainerResponse struct {
 }
 
 func (p *PlexClient) getFilesForSection(sectionKey, sectionType string) ([]PlexFile, error) {
+	// For TV shows, we need to get episodes using a different endpoint
+	if sectionType == "show" {
+		return p.getFilesForTVSection(sectionKey)
+	}
+
 	// Build URL with all items in section
 	u, err := url.Parse(p.baseURL + "/library/sections/" + sectionKey + "/all")
 	if err != nil {
@@ -250,6 +255,65 @@ func (p *PlexClient) getFilesForSection(sectionKey, sectionType string) ([]PlexF
 
 	log.Printf("Section %s (type: %s): found %d videos, %d tracks, %d photos = %d total files",
 		sectionKey, sectionType, len(container.Video), len(container.Track), len(container.Photo), len(files))
+
+	return files, nil
+}
+
+// getFilesForTVSection gets all episode files for a TV show library section
+func (p *PlexClient) getFilesForTVSection(sectionKey string) ([]PlexFile, error) {
+	// For TV shows, we need to query all episodes using type=4 (episodes)
+	u, err := url.Parse(p.baseURL + "/library/sections/" + sectionKey + "/all")
+	if err != nil {
+		return nil, err
+	}
+
+	// Add type=4 parameter to get episodes
+	q := u.Query()
+	q.Set("type", "4")
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-Plex-Token", p.token)
+	req.Header.Set("Accept", "application/xml")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("plex API returned status %d", resp.StatusCode)
+	}
+
+	// Use streaming XML decoder for better performance
+	var container mediaContainerResponse
+	decoder := xml.NewDecoder(resp.Body)
+	if err := decoder.Decode(&container); err != nil {
+		return nil, fmt.Errorf("failed to parse TV episodes: %w", err)
+	}
+
+	var files []PlexFile
+
+	// TV episodes are returned as Video elements
+	for _, video := range container.Video {
+		for _, media := range video.Media {
+			for _, part := range media.Part {
+				if part.File != "" {
+					files = append(files, PlexFile{
+						Path: part.File,
+						Size: part.Size,
+					})
+				}
+			}
+		}
+	}
+
+	log.Printf("TV Section %s: found %d episode files", sectionKey, len(files))
 
 	return files, nil
 }

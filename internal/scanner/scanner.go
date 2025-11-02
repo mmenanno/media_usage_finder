@@ -434,23 +434,36 @@ func (f qbittorrentServiceFile) GetMetadata() map[string]interface{} {
 // updateServiceUsage is a generic method to update usage information for any service
 func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) error {
 	if len(files) == 0 {
+		log.Printf("%s: No files returned from service", serviceName)
 		return nil
 	}
+
+	log.Printf("%s: Starting update with %d files from service", serviceName, len(files))
 
 	// Clear old usage records
 	if err := s.db.DeleteUsageByService(serviceName); err != nil {
 		return err
 	}
+	log.Printf("%s: Cleared old usage records", serviceName)
 
 	// Translate all paths and collect for batch lookup
 	hostPaths := make([]string, 0, len(files))
 	pathToFile := make(map[string]serviceFile)
 
-	for _, file := range files {
-		hostPath := s.config.TranslatePathToHost(file.GetPath(), serviceName)
+	for i, file := range files {
+		originalPath := file.GetPath()
+		hostPath := s.config.TranslatePathToHost(originalPath, serviceName)
+
+		// Log first few path translations for debugging
+		if i < 3 {
+			log.Printf("%s: Path translation example %d: %s -> %s", serviceName, i+1, originalPath, hostPath)
+		}
+
 		hostPaths = append(hostPaths, hostPath)
 		pathToFile[hostPath] = file
 	}
+
+	log.Printf("%s: Translated %d paths, querying database...", serviceName, len(hostPaths))
 
 	// Batch load all files from database
 	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
@@ -458,11 +471,19 @@ func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) er
 		return fmt.Errorf("failed to batch load files: %w", err)
 	}
 
+	log.Printf("%s: Found %d files in database out of %d queried", serviceName, len(dbFiles), len(hostPaths))
+
 	// Collect usage records
 	var usages []*database.Usage
+	notFoundCount := 0
 	for hostPath, file := range pathToFile {
 		dbFile, ok := dbFiles[hostPath]
 		if !ok {
+			// Log first few missing files for debugging
+			if notFoundCount < 3 {
+				log.Printf("%s: File not in database: %s", serviceName, hostPath)
+			}
+			notFoundCount++
 			continue
 		}
 
@@ -474,11 +495,14 @@ func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) er
 		})
 	}
 
+	log.Printf("%s: Created %d usage records (%d files not found in database)", serviceName, len(usages), notFoundCount)
+
 	// Batch insert all usage records
 	if len(usages) > 0 {
 		if err := s.db.BatchUpsertUsage(usages); err != nil {
 			return fmt.Errorf("failed to batch insert %s usage: %w", serviceName, err)
 		}
+		log.Printf("%s: Successfully inserted %d usage records", serviceName, len(usages))
 	}
 
 	matched := len(usages)
