@@ -66,6 +66,39 @@ func (db *DB) initSchema() error {
 	if err != nil {
 		return fmt.Errorf("failed to execute schema: %w", err)
 	}
+
+	// Run migrations
+	if err := db.runMigrations(); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	return nil
+}
+
+// runMigrations applies database migrations
+func (db *DB) runMigrations() error {
+	// Check if scan_id column is NOT NULL (needs migration)
+	var notNull int
+	err := db.conn.QueryRow(`
+		SELECT "notnull"
+		FROM pragma_table_info('files')
+		WHERE name = 'scan_id'
+	`).Scan(&notNull)
+
+	if err != nil {
+		// If there's an error, it might mean the column doesn't exist yet
+		// or the table is brand new, so we can skip migration
+		return nil
+	}
+
+	// If scan_id is NOT NULL (notNull == 1), we need to run the migration
+	if notNull == 1 {
+		_, err = db.conn.Exec(migrateScanIdNullable)
+		if err != nil {
+			return fmt.Errorf("failed to migrate scan_id to nullable: %w", err)
+		}
+	}
+
 	return nil
 }
 
