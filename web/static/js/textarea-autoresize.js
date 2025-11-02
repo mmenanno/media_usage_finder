@@ -3,7 +3,8 @@
 
 class TextareaAutoResize {
     constructor() {
-        this.observers = new Map(); // Track observers to prevent duplicates
+        this.initialized = new Set(); // Track initialized textareas
+        this.resizing = new WeakSet(); // Track textareas currently being resized (prevents recursion)
         this.setupAutoResize();
     }
 
@@ -13,47 +14,46 @@ class TextareaAutoResize {
 
         textareas.forEach(textarea => {
             // Skip if already initialized
-            if (this.observers.has(textarea)) return;
+            if (this.initialized.has(textarea)) return;
 
             // Set initial height
             this.resize(textarea);
 
-            // Add event listeners
-            const inputHandler = () => this.resize(textarea);
-            const changeHandler = () => this.resize(textarea);
+            // Add event listeners for user input
+            // These are sufficient - textareas don't have child nodes to observe
+            textarea.addEventListener('input', () => this.resize(textarea));
+            textarea.addEventListener('change', () => this.resize(textarea));
 
-            textarea.addEventListener('input', inputHandler);
-            textarea.addEventListener('change', changeHandler);
-
-            // Handle dynamic content loading (for HTMX updates)
-            // Don't watch attributes to avoid infinite loop when we modify style.height
-            const observer = new MutationObserver(() => this.resize(textarea));
-            observer.observe(textarea, {
-                childList: true,
-                subtree: true
-            });
-
-            // Store observer for cleanup
-            this.observers.set(textarea, { observer, inputHandler, changeHandler });
+            // Mark as initialized
+            this.initialized.add(textarea);
         });
     }
 
     resize(textarea) {
-        // Reset height to auto to get the correct scrollHeight
-        textarea.style.height = 'auto';
+        // Prevent recursive calls
+        if (this.resizing.has(textarea)) return;
 
-        // Set min-height to prevent shrinking below a reasonable size
-        const minHeight = 80; // ~3 rows
-        const maxHeight = 600; // Maximum height before scrolling
+        try {
+            this.resizing.add(textarea);
 
-        // Calculate new height based on scrollHeight
-        let newHeight = textarea.scrollHeight;
+            // Reset height to auto to get the correct scrollHeight
+            textarea.style.height = 'auto';
 
-        // Apply min/max constraints
-        newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
+            // Set min-height to prevent shrinking below a reasonable size
+            const minHeight = 80; // ~3 rows
+            const maxHeight = 600; // Maximum height before scrolling
 
-        // Set the new height
-        textarea.style.height = newHeight + 'px';
+            // Calculate new height based on scrollHeight
+            let newHeight = textarea.scrollHeight;
+
+            // Apply min/max constraints
+            newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
+
+            // Set the new height
+            textarea.style.height = newHeight + 'px';
+        } finally {
+            this.resizing.delete(textarea);
+        }
     }
 }
 
