@@ -69,6 +69,7 @@
                 <button
                     hx-post="/api/admin/clear-files?orphaned=true"
                     hx-confirm="Clear {{.Stats.OrphanedCount}} orphaned files? This cannot be undone."
+                    hx-swap="none"
                     class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors w-full cursor-pointer">
                     Clear Orphaned Files
                 </button>
@@ -81,6 +82,7 @@
                 <button
                     hx-post="/api/admin/clear-files"
                     hx-confirm="⚠️ Clear ALL {{.Stats.FileCount}} files? This will delete all file and usage data. This cannot be undone!"
+                    hx-swap="none"
                     class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors w-full cursor-pointer">
                     Clear All Files
                 </button>
@@ -93,6 +95,7 @@
                 <button
                     hx-post="/api/admin/clear-scans"
                     hx-confirm="Clear scan history? This will delete {{.Stats.ScanCount}} scan records."
+                    hx-swap="none"
                     class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors w-full cursor-pointer">
                     Clear Scan History
                 </button>
@@ -105,6 +108,7 @@
                 <button
                     hx-post="/api/admin/clear-usage"
                     hx-confirm="Clear all usage records? Files will be marked orphaned until next scan."
+                    hx-swap="none"
                     class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors w-full cursor-pointer">
                     Clear All Usage
                 </button>
@@ -117,6 +121,7 @@
                 <button
                     hx-post="/api/admin/clear-config"
                     hx-confirm="⚠️ Reset ALL configuration? You will need to reconfigure all services."
+                    hx-swap="none"
                     class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors w-full cursor-pointer">
                     Reset Configuration
                 </button>
@@ -129,6 +134,7 @@
                 <button
                     hx-post="/api/admin/clear-audit-log?days=90"
                     hx-confirm="Clear audit log entries older than 90 days?"
+                    hx-swap="none"
                     class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors w-full cursor-pointer">
                     Clear Old Logs
                 </button>

@@ -895,6 +895,17 @@ func (db *DB) ClearOrphanedFiles() (int64, error) {
 
 // ClearScans deletes completed scan history (preserves running scans)
 func (db *DB) ClearScans() (int64, error) {
+	// First, clear scan_id references in files table to avoid foreign key constraint
+	_, err := db.conn.Exec(`
+		UPDATE files
+		SET scan_id = NULL
+		WHERE scan_id IN (SELECT id FROM scans WHERE status != 'running')
+	`)
+	if err != nil {
+		return 0, fmt.Errorf("failed to clear scan references: %w", err)
+	}
+
+	// Now delete the scans
 	result, err := db.conn.Exec(`DELETE FROM scans WHERE status != 'running'`)
 	if err != nil {
 		return 0, err
