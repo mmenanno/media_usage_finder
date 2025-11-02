@@ -49,7 +49,7 @@
         <h3 class="text-xl font-semibold mb-6">Service Usage</h3>
 
         <!-- Charts -->
-        {{if .Stats.ServiceBreakdown}}
+        {{if gt (len .Stats.ServiceBreakdown) 0}}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <div class="bg-gray-700 rounded-lg p-4">
                 <h4 class="text-sm font-medium text-gray-400 mb-4 text-center">Files by Service</h4>
