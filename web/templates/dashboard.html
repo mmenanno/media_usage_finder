@@ -160,7 +160,9 @@
     <div class="bg-gray-800 rounded-lg p-6">
         <h3 class="text-xl font-semibold mb-4">Manual Service Updates</h3>
         <p class="text-sm text-gray-400 mb-4">Manually update service tracking without running a full scan</p>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        <!-- Primary Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <button
                 hx-post="/api/scan/update-services"
                 hx-swap="none"
@@ -168,6 +170,17 @@
                 <div class="text-lg font-medium">Update All Services</div>
                 <div class="text-sm text-purple-200 mt-1">Check all services and recalculate orphaned status</div>
             </button>
+            <button
+                hx-post="/api/scan/recalculate-orphaned"
+                hx-swap="none"
+                class="p-4 bg-orange-600 hover:bg-orange-700 rounded transition text-center cursor-pointer">
+                <div class="text-lg font-medium">Recalculate Orphaned</div>
+                <div class="text-sm text-orange-200 mt-1">Update orphaned status without checking services</div>
+            </button>
+        </div>
+
+        <!-- Individual Services -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <button
                 hx-post="/api/scan/update-service?service=plex"
                 hx-swap="none"
@@ -202,13 +215,6 @@
                 class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer">
                 <div class="text-lg font-medium">Update Stash</div>
                 <div class="text-sm text-gray-400 mt-1">Check Stash only</div>
-            </button>
-            <button
-                hx-post="/api/scan/recalculate-orphaned"
-                hx-swap="none"
-                class="p-4 bg-orange-600 hover:bg-orange-700 rounded transition text-center cursor-pointer">
-                <div class="text-lg font-medium">Recalculate Orphaned</div>
-                <div class="text-sm text-orange-200 mt-1">Update orphaned status without checking services</div>
             </button>
         </div>
     </div>

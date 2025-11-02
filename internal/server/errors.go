@@ -43,7 +43,7 @@ func getErrorSuggestion(code string) string {
 		"save_failed":          "Configuration could not be saved. Check file permissions on the config directory.",
 		"scan_already_running": "A scan is already in progress. Wait for it to complete or cancel it first.",
 		"method_not_allowed":   "This action requires a different request method.",
-		"unknown_service":      "The requested service is not recognized. Valid services: plex, sonarr, radarr, qbittorrent.",
+		"unknown_service":      "The requested service is not recognized. Valid services: plex, sonarr, radarr, qbittorrent, stash.",
 		"parse_error":          "The submitted data could not be parsed. Check the form data and try again.",
 	}
 

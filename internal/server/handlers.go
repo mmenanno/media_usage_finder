@@ -459,7 +459,7 @@ func (s *Server) checkExternalServices() map[string]interface{} {
 		result map[string]string
 	}
 
-	serviceNames := []string{"plex", "sonarr", "radarr", "qbittorrent"}
+	serviceNames := []string{"plex", "sonarr", "radarr", "qbittorrent", "stash"}
 	results := make(chan serviceCheck, len(serviceNames))
 	timeout := 2 * time.Second
 	var wg sync.WaitGroup
