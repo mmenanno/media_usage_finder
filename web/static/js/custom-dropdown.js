@@ -8,6 +8,10 @@ class CustomDropdown {
         this.options = element.querySelectorAll('[data-dropdown-option]');
         this.isOpen = false;
 
+        // Bind handlers to this instance so we can remove them later
+        this.handleOutsideClick = this.handleOutsideClick.bind(this);
+        this.handleEscape = this.handleEscape.bind(this);
+
         this.init();
     }
 
@@ -25,20 +29,18 @@ class CustomDropdown {
                 this.selectOption(option);
             });
         });
+    }
 
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!this.dropdown.contains(e.target)) {
-                this.close();
-            }
-        });
+    handleOutsideClick(e) {
+        if (!this.dropdown.contains(e.target)) {
+            this.close();
+        }
+    }
 
-        // Close on escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.isOpen) {
-                this.close();
-            }
-        });
+    handleEscape(e) {
+        if (e.key === 'Escape' && this.isOpen) {
+            this.close();
+        }
     }
 
     toggle() {
@@ -49,12 +51,20 @@ class CustomDropdown {
         this.isOpen = true;
         this.menu.classList.remove('hidden');
         this.button.setAttribute('aria-expanded', 'true');
+
+        // Add document listeners when dropdown opens
+        document.addEventListener('click', this.handleOutsideClick);
+        document.addEventListener('keydown', this.handleEscape);
     }
 
     close() {
         this.isOpen = false;
         this.menu.classList.add('hidden');
         this.button.setAttribute('aria-expanded', 'false');
+
+        // Remove document listeners when dropdown closes
+        document.removeEventListener('click', this.handleOutsideClick);
+        document.removeEventListener('keydown', this.handleEscape);
     }
 
     selectOption(option) {
