@@ -869,9 +869,16 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 
 // HandleScanLogs streams scan logs via SSE
 func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
+	// Check if scanner exists
+	if s.scanner == nil {
+		http.Error(w, "Scanner not initialized", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // Disable buffering for nginx
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -885,9 +892,30 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 
 	progress := s.scanner.GetProgress()
 	if progress == nil {
+		// No scan running - keep connection open but send status updates
 		fmt.Fprintf(w, "data: No scan currently running\n\n")
 		flusher.Flush()
-		return
+
+		// Keep connection alive with periodic pings
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case <-ticker.C:
+				fmt.Fprintf(w, ": keep-alive\n\n")
+				flusher.Flush()
+
+				// Check if a scan has started
+				if s.scanner.GetProgress() != nil {
+					fmt.Fprintf(w, "data: Scan started, reconnect to see logs\n\n")
+					flusher.Flush()
+					return
+				}
+			}
+		}
 	}
 
 	// Subscribe to log messages
