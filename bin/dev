@@ -36,9 +36,21 @@ EOF
   echo "✓ Created $CONFIG_FILE"
 fi
 
+# Function to build Tailwind CSS
+build_tailwind() {
+  echo -e "${CYAN}Building Tailwind CSS...${NC}"
+  if npx tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --minify 2>&1; then
+    echo -e "${GREEN}✓ Tailwind build successful${NC}"
+    return 0
+  else
+    echo -e "${YELLOW}✗ Tailwind build failed${NC}"
+    return 1
+  fi
+}
+
 # Function to build the binary
 build() {
-  echo -e "${CYAN}Building...${NC}"
+  echo -e "${CYAN}Building Go binary...${NC}"
   if CGO_ENABLED=1 go build -tags fts5 -o "$BINARY" ./cmd/media-finder 2>&1; then
     echo -e "${GREEN}✓ Build successful${NC}"
     return 0
@@ -48,10 +60,16 @@ build() {
   fi
 }
 
-# Function to get checksum of watched files
-get_checksum() {
-  # Watch .go, .html, .js, .css files
-  find cmd internal web -type f \( -name "*.go" -o -name "*.html" -o -name "*.js" -o -name "*.css" \) -exec stat -f "%m %N" {} \; 2>/dev/null | sort | md5
+# Function to get checksum of Go source files
+get_go_checksum() {
+  # Watch .go files
+  find cmd internal -type f -name "*.go" -exec stat -f "%m %N" {} \; 2>/dev/null | sort | md5
+}
+
+# Function to get checksum of Tailwind-related files
+get_tailwind_checksum() {
+  # Watch template files, JS files, and input CSS
+  find web/templates web/static/js web/static/css/input.css -type f \( -name "*.html" -o -name "*.js" -o -name "*.css" \) -exec stat -f "%m %N" {} \; 2>/dev/null | sort | md5
 }
 
 # Cleanup function
@@ -71,7 +89,13 @@ echo -e "${CYAN}✓ Hot-reload enabled (polling mode)${NC}"
 echo "Press Ctrl+C to stop"
 echo ""
 
-# Initial build
+# Initial Tailwind build
+if ! build_tailwind; then
+  echo "Fix Tailwind errors and try again"
+  exit 1
+fi
+
+# Initial Go build
 if ! build; then
   echo "Fix build errors and try again"
   exit 1
@@ -82,18 +106,33 @@ fi
 SERVER_PID=$!
 echo -e "${GREEN}✓ Server started (PID: $SERVER_PID)${NC}"
 
-# Store initial checksum
-LAST_CHECKSUM=$(get_checksum)
+# Store initial checksums
+LAST_GO_CHECKSUM=$(get_go_checksum)
+LAST_TAILWIND_CHECKSUM=$(get_tailwind_checksum)
 
 # Watch for changes
 while true; do
   sleep 1
 
-  CURRENT_CHECKSUM=$(get_checksum)
+  CURRENT_GO_CHECKSUM=$(get_go_checksum)
+  CURRENT_TAILWIND_CHECKSUM=$(get_tailwind_checksum)
 
-  if [ "$CURRENT_CHECKSUM" != "$LAST_CHECKSUM" ]; then
+  GO_CHANGED=false
+  TAILWIND_CHANGED=false
+
+  # Check for Tailwind changes
+  if [ "$CURRENT_TAILWIND_CHECKSUM" != "$LAST_TAILWIND_CHECKSUM" ]; then
     echo ""
-    echo -e "${CYAN}Changes detected, rebuilding...${NC}"
+    echo -e "${CYAN}Tailwind source changes detected, rebuilding CSS...${NC}"
+    build_tailwind
+    LAST_TAILWIND_CHECKSUM=$(get_tailwind_checksum)
+    TAILWIND_CHANGED=true
+  fi
+
+  # Check for Go changes
+  if [ "$CURRENT_GO_CHECKSUM" != "$LAST_GO_CHECKSUM" ]; then
+    echo ""
+    echo -e "${CYAN}Go source changes detected, rebuilding...${NC}"
 
     # Kill old server
     kill $SERVER_PID 2>/dev/null || true
@@ -110,6 +149,7 @@ while true; do
       # Keep watching for fixes
     fi
 
-    LAST_CHECKSUM=$(get_checksum)
+    LAST_GO_CHECKSUM=$(get_go_checksum)
+    GO_CHANGED=true
   fi
 done
