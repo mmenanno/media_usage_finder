@@ -73,7 +73,7 @@
                 <button
                     type="button"
                     hx-post="/api/config/test-path-mappings"
-                    hx-include="[name='local_path_mappings'], [name='service_path_mappings']"
+                    hx-include="[name='local_path_mappings'], [name='service_path_mappings'], [name='plex_url'], [name='plex_token'], [name='sonarr_url'], [name='sonarr_api_key'], [name='radarr_url'], [name='radarr_api_key']"
                     hx-target="#validation-errors"
                     hx-swap="innerHTML"
                     hx-indicator="#path-mappings-test-indicator"

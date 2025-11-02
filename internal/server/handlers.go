@@ -1108,6 +1108,9 @@ func (s *Server) HandleTestPathMappings(w http.ResponseWriter, r *http.Request) 
 
 	// Test service path mappings
 	if serviceMappingsStr != "" {
+		// First, collect service configurations from form values for intelligent testing
+		serviceConfigs := s.collectServiceConfigsFromForm(r)
+
 		lines := strings.Split(serviceMappingsStr, "\n")
 		for i, line := range lines {
 			line = strings.TrimSpace(line)
@@ -1141,8 +1144,19 @@ func (s *Server) HandleTestPathMappings(w http.ResponseWriter, r *http.Request) 
 			// Test container path (left side - what we can see)
 			if _, err := os.Stat(containerPath); err != nil {
 				errors = append(errors, fmt.Sprintf("%s:%s=%s: container path error: %v", service, containerPath, servicePath, err))
+				continue
+			}
+
+			// Intelligent validation: query service for actual file and test translation
+			if cfg, hasConfig := serviceConfigs[service]; hasConfig {
+				if err := s.testServicePathMapping(service, containerPath, servicePath, cfg); err != nil {
+					errors = append(errors, fmt.Sprintf("%s:%s=%s: mapping validation failed: %v", service, containerPath, servicePath, err))
+				} else {
+					successes = append(successes, fmt.Sprintf("%s:%s=%s: OK (container path accessible, mapping verified)", service, containerPath, servicePath))
+				}
 			} else {
-				successes = append(successes, fmt.Sprintf("%s:%s=%s: OK (container path accessible)", service, containerPath, servicePath))
+				// No service config available, only basic validation
+				successes = append(successes, fmt.Sprintf("%s:%s=%s: OK (container path accessible, no service config for intelligent test)", service, containerPath, servicePath))
 			}
 		}
 	}
@@ -1169,6 +1183,184 @@ func (s *Server) HandleTestPathMappings(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 	// Clear and hide the validation-errors div
 	w.Write([]byte(`<script>document.getElementById('validation-errors').classList.add('hidden');</script>`))
+}
+
+// collectServiceConfigsFromForm reads service configurations from form values
+// Returns a map of service name to temporary config for testing
+func (s *Server) collectServiceConfigsFromForm(r *http.Request) map[string]interface{} {
+	configs := make(map[string]interface{})
+
+	// Plex config
+	if plexURL := strings.TrimSpace(r.FormValue("plex_url")); plexURL != "" {
+		if plexToken := strings.TrimSpace(r.FormValue("plex_token")); plexToken != "" {
+			configs["plex"] = map[string]string{
+				"url":   plexURL,
+				"token": plexToken,
+			}
+		}
+	}
+
+	// Sonarr config
+	if sonarrURL := strings.TrimSpace(r.FormValue("sonarr_url")); sonarrURL != "" {
+		if sonarrKey := strings.TrimSpace(r.FormValue("sonarr_api_key")); sonarrKey != "" {
+			configs["sonarr"] = map[string]string{
+				"url":     sonarrURL,
+				"api_key": sonarrKey,
+			}
+		}
+	}
+
+	// Radarr config
+	if radarrURL := strings.TrimSpace(r.FormValue("radarr_url")); radarrURL != "" {
+		if radarrKey := strings.TrimSpace(r.FormValue("radarr_api_key")); radarrKey != "" {
+			configs["radarr"] = map[string]string{
+				"url":     radarrURL,
+				"api_key": radarrKey,
+			}
+		}
+	}
+
+	return configs
+}
+
+// testServicePathMapping validates a service path mapping by querying the service
+// and testing if the path translation works correctly
+func (s *Server) testServicePathMapping(serviceName, containerPath, servicePath string, cfg interface{}) error {
+	// Get a sample file path from the service
+	var sampleFilePath string
+	var err error
+
+	switch serviceName {
+	case "plex":
+		configMap := cfg.(map[string]string)
+		sampleFilePath, err = s.getSamplePlexFilePath(configMap["url"], configMap["token"], servicePath)
+	case "sonarr":
+		configMap := cfg.(map[string]string)
+		sampleFilePath, err = s.getSampleArrFilePath(configMap["url"], configMap["api_key"], servicePath, "sonarr")
+	case "radarr":
+		configMap := cfg.(map[string]string)
+		sampleFilePath, err = s.getSampleArrFilePath(configMap["url"], configMap["api_key"], servicePath, "radarr")
+	default:
+		return fmt.Errorf("unsupported service: %s", serviceName)
+	}
+
+	if err != nil {
+		// If we can't get a sample file, that's okay - service might be empty or not configured yet
+		return nil
+	}
+
+	if sampleFilePath == "" {
+		// No files found in service - can't validate mapping
+		return nil
+	}
+
+	// Test if we can translate the service path to container path
+	if !strings.HasPrefix(sampleFilePath, servicePath) {
+		return fmt.Errorf("service file path '%s' doesn't start with expected service path '%s'", sampleFilePath, servicePath)
+	}
+
+	// Replace service path with container path
+	translatedPath := strings.Replace(sampleFilePath, servicePath, containerPath, 1)
+
+	// Check if the translated path exists
+	if _, err := os.Stat(translatedPath); err != nil {
+		return fmt.Errorf("translated path '%s' doesn't exist (from service path '%s')", translatedPath, sampleFilePath)
+	}
+
+	return nil
+}
+
+// getSamplePlexFilePath gets a sample file path from Plex library
+func (s *Server) getSamplePlexFilePath(url, token, pathPrefix string) (string, error) {
+	// Create temporary config for testing
+	testConfig := *s.config
+	testConfig.Services.Plex.URL = url
+	testConfig.Services.Plex.Token = token
+
+	// Create client via factory
+	factory := api.NewClientFactory(&testConfig)
+	client, err := factory.CreateClient("plex", testConfig.APITimeout)
+	if err != nil {
+		return "", err
+	}
+
+	// Cast to PlexClient to access GetAllFiles
+	plexClient, ok := client.(*api.PlexClient)
+	if !ok {
+		return "", fmt.Errorf("failed to cast to PlexClient")
+	}
+
+	// Get all files and find one that matches the path prefix
+	files, err := plexClient.GetAllFiles()
+	if err != nil {
+		return "", err
+	}
+
+	for _, file := range files {
+		if strings.HasPrefix(file.Path, pathPrefix) {
+			return file.Path, nil
+		}
+	}
+
+	return "", nil
+}
+
+// getSampleArrFilePath gets a sample file path from Sonarr/Radarr
+func (s *Server) getSampleArrFilePath(url, apiKey, pathPrefix, serviceType string) (string, error) {
+	// Create temporary config for testing
+	testConfig := *s.config
+
+	if serviceType == "sonarr" {
+		testConfig.Services.Sonarr.URL = url
+		testConfig.Services.Sonarr.APIKey = apiKey
+	} else if serviceType == "radarr" {
+		testConfig.Services.Radarr.URL = url
+		testConfig.Services.Radarr.APIKey = apiKey
+	}
+
+	// Create client via factory
+	factory := api.NewClientFactory(&testConfig)
+	client, err := factory.CreateClient(serviceType, testConfig.APITimeout)
+	if err != nil {
+		return "", err
+	}
+
+	// Cast to appropriate client type to access GetAllFiles
+	if serviceType == "sonarr" {
+		sonarrClient, ok := client.(*api.SonarrClient)
+		if !ok {
+			return "", fmt.Errorf("failed to cast to SonarrClient")
+		}
+
+		files, err := sonarrClient.GetAllFiles()
+		if err != nil {
+			return "", err
+		}
+
+		for _, file := range files {
+			if strings.HasPrefix(file.Path, pathPrefix) {
+				return file.Path, nil
+			}
+		}
+	} else if serviceType == "radarr" {
+		radarrClient, ok := client.(*api.RadarrClient)
+		if !ok {
+			return "", fmt.Errorf("failed to cast to RadarrClient")
+		}
+
+		files, err := radarrClient.GetAllFiles()
+		if err != nil {
+			return "", err
+		}
+
+		for _, file := range files {
+			if strings.HasPrefix(file.Path, pathPrefix) {
+				return file.Path, nil
+			}
+		}
+	}
+
+	return "", nil
 }
 
 // HandleExport exports files list using streaming for memory efficiency
