@@ -874,6 +874,22 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`<script>document.getElementById('validation-errors').classList.add('hidden');</script>`))
 }
 
+// getServiceDisplayName returns the properly capitalized display name for a service
+func getServiceDisplayName(serviceName string) string {
+	switch serviceName {
+	case "plex":
+		return "Plex"
+	case "sonarr":
+		return "Sonarr"
+	case "radarr":
+		return "Radarr"
+	case "qbittorrent":
+		return "qBittorrent"
+	default:
+		return serviceName
+	}
+}
+
 // HandleTestService tests connection to a service using current form values
 func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodPost) {
@@ -881,6 +897,7 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serviceName := r.URL.Query().Get("service")
+	displayName := getServiceDisplayName(serviceName)
 
 	// Create a temporary config with form values for testing
 	testConfig := *s.config // Copy current config
@@ -953,13 +970,13 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 
 	// Test the connection
 	if err := testClient.Test(); err != nil {
-		w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection failed: %v", serviceName, err))
+		w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection failed: %v", displayName, err))
 		w.Header().Set("X-Toast-Type", "error")
 		respondError(w, http.StatusBadRequest, err.Error(), "connection_failed")
 		return
 	}
 
-	w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection successful", serviceName))
+	w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection successful", displayName))
 	w.Header().Set("X-Toast-Type", "success")
 
 	response := TestServiceResponse{

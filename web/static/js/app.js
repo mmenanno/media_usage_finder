@@ -5,14 +5,7 @@ document.body.addEventListener('htmx:afterSwap', function(evt) {
     // Custom animations or processing after HTMX swaps
 });
 
-// Handle scan start confirmation
-document.body.addEventListener('htmx:confirm', function(evt) {
-    if (evt.detail.path === '/api/scan/start') {
-        if (!confirm('Start a new scan? This may take a while for large libraries.')) {
-            evt.preventDefault();
-        }
-    }
-});
+// Note: Confirmation dialogs are handled by modal.js
 
 // Format file sizes
 function formatBytes(bytes) {
@@ -69,6 +62,50 @@ window.addEventListener('offline', () => {
 window.addEventListener('online', () => {
     window.showToast && window.showToast('You are back online.', 'success');
 });
+
+// Form dirty state tracking for config page
+let formIsDirty = false;
+let originalFormData = null;
+
+function initFormDirtyTracking() {
+    const configForm = document.querySelector('form[hx-post="/api/config/save"]');
+    if (!configForm) return;
+
+    // Store original form data
+    originalFormData = new FormData(configForm);
+
+    // Track changes to any form input
+    configForm.addEventListener('input', () => {
+        formIsDirty = true;
+    });
+
+    configForm.addEventListener('change', () => {
+        formIsDirty = true;
+    });
+
+    // Warn before leaving page with unsaved changes
+    window.addEventListener('beforeunload', (e) => {
+        if (formIsDirty) {
+            e.preventDefault();
+            e.returnValue = ''; // Required for Chrome
+            return ''; // Required for some browsers
+        }
+    });
+
+    // Reset dirty state on successful save
+    document.body.addEventListener('htmx:afterRequest', (event) => {
+        // Check if this is the config save endpoint
+        if (event.detail.pathInfo.requestPath === '/api/config/save') {
+            // Check if request was successful
+            if (event.detail.successful) {
+                formIsDirty = false;
+            }
+        }
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', initFormDirtyTracking);
 
 // Application initialization is handled by individual modules
 // (modal.js, notifications.js, batch-selection.js, etc.)

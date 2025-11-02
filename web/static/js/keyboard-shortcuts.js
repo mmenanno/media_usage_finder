@@ -64,18 +64,21 @@ class KeyboardShortcuts {
 
     startScan() {
         // Trigger scan start with confirmation
-        if (confirm('Start a new scan? This may take a while for large libraries.')) {
-            fetch('/api/scan/start', { method: 'POST' })
-                .then(response => response.json())
-                .then(() => {
-                    window.showToast && window.showToast('Scan started successfully', 'info');
-                    // Reload page to show progress
-                    setTimeout(() => window.location.href = '/', 500);
-                })
-                .catch(error => {
-                    window.showToast && window.showToast('Failed to start scan', 'error');
-                });
-        }
+        const message = 'Start a new scan? This may take a while for large libraries.';
+        window.showConfirm(message, 'Start Scan').then((confirmed) => {
+            if (confirmed) {
+                fetch('/api/scan/start', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(() => {
+                        window.showToast && window.showToast('Scan started successfully', 'info');
+                        // Reload page to show progress
+                        setTimeout(() => window.location.href = '/', 500);
+                    })
+                    .catch(error => {
+                        window.showToast && window.showToast('Failed to start scan', 'error');
+                    });
+            }
+        });
     }
 
     goTo(path) {

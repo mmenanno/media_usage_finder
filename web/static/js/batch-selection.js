@@ -297,7 +297,12 @@ class BatchSelection {
     async markSelectedForRescan() {
         if (this.selectedFiles.size === 0) return;
 
-        if (!confirm(`Mark ${this.selectedFiles.size} files for rescan?`)) {
+        const confirmed = await window.showConfirm(
+            `Mark ${this.selectedFiles.size} files for rescan?`,
+            'Mark for Rescan'
+        );
+
+        if (!confirmed) {
             return;
         }
 
@@ -327,7 +332,12 @@ class BatchSelection {
     async deleteSelected() {
         if (this.selectedFiles.size === 0) return;
 
-        if (!confirm(`Are you ABSOLUTELY SURE you want to delete ${this.selectedFiles.size} files? This CANNOT be undone!`)) {
+        const confirmed = await window.showConfirm(
+            `Are you ABSOLUTELY SURE you want to delete ${this.selectedFiles.size} files? This CANNOT be undone!`,
+            'Delete Files'
+        );
+
+        if (!confirmed) {
             return;
         }
 
