@@ -1,5 +1,6 @@
-# Binaries
-bin/
+# Binaries (but keep bin/dev script)
+bin/*
+!bin/dev
 *.exe
 *.dll
 *.so
@@ -23,6 +24,7 @@ build/
 # Data and config
 data/
 config/config.yaml
+config.local.yaml
 *.db
 *.db-shm
 *.db-wal

@@ -33,15 +33,11 @@ class KeyboardShortcuts {
                 return;
             }
 
-            // Don't trigger shortcuts when typing in input fields
+            // Don't trigger ANY shortcuts when typing in input fields, textareas, or contenteditable
+            // This ensures users can type all characters (including '/', 's', 'f', etc.) normally
             if (e.target.tagName === 'INPUT' ||
                 e.target.tagName === 'TEXTAREA' ||
                 e.target.isContentEditable) {
-                // Exception: allow '/' to focus search from input fields (but not textareas)
-                if (e.key === '/' && e.target.tagName !== 'TEXTAREA' && e.target.id !== 'search-input') {
-                    e.preventDefault();
-                    this.focusSearch();
-                }
                 return;
             }
 

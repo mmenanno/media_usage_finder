@@ -69,8 +69,11 @@ class ToastManager {
         const toast = this.createToast(message, type, retryAction, dismissible);
         this.container.appendChild(toast);
 
-        // Animate in
-        setTimeout(() => toast.classList.add('translate-x-0', 'opacity-100'), 10);
+        // Animate in - remove off-screen classes and add on-screen classes
+        setTimeout(() => {
+            toast.classList.remove('translate-x-full', 'opacity-0');
+            toast.classList.add('translate-x-0', 'opacity-100');
+        }, 10);
 
         // Auto-dismiss if duration is set
         if (duration) {
@@ -81,7 +84,7 @@ class ToastManager {
     createToast(message, type, retryAction, dismissible) {
         const toast = document.createElement('div');
         toast.className = `transform translate-x-full opacity-0 transition-all duration-300
-                          rounded-lg shadow-lg p-4 flex items-center space-x-3
+                          rounded-lg shadow-lg p-4 flex items-start space-x-3
                           ${this.getTypeClasses(type)}`;
 
         const icon = this.getIcon(type);
@@ -90,8 +93,8 @@ class ToastManager {
 
         toast.innerHTML = `
             ${icon}
-            <span class="flex-1 text-sm font-medium">${message}</span>
-            <div class="flex items-center space-x-2">
+            <span class="flex-1 text-sm font-medium break-words">${message}</span>
+            <div class="flex items-start space-x-2 flex-shrink-0">
                 ${retryBtn}
                 ${closeBtn}
             </div>
@@ -136,13 +139,13 @@ class ToastManager {
 
     createCloseButton(toast) {
         const closeIcon = window.Icons ? window.Icons.close : '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
-        return `<button class="toast-close text-white hover:text-gray-200 transition focus:outline-none focus:ring-2 focus:ring-white rounded" aria-label="Dismiss notification">
+        return `<button class="toast-close text-white hover:text-gray-200 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-white rounded" aria-label="Dismiss notification">
                     ${closeIcon}
                 </button>`;
     }
 
     createRetryButton(toast) {
-        return `<button class="toast-retry px-3 py-1 bg-white bg-opacity-20 hover:bg-opacity-30 rounded text-xs font-medium transition focus:outline-none focus:ring-2 focus:ring-white" aria-label="Retry action">
+        return `<button class="toast-retry px-3 py-1 bg-white bg-opacity-20 hover:bg-opacity-30 rounded text-xs font-medium transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-white" aria-label="Retry action">
                     Retry
                 </button>`;
     }

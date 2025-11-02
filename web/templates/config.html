@@ -4,6 +4,9 @@
 <div class="space-y-6">
     <h2 class="text-3xl font-bold">Configuration</h2>
 
+    <!-- Validation Errors Container -->
+    <div id="validation-errors" class="hidden"></div>
+
     <form hx-post="/api/config/save" hx-swap="none" class="space-y-6">
         <!-- General Settings -->
         <div class="bg-gray-800 rounded-lg p-6">
@@ -39,6 +42,8 @@
                     type="button"
                     hx-post="/api/config/test-scan-paths"
                     hx-include="[name='scan_paths']"
+                    hx-target="#validation-errors"
+                    hx-swap="innerHTML"
                     hx-indicator="#scan-paths-test-indicator"
                     class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative cursor-pointer">
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="scan-paths-test-indicator">
@@ -69,6 +74,8 @@
                     type="button"
                     hx-post="/api/config/test-path-mappings"
                     hx-include="[name='local_path_mappings'], [name='service_path_mappings']"
+                    hx-target="#validation-errors"
+                    hx-swap="innerHTML"
                     hx-indicator="#path-mappings-test-indicator"
                     class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative cursor-pointer">
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="path-mappings-test-indicator">
@@ -287,6 +294,8 @@
         <div class="flex justify-end space-x-4">
             <button
                 type="submit"
+                hx-target="#validation-errors"
+                hx-swap="innerHTML"
                 class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded transition cursor-pointer">
                 Save Configuration
             </button>

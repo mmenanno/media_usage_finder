@@ -99,6 +99,21 @@ func (s *Server) LoadTemplates(pattern string) error {
 		s.templates[page] = tmpl
 	}
 
+	// Load partial templates (used for HTMX responses)
+	partials := []string{
+		"partials/validation-errors.html",
+	}
+
+	for _, partial := range partials {
+		tmpl, err := template.New(partial).Funcs(s.templateFuncs).ParseFiles(
+			baseDir + "/" + partial,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to parse %s: %w", partial, err)
+		}
+		s.templates[partial] = tmpl
+	}
+
 	return nil
 }
 
@@ -717,54 +732,61 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Update Plex config with validation
+	// Collect all validation errors before updating config
+	var validationErrors []string
+
+	// Validate Plex config
 	plexURL := r.FormValue("plex_url")
 	if err := ValidateURL(plexURL); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid Plex URL: %v", err), "validation_failed")
-		return
+		validationErrors = append(validationErrors, fmt.Sprintf("Plex URL: %v", err))
 	}
-	s.config.Services.Plex.URL = plexURL
-	s.config.Services.Plex.Token = r.FormValue("plex_token")
 
-	// Update Sonarr config with validation
+	// Validate Sonarr config
 	sonarrURL := r.FormValue("sonarr_url")
 	if err := ValidateURL(sonarrURL); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid Sonarr URL: %v", err), "validation_failed")
-		return
+		validationErrors = append(validationErrors, fmt.Sprintf("Sonarr URL: %v", err))
 	}
 	sonarrAPIKey := r.FormValue("sonarr_api_key")
 	if err := ValidateAPIKey(sonarrAPIKey); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid Sonarr API key: %v", err), "validation_failed")
-		return
+		validationErrors = append(validationErrors, fmt.Sprintf("Sonarr API key: %v", err))
 	}
-	s.config.Services.Sonarr.URL = sonarrURL
-	s.config.Services.Sonarr.APIKey = sonarrAPIKey
 
-	// Update Radarr config with validation
+	// Validate Radarr config
 	radarrURL := r.FormValue("radarr_url")
 	if err := ValidateURL(radarrURL); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid Radarr URL: %v", err), "validation_failed")
-		return
+		validationErrors = append(validationErrors, fmt.Sprintf("Radarr URL: %v", err))
 	}
 	radarrAPIKey := r.FormValue("radarr_api_key")
 	if err := ValidateAPIKey(radarrAPIKey); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid Radarr API key: %v", err), "validation_failed")
-		return
+		validationErrors = append(validationErrors, fmt.Sprintf("Radarr API key: %v", err))
 	}
-	s.config.Services.Radarr.URL = radarrURL
-	s.config.Services.Radarr.APIKey = radarrAPIKey
 
-	// Update qBittorrent config with validation
+	// Validate qBittorrent config
 	qbURL := r.FormValue("qbittorrent_url")
 	if err := ValidateURL(qbURL); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid qBittorrent URL: %v", err), "validation_failed")
-		return
+		validationErrors = append(validationErrors, fmt.Sprintf("qBittorrent URL: %v", err))
 	}
 	qbProxyURL := r.FormValue("qbittorrent_qui_proxy_url")
 	if err := ValidateURL(qbProxyURL); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid qBittorrent proxy URL: %v", err), "validation_failed")
+		validationErrors = append(validationErrors, fmt.Sprintf("qBittorrent proxy URL: %v", err))
+	}
+
+	// If there are validation errors, show them in the error panel
+	if len(validationErrors) > 0 {
+		s.renderValidationErrors(w, "Configuration Validation Failed", validationErrors)
 		return
 	}
+
+	// All validations passed, update config
+	s.config.Services.Plex.URL = plexURL
+	s.config.Services.Plex.Token = r.FormValue("plex_token")
+
+	s.config.Services.Sonarr.URL = sonarrURL
+	s.config.Services.Sonarr.APIKey = sonarrAPIKey
+
+	s.config.Services.Radarr.URL = radarrURL
+	s.config.Services.Radarr.APIKey = radarrAPIKey
+
 	s.config.Services.QBittorrent.URL = qbURL
 	s.config.Services.QBittorrent.Username = r.FormValue("qbittorrent_username")
 	s.config.Services.QBittorrent.Password = r.FormValue("qbittorrent_password")
@@ -833,29 +855,63 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Validate config before saving
 	if err := s.config.Validate(); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid configuration: %v", err), "validation_failed")
+		s.renderValidationErrors(w, "Configuration Validation Failed", []string{err.Error()})
 		return
 	}
 
 	// Save config to file
 	if err := s.config.Save("/appdata/config/config.yaml"); err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to save configuration", "save_failed")
+		s.renderValidationErrors(w, "Failed to Save Configuration", []string{err.Error()})
 		return
 	}
 
+	// Success - show toast and clear error panel
 	w.Header().Set("X-Toast-Message", "Configuration saved successfully")
 	w.Header().Set("X-Toast-Type", "success")
-
-	response := ConfigSaveResponse{
-		Status:  "success",
-		Message: "Configuration saved",
-	}
-	respondJSON(w, http.StatusOK, response)
+	w.Header().Set("Content-Type", "text/html")
+	w.WriteHeader(http.StatusOK)
+	// Clear and hide the validation-errors div
+	w.Write([]byte(`<script>document.getElementById('validation-errors').classList.add('hidden');</script>`))
 }
 
 // HandleTestService tests connection to a service
 func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 	serviceName := r.URL.Query().Get("service")
+
+	// Validate that required fields are not empty before attempting connection
+	var missingField string
+	switch serviceName {
+	case "plex":
+		if s.config.Services.Plex.URL == "" {
+			missingField = "Plex URL"
+		} else if s.config.Services.Plex.Token == "" {
+			missingField = "Plex Token"
+		}
+	case "sonarr":
+		if s.config.Services.Sonarr.URL == "" {
+			missingField = "Sonarr URL"
+		} else if s.config.Services.Sonarr.APIKey == "" {
+			missingField = "Sonarr API Key"
+		}
+	case "radarr":
+		if s.config.Services.Radarr.URL == "" {
+			missingField = "Radarr URL"
+		} else if s.config.Services.Radarr.APIKey == "" {
+			missingField = "Radarr API Key"
+		}
+	case "qbittorrent":
+		if s.config.Services.QBittorrent.URL == "" {
+			missingField = "qBittorrent URL"
+		}
+	}
+
+	// If a required field is missing, return warning toast
+	if missingField != "" {
+		w.Header().Set("X-Toast-Message", fmt.Sprintf("No %s provided", missingField))
+		w.Header().Set("X-Toast-Type", "warning")
+		respondSuccess(w, "No configuration to test", nil)
+		return
+	}
 
 	// Use factory to create client
 	client, err := s.clientFactory.CreateClient(serviceName, s.config.APITimeout)
@@ -936,17 +992,17 @@ func (s *Server) HandleTestScanPaths(w http.ResponseWriter, r *http.Request) {
 
 	// Send response
 	if len(errors) > 0 {
-		message := fmt.Sprintf("Found %d issue(s): %s", len(errors), strings.Join(errors, "; "))
-		w.Header().Set("X-Toast-Message", message)
-		w.Header().Set("X-Toast-Type", "error")
-		respondError(w, http.StatusBadRequest, message, "path_test_failed")
+		// Render validation errors panel
+		s.renderValidationErrors(w, "Scan Path Validation Failed", errors)
 		return
 	}
 
-	message := fmt.Sprintf("All %d scan path(s) validated successfully", len(results))
-	w.Header().Set("X-Toast-Message", message)
+	// Success - show toast and clear error panel
+	w.Header().Set("X-Toast-Message", fmt.Sprintf("All %d scan path(s) validated successfully", len(results)))
 	w.Header().Set("X-Toast-Type", "success")
-	respondSuccess(w, message, nil)
+	w.WriteHeader(http.StatusOK)
+	// Clear and hide the validation-errors div
+	w.Write([]byte(`<script>document.getElementById('validation-errors').classList.add('hidden');</script>`))
 }
 
 // HandleTestPathMappings validates path mapping syntax and tests paths
@@ -1045,24 +1101,26 @@ func (s *Server) HandleTestPathMappings(w http.ResponseWriter, r *http.Request) 
 
 	// Send response
 	if len(errors) > 0 {
-		message := fmt.Sprintf("Found %d issue(s) in %d mapping(s): %s", len(errors), mappingCount, strings.Join(errors, "; "))
-		w.Header().Set("X-Toast-Message", message)
-		w.Header().Set("X-Toast-Type", "error")
-		respondError(w, http.StatusBadRequest, message, "mapping_test_failed")
+		// Render validation errors panel
+		s.renderValidationErrors(w, "Path Mapping Validation Failed", errors)
 		return
 	}
 
 	if mappingCount == 0 {
 		w.Header().Set("X-Toast-Message", "No valid mappings found")
 		w.Header().Set("X-Toast-Type", "warning")
-		respondSuccess(w, "No mappings to test", nil)
+		w.WriteHeader(http.StatusOK)
+		// Clear and hide the validation-errors div
+		w.Write([]byte(`<script>document.getElementById('validation-errors').classList.add('hidden');</script>`))
 		return
 	}
 
-	message := fmt.Sprintf("All %d path mapping(s) validated successfully", len(successes))
-	w.Header().Set("X-Toast-Message", message)
+	// Success - show toast and clear error panel
+	w.Header().Set("X-Toast-Message", fmt.Sprintf("All %d path mapping(s) validated successfully", len(successes)))
 	w.Header().Set("X-Toast-Type", "success")
-	respondSuccess(w, message, nil)
+	w.WriteHeader(http.StatusOK)
+	// Clear and hide the validation-errors div
+	w.Write([]byte(`<script>document.getElementById('validation-errors').classList.add('hidden');</script>`))
 }
 
 // HandleExport exports files list using streaming for memory efficiency
@@ -1380,6 +1438,38 @@ func (s *Server) renderTemplate(w http.ResponseWriter, name string, data interfa
 	// Execute layout.html which will call the "content" block from the specific page template
 	if err := tmpl.ExecuteTemplate(w, "layout.html", data); err != nil {
 		log.Printf("ERROR: Failed to execute template %s: %v", name, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+// ValidationErrorsData holds data for rendering validation errors
+type ValidationErrorsData struct {
+	Title  string
+	Errors []string
+}
+
+// renderValidationErrors renders the validation errors partial template as HTML
+func (s *Server) renderValidationErrors(w http.ResponseWriter, title string, errors []string) {
+	if s.templates == nil {
+		http.Error(w, "Templates not loaded", http.StatusInternalServerError)
+		return
+	}
+
+	tmpl, ok := s.templates["partials/validation-errors.html"]
+	if !ok {
+		http.Error(w, "Validation errors template not found", http.StatusInternalServerError)
+		return
+	}
+
+	data := ValidationErrorsData{
+		Title:  title,
+		Errors: errors,
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	// Execute the template using the filename (not the full path)
+	if err := tmpl.ExecuteTemplate(w, "validation-errors.html", data); err != nil {
+		log.Printf("ERROR: Failed to render validation errors: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
