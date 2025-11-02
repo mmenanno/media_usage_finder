@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bufio"
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
@@ -50,6 +52,29 @@ type responseWriter struct {
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
+}
+
+// Flush implements http.Flusher for SSE support
+func (rw *responseWriter) Flush() {
+	if flusher, ok := rw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// Hijack implements http.Hijacker for WebSocket support
+func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hijacker, ok := rw.ResponseWriter.(http.Hijacker); ok {
+		return hijacker.Hijack()
+	}
+	return nil, nil, http.ErrNotSupported
+}
+
+// Push implements http.Pusher for HTTP/2 Server Push support
+func (rw *responseWriter) Push(target string, opts *http.PushOptions) error {
+	if pusher, ok := rw.ResponseWriter.(http.Pusher); ok {
+		return pusher.Push(target, opts)
+	}
+	return http.ErrNotSupported
 }
 
 // CORS middleware adds CORS headers with configurable origin

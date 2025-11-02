@@ -891,13 +891,13 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no") // Disable buffering for nginx
 
 	// Send initial connection message
-	fmt.Fprintf(w, "data: Connected to log stream\n\n")
+	fmt.Fprintf(w, "data: <div class=\"text-gray-400\">Connected to log stream</div>\n\n")
 	flusher.Flush()
 
 	progress := s.scanner.GetProgress()
 	if progress == nil {
 		// No scan running - keep connection open but send status updates
-		fmt.Fprintf(w, "data: No scan currently running\n\n")
+		fmt.Fprintf(w, "data: <div class=\"text-gray-500\">No scan currently running</div>\n\n")
 		flusher.Flush()
 
 		// Keep connection alive with periodic pings
@@ -914,7 +914,7 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 
 				// Check if a scan has started
 				if s.scanner.GetProgress() != nil {
-					fmt.Fprintf(w, "data: Scan started, reconnect to see logs\n\n")
+					fmt.Fprintf(w, "data: <div class=\"text-green-400\">Scan started, reconnect to see logs</div>\n\n")
 					flusher.Flush()
 					return
 				}
@@ -925,7 +925,7 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 	// Subscribe to log messages
 	logChan := progress.Subscribe()
 	if logChan == nil {
-		fmt.Fprintf(w, "data: Failed to subscribe to scan logs\n\n")
+		fmt.Fprintf(w, "data: <div class=\"text-red-400\">Failed to subscribe to scan logs</div>\n\n")
 		flusher.Flush()
 		return
 	}
@@ -947,11 +947,11 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 		case msg, ok := <-logChan:
 			if !ok {
 				// Channel closed, scan finished
-				fmt.Fprintf(w, "data: Scan completed\n\n")
+				fmt.Fprintf(w, "data: <div class=\"text-green-400\">Scan completed</div>\n\n")
 				flusher.Flush()
 				return
 			}
-			fmt.Fprintf(w, "data: %s\n\n", msg)
+			fmt.Fprintf(w, "data: <div class=\"text-gray-300\">%s</div>\n\n", msg)
 			flusher.Flush()
 		}
 	}
