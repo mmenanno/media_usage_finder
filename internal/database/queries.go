@@ -73,6 +73,7 @@ type Scan struct {
 	FilesScanned int64
 	Errors       *string
 	ScanType     string
+	CurrentPhase *string
 	CreatedAt    time.Time
 }
 
@@ -223,10 +224,17 @@ func (db *DB) IncrementScanFiles(scanID int64, count int64) error {
 	return err
 }
 
+// UpdateScanPhase updates the current_phase of a scan
+func (db *DB) UpdateScanPhase(scanID int64, phase string) error {
+	query := `UPDATE scans SET current_phase = ? WHERE id = ?`
+	_, err := db.conn.Exec(query, phase, scanID)
+	return err
+}
+
 // GetCurrentScan returns the currently running scan, if any
 func (db *DB) GetCurrentScan() (*Scan, error) {
 	query := `
-		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, created_at
+		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, created_at
 		FROM scans
 		WHERE status = 'running'
 		ORDER BY started_at DESC
@@ -237,6 +245,7 @@ func (db *DB) GetCurrentScan() (*Scan, error) {
 	var startedAt, createdAt int64
 	var completedAt sql.NullInt64
 	var errors sql.NullString
+	var currentPhase sql.NullString
 
 	err := db.conn.QueryRow(query).Scan(
 		&scan.ID,
@@ -246,6 +255,7 @@ func (db *DB) GetCurrentScan() (*Scan, error) {
 		&scan.FilesScanned,
 		&errors,
 		&scan.ScanType,
+		&currentPhase,
 		&createdAt,
 	)
 
@@ -266,6 +276,9 @@ func (db *DB) GetCurrentScan() (*Scan, error) {
 	if errors.Valid {
 		scan.Errors = &errors.String
 	}
+	if currentPhase.Valid {
+		scan.CurrentPhase = &currentPhase.String
+	}
 
 	return scan, nil
 }
@@ -281,7 +294,7 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 
 	// Get scans
 	query := `
-		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, created_at
+		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, created_at
 		FROM scans
 		ORDER BY started_at DESC
 		LIMIT ? OFFSET ?
@@ -299,6 +312,7 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 		var startedAt, createdAt int64
 		var completedAt sql.NullInt64
 		var errors sql.NullString
+		var currentPhase sql.NullString
 
 		err := rows.Scan(
 			&scan.ID,
@@ -308,6 +322,7 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 			&scan.FilesScanned,
 			&errors,
 			&scan.ScanType,
+			&currentPhase,
 			&createdAt,
 		)
 		if err != nil {
@@ -323,6 +338,9 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 		}
 		if errors.Valid {
 			scan.Errors = &errors.String
+		}
+		if currentPhase.Valid {
+			scan.CurrentPhase = &currentPhase.String
 		}
 
 		scans = append(scans, scan)

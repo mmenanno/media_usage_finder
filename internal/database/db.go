@@ -85,7 +85,7 @@ func (db *DB) initSchema() error {
 
 // runMigrations applies database migrations
 func (db *DB) runMigrations() error {
-	// Check if scan_id column is NOT NULL (needs migration)
+	// Migration 1: Check if scan_id column is NOT NULL (needs migration)
 	var notNull int
 	err := db.conn.QueryRow(`
 		SELECT "notnull"
@@ -104,6 +104,26 @@ func (db *DB) runMigrations() error {
 		_, err = db.conn.Exec(migrateScanIdNullable)
 		if err != nil {
 			return fmt.Errorf("failed to migrate scan_id to nullable: %w", err)
+		}
+	}
+
+	// Migration 2: Add current_phase column to scans table if it doesn't exist
+	var hasCurrentPhase int
+	err = db.conn.QueryRow(`
+		SELECT COUNT(*)
+		FROM pragma_table_info('scans')
+		WHERE name = 'current_phase'
+	`).Scan(&hasCurrentPhase)
+
+	if err != nil {
+		return fmt.Errorf("failed to check for current_phase column: %w", err)
+	}
+
+	// If current_phase column doesn't exist, add it
+	if hasCurrentPhase == 0 {
+		_, err = db.conn.Exec(migrateAddCurrentPhase)
+		if err != nil {
+			return fmt.Errorf("failed to add current_phase column: %w", err)
 		}
 	}
 

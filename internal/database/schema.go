@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS scans (
 	files_scanned INTEGER NOT NULL DEFAULT 0,
 	errors TEXT,
 	scan_type TEXT NOT NULL DEFAULT 'full' CHECK(scan_type IN ('full', 'incremental')),
+	current_phase TEXT,
 	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
@@ -170,4 +171,10 @@ CREATE TRIGGER files_au AFTER UPDATE ON files BEGIN
 	INSERT INTO files_fts(files_fts, rowid, path) VALUES('delete', old.id, old.path);
 	INSERT INTO files_fts(rowid, path) VALUES (new.id, new.path);
 END;
+`
+
+// Migration to add current_phase column to scans table
+const migrateAddCurrentPhase = `
+-- Add current_phase column to scans table
+ALTER TABLE scans ADD COLUMN current_phase TEXT;
 `

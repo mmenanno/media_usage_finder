@@ -46,10 +46,19 @@
                                 <span class="px-2 py-1 bg-green-600 rounded text-xs">Completed</span>
                             {{else if eq .Status "running"}}
                                 <span class="px-2 py-1 bg-blue-600 rounded text-xs">Running</span>
+                                {{if .CurrentPhase}}
+                                    <div class="text-xs text-blue-300 mt-1">{{.CurrentPhase}}</div>
+                                {{end}}
                             {{else if eq .Status "failed"}}
                                 <span class="px-2 py-1 bg-red-600 rounded text-xs">Failed</span>
+                                {{if .CurrentPhase}}
+                                    <div class="text-xs text-gray-400 mt-1">Last phase: {{.CurrentPhase}}</div>
+                                {{end}}
                             {{else if eq .Status "interrupted"}}
                                 <span class="px-2 py-1 bg-yellow-600 rounded text-xs">Interrupted</span>
+                                {{if .CurrentPhase}}
+                                    <div class="text-xs text-yellow-300 mt-1">Last phase: {{.CurrentPhase}}</div>
+                                {{end}}
                             {{end}}
                             {{if .Errors}}
                             <button
