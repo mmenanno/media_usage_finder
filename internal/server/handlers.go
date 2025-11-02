@@ -1097,11 +1097,11 @@ func (s *Server) HandleTestPathMappings(w http.ResponseWriter, r *http.Request) 
 				continue
 			}
 
-			// Test host path
-			if _, err := os.Stat(host); err != nil {
-				errors = append(errors, fmt.Sprintf("%s=%s: host path error: %v", container, host, err))
+			// Test container path (left side - what we can see from inside the container)
+			if _, err := os.Stat(container); err != nil {
+				errors = append(errors, fmt.Sprintf("%s=%s: container path error: %v", container, host, err))
 			} else {
-				successes = append(successes, fmt.Sprintf("%s=%s: OK", container, host))
+				successes = append(successes, fmt.Sprintf("%s=%s: OK (container path accessible)", container, host))
 			}
 		}
 	}
@@ -1116,33 +1116,33 @@ func (s *Server) HandleTestPathMappings(w http.ResponseWriter, r *http.Request) 
 			}
 			mappingCount++
 
-			// Split service:path=host
+			// Split service:container_path=service_path
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) != 2 {
-				errors = append(errors, fmt.Sprintf("Service line %d: invalid format (expected 'service:container=host')", i+1))
+				errors = append(errors, fmt.Sprintf("Service line %d: invalid format (expected 'service:container_path=service_path')", i+1))
 				continue
 			}
 
 			service := strings.TrimSpace(parts[0])
 			pathParts := strings.SplitN(parts[1], "=", 2)
 			if len(pathParts) != 2 {
-				errors = append(errors, fmt.Sprintf("Service line %d: invalid format (expected 'service:container=host')", i+1))
+				errors = append(errors, fmt.Sprintf("Service line %d: invalid format (expected 'service:container_path=service_path')", i+1))
 				continue
 			}
 
-			container := strings.TrimSpace(pathParts[0])
-			host := strings.TrimSpace(pathParts[1])
+			containerPath := strings.TrimSpace(pathParts[0])
+			servicePath := strings.TrimSpace(pathParts[1])
 
-			if service == "" || container == "" || host == "" {
-				errors = append(errors, fmt.Sprintf("Service line %d: empty service, container, or host path", i+1))
+			if service == "" || containerPath == "" || servicePath == "" {
+				errors = append(errors, fmt.Sprintf("Service line %d: empty service, container, or service path", i+1))
 				continue
 			}
 
-			// Test host path
-			if _, err := os.Stat(host); err != nil {
-				errors = append(errors, fmt.Sprintf("%s:%s=%s: host path error: %v", service, container, host, err))
+			// Test container path (left side - what we can see)
+			if _, err := os.Stat(containerPath); err != nil {
+				errors = append(errors, fmt.Sprintf("%s:%s=%s: container path error: %v", service, containerPath, servicePath, err))
 			} else {
-				successes = append(successes, fmt.Sprintf("%s:%s=%s: OK", service, container, host))
+				successes = append(successes, fmt.Sprintf("%s:%s=%s: OK (container path accessible)", service, containerPath, servicePath))
 			}
 		}
 	}
