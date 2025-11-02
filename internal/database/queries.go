@@ -267,17 +267,6 @@ func (db *DB) GetCurrentScan() (*Scan, error) {
 		scan.Errors = &errors.String
 	}
 
-	// Check if scan is stale (running for more than 1 hour)
-	// This handles cases where the app crashed before updating scan status
-	if time.Since(scan.StartedAt) > 1*time.Hour {
-		log.Printf("Found stale running scan (ID: %d, started: %v), marking as interrupted", scan.ID, scan.StartedAt)
-		errMsg := "Scan interrupted - exceeded maximum runtime of 1 hour"
-		if err := db.UpdateScan(scan.ID, "interrupted", scan.FilesScanned, &errMsg); err != nil {
-			log.Printf("Failed to update stale scan status: %v", err)
-		}
-		return nil, nil // Return no current scan
-	}
-
 	return scan, nil
 }
 
@@ -978,7 +967,38 @@ func (db *DB) RebuildFTSIndex() error {
 	return nil
 }
 
+// CleanStaleScansOnStartup marks all running scans as interrupted on application startup
+// This handles cases where the app was restarted while scans were running
+func (db *DB) CleanStaleScansOnStartup() (int64, error) {
+	errMsg := "Scan interrupted - application restarted"
+
+	result, err := db.conn.Exec(
+		`UPDATE scans SET status = 'interrupted', errors = ?, completed_at = ? WHERE status = 'running'`,
+		errMsg, time.Now().Unix(),
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+
+	if count > 0 {
+		log.Printf("Marked %d running scans as interrupted on startup", count)
+		// Log the action
+		_, _ = db.conn.Exec(
+			`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('config_change', 'scans', 0, ?)`,
+			fmt.Sprintf("Marked %d running scans as interrupted on startup", count),
+		)
+	}
+
+	return count, nil
+}
+
 // CleanStaleScans marks old running scans as interrupted
+// This is a safety mechanism for scans that have been running for over 1 hour
 func (db *DB) CleanStaleScans() (int64, error) {
 	oneHourAgo := time.Now().Add(-1 * time.Hour).Unix()
 	errMsg := "Scan interrupted - exceeded maximum runtime"

@@ -57,6 +57,14 @@ func NewWithConfig(dbPath string, cfg DBConfig) (*DB, error) {
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
+	// Clean up any orphaned running scans from previous app instances
+	// This marks all scans with status='running' as 'interrupted' since
+	// if the app is starting up, no scan can actually be running
+	if _, err := db.CleanStaleScansOnStartup(); err != nil {
+		// Log but don't fail startup
+		fmt.Printf("Warning: failed to clean orphaned scans on startup: %v\n", err)
+	}
+
 	return db, nil
 }
 
