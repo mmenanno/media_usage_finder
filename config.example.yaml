@@ -36,6 +36,9 @@ service_path_mappings:
   qbittorrent:
     - service: /downloads
       local: /mnt/user/data/downloads/torrents
+  stash:
+    - service: /stash
+      local: /mnt/user/data/media/stash
 
 services:
   plex:
@@ -53,6 +56,9 @@ services:
     password: adminpass
     # Optional: Use qui proxy instead of direct connection
     # qui_proxy_url: http://qui:7476/proxy/YOUR_PROXY_KEY_HERE
+  stash:
+    url: http://stash:9999
+    api_key: YOUR_STASH_API_KEY_HERE
 
 # Paths to scan (as seen by media-finder container)
 scan_paths:

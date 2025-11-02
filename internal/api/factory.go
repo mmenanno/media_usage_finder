@@ -28,6 +28,8 @@ func (f *ClientFactory) CreateClient(serviceName string, timeout time.Duration) 
 		return f.CreateRadarrClient(timeout), nil
 	case "qbittorrent":
 		return f.CreateQBittorrentClient(timeout), nil
+	case "stash":
+		return f.CreateStashClient(timeout), nil
 	default:
 		return nil, fmt.Errorf("unknown service: %s", serviceName)
 	}
@@ -54,6 +56,11 @@ func (f *ClientFactory) CreateQBittorrentClient(timeout time.Duration) *QBittorr
 	return NewQBittorrentClient(qbConfig.URL, qbConfig.Username, qbConfig.Password, qbConfig.QuiProxyURL, timeout)
 }
 
+// CreateStashClient creates a Stash API client
+func (f *ClientFactory) CreateStashClient(timeout time.Duration) *StashClient {
+	return NewStashClient(f.config.Services.Stash.URL, f.config.Services.Stash.APIKey, timeout)
+}
+
 // IsServiceConfigured checks if a service is configured with valid credentials
 func (f *ClientFactory) IsServiceConfigured(serviceName string) bool {
 	switch serviceName {
@@ -69,6 +76,8 @@ func (f *ClientFactory) IsServiceConfigured(serviceName string) bool {
 		hasDirectAccess := qbConfig.URL != "" && qbConfig.Username != "" && qbConfig.Password != ""
 		hasProxyAccess := qbConfig.QuiProxyURL != ""
 		return hasDirectAccess || hasProxyAccess
+	case "stash":
+		return f.config.Services.Stash.URL != "" && f.config.Services.Stash.APIKey != ""
 	default:
 		return false
 	}

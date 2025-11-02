@@ -47,6 +47,7 @@ type Services struct {
 	Sonarr      SonarrConfig      `yaml:"sonarr"`
 	Radarr      RadarrConfig      `yaml:"radarr"`
 	QBittorrent QBittorrentConfig `yaml:"qbittorrent"`
+	Stash       StashConfig       `yaml:"stash"`
 }
 
 // PlexConfig contains Plex server configuration
@@ -73,6 +74,12 @@ type QBittorrentConfig struct {
 	Username    string `yaml:"username"`
 	Password    string `yaml:"password"`
 	QuiProxyURL string `yaml:"qui_proxy_url"`
+}
+
+// StashConfig contains Stash configuration
+type StashConfig struct {
+	URL    string `yaml:"url"`
+	APIKey string `yaml:"api_key"`
 }
 
 // Default returns a default configuration

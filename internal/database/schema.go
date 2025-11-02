@@ -53,7 +53,7 @@ END;
 CREATE TABLE IF NOT EXISTS usage (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	file_id INTEGER NOT NULL,
-	service TEXT NOT NULL CHECK(service IN ('plex', 'sonarr', 'radarr', 'qbittorrent')),
+	service TEXT NOT NULL CHECK(service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash')),
 	reference_path TEXT NOT NULL,
 	metadata TEXT,
 	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),

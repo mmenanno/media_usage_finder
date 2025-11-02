@@ -273,6 +273,12 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 		s.progress.Log(fmt.Sprintf("Warning: Failed to update qBittorrent usage: %v", err))
 	}
 
+	s.updatePhase(scanID, "Checking Stash")
+	s.progress.Log("Querying Stash for tracked files...")
+	if err := s.updateStashUsage(); err != nil {
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+	}
+
 	// Phase 4: Update orphaned status
 	s.updatePhase(scanID, "Updating orphaned status")
 	s.progress.Log("Calculating orphaned file status...")
@@ -371,6 +377,12 @@ func (s *Scanner) runScanWithResume(ctx context.Context, scanID int64, increment
 		s.progress.Log(fmt.Sprintf("Warning: Failed to update qBittorrent usage: %v", err))
 	}
 
+	s.updatePhase(scanID, "Checking Stash")
+	s.progress.Log("Querying Stash for tracked files...")
+	if err := s.updateStashUsage(); err != nil {
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+	}
+
 	// Phase 4: Update orphaned status
 	s.updatePhase(scanID, "Updating orphaned status")
 	s.progress.Log("Calculating orphaned file status...")
@@ -428,6 +440,19 @@ func (f qbittorrentServiceFile) GetMetadata() map[string]interface{} {
 	return map[string]interface{}{
 		"torrent_hash": f.TorrentHash,
 		"torrent_name": f.TorrentName,
+	}
+}
+
+type stashServiceFile struct{ api.StashFile }
+
+func (f stashServiceFile) GetPath() string { return f.Path }
+func (f stashServiceFile) GetMetadata() map[string]interface{} {
+	return map[string]interface{}{
+		"scene_id":   f.SceneID,
+		"title":      f.Title,
+		"studio":     f.Studio,
+		"tags":       f.Tags,
+		"play_count": f.PlayCount,
 	}
 }
 
@@ -628,6 +653,29 @@ func (s *Scanner) updateQBittorrentUsage() error {
 	)
 }
 
+// updateStashUsage updates usage information from Stash
+func (s *Scanner) updateStashUsage() error {
+	if s.config.Services.Stash.URL == "" {
+		return nil
+	}
+
+	return s.updateServiceUsageWithTimeout(
+		"stash",
+		func() ([]serviceFile, error) {
+			client := api.NewStashClient(s.config.Services.Stash.URL, s.config.Services.Stash.APIKey, s.config.APITimeout)
+			files, err := client.GetAllFiles()
+			if err != nil {
+				return nil, err
+			}
+			serviceFiles := make([]serviceFile, len(files))
+			for i, f := range files {
+				serviceFiles[i] = stashServiceFile{f}
+			}
+			return serviceFiles, nil
+		},
+	)
+}
+
 // updateServiceUsageWithTimeout is a generic helper to update service usage with timeout handling
 // This eliminates duplication across all service update methods
 func (s *Scanner) updateServiceUsageWithTimeout(serviceName string, getFiles func() ([]serviceFile, error)) error {
@@ -738,6 +786,8 @@ func (s *Scanner) UpdateSingleService(serviceName string) error {
 		err = s.updateRadarrUsage()
 	case "qbittorrent":
 		err = s.updateQBittorrentUsage()
+	case "stash":
+		err = s.updateStashUsage()
 	default:
 		return fmt.Errorf("unknown service: %s", serviceName)
 	}
