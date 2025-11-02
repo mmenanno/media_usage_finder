@@ -137,18 +137,46 @@
                 <thead class="bg-gray-700">
                     <tr role="row">
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                            <a href="/files?order=path&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                            {{if and (eq .OrderBy "path") (eq .Direction "asc")}}
+                            <a href="/files?order=path&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                               class="hover:text-gray-200 cursor-pointer"
+                               aria-label="Sort by path descending">
+                                Path ↑
+                            </a>
+                            {{else if and (eq .OrderBy "path") (eq .Direction "desc")}}
+                            <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                               class="hover:text-gray-200 cursor-pointer"
+                               aria-label="Sort by path ascending">
+                                Path ↓
+                            </a>
+                            {{else}}
+                            <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
                                class="hover:text-gray-200 cursor-pointer"
                                aria-label="Sort by path">
-                                Path ↕
+                                Path
                             </a>
+                            {{end}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                            <a href="/files?order=size&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                            {{if and (eq .OrderBy "size") (eq .Direction "asc")}}
+                            <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                               class="hover:text-gray-200 cursor-pointer"
+                               aria-label="Sort by size descending">
+                                Size ↑
+                            </a>
+                            {{else if and (eq .OrderBy "size") (eq .Direction "desc")}}
+                            <a href="/files?order=size&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                               class="hover:text-gray-200 cursor-pointer"
+                               aria-label="Sort by size ascending">
+                                Size ↓
+                            </a>
+                            {{else}}
+                            <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
                                class="hover:text-gray-200 cursor-pointer"
                                aria-label="Sort by size">
-                                Size ↕
+                                Size
                             </a>
+                            {{end}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Services</th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>

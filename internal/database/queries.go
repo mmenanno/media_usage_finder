@@ -598,8 +598,19 @@ func ValidateOrderBy(orderBy string) string {
 	return "path" // default
 }
 
+// ValidateDirection ensures only valid SQL direction keywords are used
+func ValidateDirection(direction string) string {
+	if direction == "asc" || direction == "ASC" {
+		return "ASC"
+	}
+	if direction == "desc" || direction == "DESC" {
+		return "DESC"
+	}
+	return "ASC" // default
+}
+
 // ListFiles retrieves files with filtering and pagination
-func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, limit, offset int, orderBy string) ([]*File, int, error) {
+func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, limit, offset int, orderBy, direction string) ([]*File, int, error) {
 	var conditions []string
 	args := []interface{}{}
 
@@ -631,20 +642,21 @@ func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, l
 		return nil, 0, err
 	}
 
-	// Validate and sanitize orderBy
+	// Validate and sanitize orderBy and direction
 	// SQL Injection Safety: ValidateOrderBy uses an allowlist to ensure only
-	// valid column names are used. This is safe from SQL injection because the
-	// value is validated against a fixed set of allowed column names.
+	// valid column names are used. ValidateDirection ensures only ASC/DESC.
+	// This is safe from SQL injection because both values are validated.
 	safeOrderBy := ValidateOrderBy(orderBy)
+	safeDirection := ValidateDirection(direction)
 
 	query := fmt.Sprintf(`
 		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
 		       f.scan_id, f.last_verified, f.is_orphaned, f.created_at
 		FROM files f
 		%s
-		ORDER BY f.%s
+		ORDER BY f.%s %s
 		LIMIT ? OFFSET ?
-	`, whereClause, safeOrderBy)
+	`, whereClause, safeOrderBy, safeDirection)
 
 	args = append(args, limit, offset)
 	rows, err := db.conn.Query(query, args...)

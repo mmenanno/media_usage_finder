@@ -107,6 +107,8 @@ type FilesData struct {
 	Hardlinks  bool
 	Service    string
 	Search     string
+	OrderBy    string
+	Direction  string
 }
 
 // ConfigData represents data for the configuration template

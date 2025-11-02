@@ -178,6 +178,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	service := r.URL.Query().Get("service")
 	search := r.URL.Query().Get("search")
 	orderBy := r.URL.Query().Get("order")
+	direction := r.URL.Query().Get("direction")
 
 	var files []*database.File
 	var total int
@@ -186,7 +187,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	if search != "" {
 		files, total, err = s.db.SearchFiles(search, limit, offset)
 	} else {
-		files, total, err = s.db.ListFiles(orphanedOnly, service, hardlinksOnly, limit, offset, orderBy)
+		files, total, err = s.db.ListFiles(orphanedOnly, service, hardlinksOnly, limit, offset, orderBy, direction)
 	}
 
 	if err != nil {
@@ -226,6 +227,8 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		Hardlinks:  hardlinksOnly,
 		Service:    service,
 		Search:     search,
+		OrderBy:    orderBy,
+		Direction:  direction,
 	}
 
 	s.renderTemplate(w, "files.html", data)
@@ -1412,7 +1415,7 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 
 		first := true
 		for {
-			files, _, err := s.db.ListFiles(orphanedOnly, "", false, batchSize, offset, "path")
+			files, _, err := s.db.ListFiles(orphanedOnly, "", false, batchSize, offset, "path", "asc")
 			if err != nil {
 				if offset == 0 {
 					http.Error(w, "Failed to list files", http.StatusInternalServerError)
@@ -1465,7 +1468,7 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for {
-			files, _, err := s.db.ListFiles(orphanedOnly, "", false, batchSize, offset, "path")
+			files, _, err := s.db.ListFiles(orphanedOnly, "", false, batchSize, offset, "path", "asc")
 			if err != nil {
 				if offset == 0 {
 					http.Error(w, "Failed to list files", http.StatusInternalServerError)
@@ -1535,7 +1538,7 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 
 	// Bulk orphaned files deletion
 	if orphaned {
-		files, _, err := s.db.ListFiles(true, "", false, constants.MaxExportFiles, 0, "path")
+		files, _, err := s.db.ListFiles(true, "", false, constants.MaxExportFiles, 0, "path", "asc")
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to list orphaned files", "list_failed")
 			return
