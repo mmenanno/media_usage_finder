@@ -121,7 +121,8 @@
                 <h3 class="text-xl font-semibold">Plex</h3>
                 <button
                     type="button"
-                    hx-get="/api/config/test?service=plex"
+                    hx-post="/api/config/test?service=plex"
+                    hx-include="[name='plex_url'], [name='plex_token']"
                     hx-indicator="#plex-test-indicator"
                     class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative cursor-pointer">
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="plex-test-indicator">
@@ -160,13 +161,14 @@
                 <h3 class="text-xl font-semibold">Sonarr</h3>
                 <button
                     type="button"
-                    hx-get="/api/config/test?service=sonarr"
+                    hx-post="/api/config/test?service=sonarr"
+                    hx-include="[name='sonarr_url'], [name='sonarr_api_key']"
                     hx-indicator="#sonarr-test-indicator"
                     class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative cursor-pointer">
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="sonarr-test-indicator">
                         <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     </span>
                     <span class="htmx-indicator-hidden">Test Connection</span>
@@ -199,7 +201,8 @@
                 <h3 class="text-xl font-semibold">Radarr</h3>
                 <button
                     type="button"
-                    hx-get="/api/config/test?service=radarr"
+                    hx-post="/api/config/test?service=radarr"
+                    hx-include="[name='radarr_url'], [name='radarr_api_key']"
                     hx-indicator="#radarr-test-indicator"
                     class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative cursor-pointer">
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="radarr-test-indicator">
@@ -238,7 +241,8 @@
                 <h3 class="text-xl font-semibold">qBittorrent</h3>
                 <button
                     type="button"
-                    hx-get="/api/config/test?service=qbittorrent"
+                    hx-post="/api/config/test?service=qbittorrent"
+                    hx-include="[name='qbittorrent_url'], [name='qbittorrent_username'], [name='qbittorrent_password'], [name='qbittorrent_qui_proxy_url']"
                     hx-indicator="#qbit-test-indicator"
                     class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition relative cursor-pointer">
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="qbit-test-indicator">

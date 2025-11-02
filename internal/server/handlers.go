@@ -874,34 +874,62 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`<script>document.getElementById('validation-errors').classList.add('hidden');</script>`))
 }
 
-// HandleTestService tests connection to a service
+// HandleTestService tests connection to a service using current form values
 func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
 	serviceName := r.URL.Query().Get("service")
 
-	// Validate that required fields are not empty before attempting connection
+	// Create a temporary config with form values for testing
+	testConfig := *s.config // Copy current config
+
+	// Read form values and validate based on service type
 	var missingField string
 	switch serviceName {
 	case "plex":
-		if s.config.Services.Plex.URL == "" {
+		url := strings.TrimSpace(r.FormValue("plex_url"))
+		token := strings.TrimSpace(r.FormValue("plex_token"))
+		if url == "" {
 			missingField = "Plex URL"
-		} else if s.config.Services.Plex.Token == "" {
+		} else if token == "" {
 			missingField = "Plex Token"
+		} else {
+			testConfig.Services.Plex.URL = url
+			testConfig.Services.Plex.Token = token
 		}
 	case "sonarr":
-		if s.config.Services.Sonarr.URL == "" {
+		url := strings.TrimSpace(r.FormValue("sonarr_url"))
+		apiKey := strings.TrimSpace(r.FormValue("sonarr_api_key"))
+		if url == "" {
 			missingField = "Sonarr URL"
-		} else if s.config.Services.Sonarr.APIKey == "" {
+		} else if apiKey == "" {
 			missingField = "Sonarr API Key"
+		} else {
+			testConfig.Services.Sonarr.URL = url
+			testConfig.Services.Sonarr.APIKey = apiKey
 		}
 	case "radarr":
-		if s.config.Services.Radarr.URL == "" {
+		url := strings.TrimSpace(r.FormValue("radarr_url"))
+		apiKey := strings.TrimSpace(r.FormValue("radarr_api_key"))
+		if url == "" {
 			missingField = "Radarr URL"
-		} else if s.config.Services.Radarr.APIKey == "" {
+		} else if apiKey == "" {
 			missingField = "Radarr API Key"
+		} else {
+			testConfig.Services.Radarr.URL = url
+			testConfig.Services.Radarr.APIKey = apiKey
 		}
 	case "qbittorrent":
-		if s.config.Services.QBittorrent.URL == "" {
+		url := strings.TrimSpace(r.FormValue("qbittorrent_url"))
+		if url == "" {
 			missingField = "qBittorrent URL"
+		} else {
+			testConfig.Services.QBittorrent.URL = url
+			testConfig.Services.QBittorrent.Username = strings.TrimSpace(r.FormValue("qbittorrent_username"))
+			testConfig.Services.QBittorrent.Password = strings.TrimSpace(r.FormValue("qbittorrent_password"))
+			testConfig.Services.QBittorrent.QuiProxyURL = strings.TrimSpace(r.FormValue("qbittorrent_qui_proxy_url"))
 		}
 	}
 
@@ -913,15 +941,18 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use factory to create client
-	client, err := s.clientFactory.CreateClient(serviceName, s.config.APITimeout)
+	// Create a temporary client factory with the test config
+	testFactory := api.NewClientFactory(&testConfig)
+
+	// Use factory to create client with test config
+	testClient, err := testFactory.CreateClient(serviceName, testConfig.APITimeout)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Unknown service", "unknown_service")
 		return
 	}
 
 	// Test the connection
-	if err := client.Test(); err != nil {
+	if err := testClient.Test(); err != nil {
 		w.Header().Set("X-Toast-Message", fmt.Sprintf("%s connection failed: %v", serviceName, err))
 		w.Header().Set("X-Toast-Type", "error")
 		respondError(w, http.StatusBadRequest, err.Error(), "connection_failed")
