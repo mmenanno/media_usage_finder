@@ -266,6 +266,12 @@ type HardlinkGroup struct {
 	Size      int64 // Space saved by hardlinks
 }
 
+// ScanDisplay represents a scan with additional computed fields for display
+type ScanDisplay struct {
+	*database.Scan
+	ActualFileCount int // Actual count of files with this scan_id
+}
+
 // HandleHardlinks serves the hardlinks page with pagination
 func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
@@ -358,8 +364,22 @@ func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Enhance scans with actual file counts
+	scanDisplays := make([]*ScanDisplay, 0, len(scans))
+	for _, scan := range scans {
+		actualCount, err := s.db.GetScanFileCount(scan.ID)
+		if err != nil {
+			log.Printf("WARNING: Failed to get file count for scan %d: %v", scan.ID, err)
+			actualCount = 0
+		}
+		scanDisplays = append(scanDisplays, &ScanDisplay{
+			Scan:            scan,
+			ActualFileCount: actualCount,
+		})
+	}
+
 	data := ScansData{
-		Scans:      scans,
+		Scans:      scanDisplays,
 		Total:      total,
 		Page:       int64(page),
 		TotalPages: CalculateTotalPages(total, limit),

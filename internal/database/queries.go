@@ -331,6 +331,17 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 	return scans, total, rows.Err()
 }
 
+// GetScanFileCount returns the count of files associated with a specific scan
+func (db *DB) GetScanFileCount(scanID int64) (int, error) {
+	var count int
+	query := `SELECT COUNT(*) FROM files WHERE scan_id = ?`
+	err := db.conn.QueryRow(query, scanID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // UpsertUsage inserts or updates a usage record
 func (db *DB) UpsertUsage(usage *Usage) error {
 	metadataJSON, err := json.Marshal(usage.Metadata)
