@@ -75,7 +75,7 @@ class ModalManager {
         modal.className = 'fixed inset-0 flex items-center justify-center animate-fadeIn';
 
         modal.innerHTML = `
-            <div class="bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all animate-scaleIn">
+            <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all animate-scaleIn">
                 <div class="p-6">
                     <div class="flex items-start space-x-4">
                         ${this.getIcon(type, color)}
@@ -89,7 +89,7 @@ class ModalManager {
                     ${buttons.map((btn, i) => `
                         <button
                             data-action="${i}"
-                            class="px-4 py-2 rounded-lg font-medium transition-colors ${this.getButtonClass(btn.class)}"
+                            class="px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${this.getButtonClass(btn.class)}"
                         >
                             ${btn.text}
                         </button>
