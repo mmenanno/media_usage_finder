@@ -11,31 +11,31 @@ db_max_open_conns: 25
 db_max_idle_conns: 5
 db_conn_max_lifetime: 5m
 
-# Media-finder's own container-to-host mappings
+# Media-finder's own path mappings (service = media-finder's container path, local = host filesystem path)
 local_path_mappings:
-  - container: /media
-    host: /mnt/user/data/media
-  - container: /downloads
-    host: /mnt/user/data/downloads/torrents
+  - service: /media
+    local: /mnt/user/data/media
+  - service: /downloads
+    local: /mnt/user/data/downloads/torrents
 
-# Each service's container-to-host mappings
+# Each service's path mappings (service = external service's path, local = media-finder's path)
 service_path_mappings:
   plex:
-    - container: /media
-      host: /mnt/user/data/media
+    - service: /media
+      local: /mnt/user/data/media
   sonarr:
-    - container: /tv
-      host: /mnt/user/data/media/tv
-    - container: /downloads
-      host: /mnt/user/data/downloads/torrents
+    - service: /tv
+      local: /mnt/user/data/media/tv
+    - service: /downloads
+      local: /mnt/user/data/downloads/torrents
   radarr:
-    - container: /movies
-      host: /mnt/user/data/media/movies
-    - container: /downloads
-      host: /mnt/user/data/downloads/torrents
+    - service: /movies
+      local: /mnt/user/data/media/movies
+    - service: /downloads
+      local: /mnt/user/data/downloads/torrents
   qbittorrent:
-    - container: /downloads
-      host: /mnt/user/data/downloads/torrents
+    - service: /downloads
+      local: /mnt/user/data/downloads/torrents
 
 services:
   plex:

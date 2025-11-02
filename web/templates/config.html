@@ -70,7 +70,7 @@
             <div class="flex justify-between items-center mb-4">
                 <div>
                     <h3 class="text-xl font-semibold">Path Mappings</h3>
-                    <p class="text-sm text-gray-400 mt-1">Configure container-to-host path translations</p>
+                    <p class="text-sm text-gray-400 mt-1">Configure path translations between services and local storage</p>
                 </div>
                 <button
                     type="button"
@@ -94,25 +94,27 @@
                 <!-- Local Path Mappings -->
                 <div>
                     <h4 class="text-lg font-medium mb-2">Local Path Mappings</h4>
-                    <p class="text-xs text-gray-500 mb-2">Format: container_path=host_path (one per line)</p>
+                    <p class="text-xs text-gray-500 mb-1">Format: service_path=local_path (one per line)</p>
+                    <p class="text-xs text-gray-400 mb-2">Maps paths inside media-finder's container to the actual host filesystem</p>
                     <textarea
                         name="local_path_mappings"
                         rows="3"
                         data-autoresize
                         class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 font-mono text-sm resize-none"
-                        placeholder="/media=/mnt/user/data/media&#10;/downloads=/mnt/user/data/downloads/torrents">{{range .Config.LocalPathMappings}}{{.Container}}={{.Host}}&#10;{{end}}</textarea>
+                        placeholder="/media=/mnt/user/data/media&#10;/downloads=/mnt/user/data/downloads/torrents">{{range .Config.LocalPathMappings}}{{.Service}}={{.Local}}&#10;{{end}}</textarea>
                 </div>
 
                 <!-- Service Path Mappings -->
                 <div>
                     <h4 class="text-lg font-medium mb-2">Service-Specific Path Mappings</h4>
-                    <p class="text-xs text-gray-500 mb-4">Format: service:container_path=service_path (one per line)</p>
+                    <p class="text-xs text-gray-500 mb-1">Format: service:service_path=local_path (one per line)</p>
+                    <p class="text-xs text-gray-400 mb-2">Maps paths from external services to paths in media-finder's database</p>
                     <textarea
                         name="service_path_mappings"
                         rows="8"
                         data-autoresize
                         class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 font-mono text-sm resize-none"
-                        placeholder="plex:/media=/mnt/user/data/media&#10;sonarr:/tv=/mnt/user/data/media/tv&#10;sonarr:/downloads=/mnt/user/data/downloads/torrents&#10;radarr:/movies=/mnt/user/data/media/movies&#10;radarr:/downloads=/mnt/user/data/downloads/torrents&#10;qbittorrent:/downloads=/mnt/user/data/downloads/torrents">{{range $service, $mappings := .Config.ServicePathMappings}}{{range $mappings}}{{$service}}:{{.Container}}={{.Host}}&#10;{{end}}{{end}}</textarea>
+                        placeholder="plex:/media=/mnt/user/data/media&#10;sonarr:/tv=/mnt/user/data/media/tv&#10;sonarr:/downloads=/mnt/user/data/downloads/torrents&#10;radarr:/movies=/mnt/user/data/media/movies&#10;radarr:/downloads=/mnt/user/data/downloads/torrents&#10;qbittorrent:/downloads=/mnt/user/data/downloads/torrents">{{range $service, $mappings := .Config.ServicePathMappings}}{{range $mappings}}{{$service}}:{{.Service}}={{.Local}}&#10;{{end}}{{end}}</textarea>
                 </div>
             </div>
         </div>

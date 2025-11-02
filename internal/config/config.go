@@ -33,10 +33,12 @@ type Config struct {
 	pathCache *PathCache `yaml:"-"`
 }
 
-// PathMapping represents a container-to-host path mapping
+// PathMapping represents a path mapping between two locations
+// For service_path_mappings: Service = path from the external service, Local = path in media-finder's database
+// For local_path_mappings: Service = path in media-finder's container, Local = path on the host filesystem
 type PathMapping struct {
-	Container string `yaml:"container"`
-	Host      string `yaml:"host"`
+	Service string `yaml:"service"`
+	Local   string `yaml:"local"`
 }
 
 // Services contains configuration for all external services
@@ -86,23 +88,23 @@ func Default() *Config {
 		DBMaxIdleConns:    5,
 		DBConnMaxLifetime: 5 * time.Minute,
 		LocalPathMappings: []PathMapping{
-			{Container: "/media", Host: "/mnt/user/data/media"},
-			{Container: "/downloads", Host: "/mnt/user/data/downloads/torrents"},
+			{Service: "/media", Local: "/mnt/user/data/media"},
+			{Service: "/downloads", Local: "/mnt/user/data/downloads/torrents"},
 		},
 		ServicePathMappings: map[string][]PathMapping{
 			"plex": {
-				{Container: "/media", Host: "/mnt/user/data/media"},
+				{Service: "/media", Local: "/mnt/user/data/media"},
 			},
 			"sonarr": {
-				{Container: "/tv", Host: "/mnt/user/data/media/tv"},
-				{Container: "/downloads", Host: "/mnt/user/data/downloads/torrents"},
+				{Service: "/tv", Local: "/mnt/user/data/media/tv"},
+				{Service: "/downloads", Local: "/mnt/user/data/downloads/torrents"},
 			},
 			"radarr": {
-				{Container: "/movies", Host: "/mnt/user/data/media/movies"},
-				{Container: "/downloads", Host: "/mnt/user/data/downloads/torrents"},
+				{Service: "/movies", Local: "/mnt/user/data/media/movies"},
+				{Service: "/downloads", Local: "/mnt/user/data/downloads/torrents"},
 			},
 			"qbittorrent": {
-				{Container: "/downloads", Host: "/mnt/user/data/downloads/torrents"},
+				{Service: "/downloads", Local: "/mnt/user/data/downloads/torrents"},
 			},
 		},
 		ScanPaths: []string{"/media", "/downloads"},
@@ -196,22 +198,22 @@ func (c *Config) TranslatePathToContainer(hostPath string) string {
 		}
 	}
 
-	// Find the longest matching host path
+	// Find the longest matching local path
 	var bestMatch PathMapping
 	maxLen := 0
 
 	for _, mapping := range c.LocalPathMappings {
-		if strings.HasPrefix(hostPath, mapping.Host) && len(mapping.Host) > maxLen {
+		if strings.HasPrefix(hostPath, mapping.Local) && len(mapping.Local) > maxLen {
 			bestMatch = mapping
-			maxLen = len(mapping.Host)
+			maxLen = len(mapping.Local)
 		}
 	}
 
 	result := hostPath
 	if maxLen > 0 {
-		// Replace host prefix with container prefix
-		remainder := strings.TrimPrefix(hostPath, bestMatch.Host)
-		result = filepath.Join(bestMatch.Container, remainder)
+		// Replace local prefix with service prefix
+		remainder := strings.TrimPrefix(hostPath, bestMatch.Local)
+		result = filepath.Join(bestMatch.Service, remainder)
 	}
 
 	// Cache the result
@@ -239,14 +241,14 @@ func (c *Config) GetPathCacheStats() (hits, total uint64, hitRate float64) {
 
 // translatePath performs the actual path translation
 func (c *Config) translatePath(sourcePath string, mappings []PathMapping) string {
-	// Find the longest matching container path
+	// Find the longest matching service path
 	var bestMatch PathMapping
 	maxLen := 0
 
 	for _, mapping := range mappings {
-		if strings.HasPrefix(sourcePath, mapping.Container) && len(mapping.Container) > maxLen {
+		if strings.HasPrefix(sourcePath, mapping.Service) && len(mapping.Service) > maxLen {
 			bestMatch = mapping
-			maxLen = len(mapping.Container)
+			maxLen = len(mapping.Service)
 		}
 	}
 
@@ -254,9 +256,9 @@ func (c *Config) translatePath(sourcePath string, mappings []PathMapping) string
 		return sourcePath
 	}
 
-	// Replace container prefix with host prefix
-	remainder := strings.TrimPrefix(sourcePath, bestMatch.Container)
-	return filepath.Join(bestMatch.Host, remainder)
+	// Replace service prefix with local prefix
+	remainder := strings.TrimPrefix(sourcePath, bestMatch.Service)
+	return filepath.Join(bestMatch.Local, remainder)
 }
 
 // Validate checks if the configuration is valid
@@ -332,24 +334,24 @@ func (c *Config) validatePathMappings() error {
 
 // validatePathMapping validates a single path mapping
 func validatePathMapping(mapping PathMapping, context string) error {
-	if mapping.Container == "" {
-		return fmt.Errorf("%s: container path cannot be empty", context)
+	if mapping.Service == "" {
+		return fmt.Errorf("%s: service path cannot be empty", context)
 	}
 
-	if mapping.Host == "" {
-		return fmt.Errorf("%s: host path cannot be empty", context)
+	if mapping.Local == "" {
+		return fmt.Errorf("%s: local path cannot be empty", context)
 	}
 
-	if !filepath.IsAbs(mapping.Container) {
-		return fmt.Errorf("%s: container path must be absolute (got: %s)", context, mapping.Container)
+	if !filepath.IsAbs(mapping.Service) {
+		return fmt.Errorf("%s: service path must be absolute (got: %s)", context, mapping.Service)
 	}
 
-	if !filepath.IsAbs(mapping.Host) {
-		return fmt.Errorf("%s: host path must be absolute (got: %s)", context, mapping.Host)
+	if !filepath.IsAbs(mapping.Local) {
+		return fmt.Errorf("%s: local path must be absolute (got: %s)", context, mapping.Local)
 	}
 
 	// Check for directory traversal attempts
-	if strings.Contains(mapping.Container, "..") || strings.Contains(mapping.Host, "..") {
+	if strings.Contains(mapping.Service, "..") || strings.Contains(mapping.Local, "..") {
 		return fmt.Errorf("%s: paths cannot contain '..' (directory traversal)", context)
 	}
 

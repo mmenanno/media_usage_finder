@@ -1062,8 +1062,8 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 			parts := strings.SplitN(line, "=", 2)
 			if len(parts) == 2 {
 				s.config.LocalPathMappings = append(s.config.LocalPathMappings, config.PathMapping{
-					Container: strings.TrimSpace(parts[0]),
-					Host:      strings.TrimSpace(parts[1]),
+					Service: strings.TrimSpace(parts[0]),
+					Local:   strings.TrimSpace(parts[1]),
 				})
 			}
 		}
@@ -1089,8 +1089,8 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			mapping := config.PathMapping{
-				Container: strings.TrimSpace(pathParts[0]),
-				Host:      strings.TrimSpace(pathParts[1]),
+				Service: strings.TrimSpace(pathParts[0]),
+				Local:   strings.TrimSpace(pathParts[1]),
 			}
 			s.config.ServicePathMappings[service] = append(s.config.ServicePathMappings[service], mapping)
 		}
