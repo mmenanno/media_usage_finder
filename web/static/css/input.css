@@ -105,3 +105,18 @@ button.htmx-request::after {
   animation: progress 2s infinite;
 }
 
+/* Prevent underlines on button-styled links and navigation */
+a.inline-block,
+a.block,
+a[download],
+nav a {
+  text-decoration: none !important;
+}
+
+a.inline-block:hover,
+a.block:hover,
+a[download]:hover,
+nav a:hover {
+  text-decoration: none !important;
+}
+

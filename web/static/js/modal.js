@@ -17,17 +17,14 @@ class ModalManager {
     replaceNativeConfirm() {
         // Intercept HTMX confirm events
         document.body.addEventListener('htmx:confirm', (event) => {
-            // Debug logging
-            console.log('htmx:confirm triggered', {
-                question: event.detail.question,
-                target: event.target,
-                elt: event.detail.elt,
-                issuer: event.detail.issuer
-            });
+            // Ignore events with no question (spurious events from HTMX processing)
+            if (!event.detail.question) {
+                return;
+            }
 
             event.preventDefault();
 
-            const question = event.detail.question || 'Are you sure?';
+            const question = event.detail.question;
 
             this.confirm(question).then((result) => {
                 if (result) {
@@ -177,10 +174,7 @@ class ModalManager {
 // Initialize modal manager when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     if (!window.modalManager) {
-        console.log('Initializing ModalManager');
         window.modalManager = new ModalManager();
-    } else {
-        console.warn('ModalManager already initialized - skipping');
     }
 });
 

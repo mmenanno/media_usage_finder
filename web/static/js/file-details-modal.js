@@ -19,6 +19,17 @@ class FileDetailsModal {
             this.show(event.detail.fileId);
         });
 
+        // Handle clicks on details buttons using event delegation
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-action="show-details"]');
+            if (button) {
+                const fileId = button.dataset.fileId;
+                if (fileId) {
+                    this.show(fileId);
+                }
+            }
+        });
+
         // Close on escape key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && !document.getElementById('file-details-modal').classList.contains('hidden')) {

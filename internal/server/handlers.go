@@ -82,6 +82,7 @@ func (s *Server) LoadTemplates(pattern string) error {
 		"scans.html",
 		"stats.html",
 		"config.html",
+		"advanced.html",
 	}
 
 	layoutPath := baseDir + "/layout.html"

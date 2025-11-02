@@ -13,16 +13,18 @@
             <h3 class="text-xl font-semibold mb-4">General Settings</h3>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">Database Path</label>
+                    <label for="database_path" class="block text-sm font-medium text-gray-400 mb-2">Database Path</label>
                     <input
+                        id="database_path"
                         type="text"
                         name="database_path"
                         value="{{.Config.DatabasePath}}"
                         class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">Scan Workers</label>
+                    <label for="scan_workers" class="block text-sm font-medium text-gray-400 mb-2">Scan Workers</label>
                     <input
+                        id="scan_workers"
                         type="number"
                         name="scan_workers"
                         value="{{.Config.ScanWorkers}}"
@@ -136,8 +138,9 @@
             </div>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">URL</label>
+                    <label for="plex_url" class="block text-sm font-medium text-gray-400 mb-2">URL</label>
                     <input
+                        id="plex_url"
                         type="text"
                         name="plex_url"
                         value="{{.Config.Services.Plex.URL}}"
@@ -145,8 +148,9 @@
                         class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">Token</label>
+                    <label for="plex_token" class="block text-sm font-medium text-gray-400 mb-2">Token</label>
                     <input
+                        id="plex_token"
                         type="password"
                         name="plex_token"
                         value="{{.Config.Services.Plex.Token}}"
@@ -168,7 +172,7 @@
                     <span class="htmx-indicator absolute inset-0 flex items-center justify-center" id="sonarr-test-indicator">
                         <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     </span>
                     <span class="htmx-indicator-hidden">Test Connection</span>
@@ -176,8 +180,9 @@
             </div>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">URL</label>
+                    <label for="sonarr_url" class="block text-sm font-medium text-gray-400 mb-2">URL</label>
                     <input
+                        id="sonarr_url"
                         type="text"
                         name="sonarr_url"
                         value="{{.Config.Services.Sonarr.URL}}"
@@ -185,8 +190,9 @@
                         class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">API Key</label>
+                    <label for="sonarr_api_key" class="block text-sm font-medium text-gray-400 mb-2">API Key</label>
                     <input
+                        id="sonarr_api_key"
                         type="password"
                         name="sonarr_api_key"
                         value="{{.Config.Services.Sonarr.APIKey}}"
@@ -216,8 +222,9 @@
             </div>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">URL</label>
+                    <label for="radarr_url" class="block text-sm font-medium text-gray-400 mb-2">URL</label>
                     <input
+                        id="radarr_url"
                         type="text"
                         name="radarr_url"
                         value="{{.Config.Services.Radarr.URL}}"
@@ -225,8 +232,9 @@
                         class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">API Key</label>
+                    <label for="radarr_api_key" class="block text-sm font-medium text-gray-400 mb-2">API Key</label>
                     <input
+                        id="radarr_api_key"
                         type="password"
                         name="radarr_api_key"
                         value="{{.Config.Services.Radarr.APIKey}}"
@@ -256,8 +264,9 @@
             </div>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">URL</label>
+                    <label for="qbittorrent_url" class="block text-sm font-medium text-gray-400 mb-2">URL</label>
                     <input
+                        id="qbittorrent_url"
                         type="text"
                         name="qbittorrent_url"
                         value="{{.Config.Services.QBittorrent.URL}}"
@@ -266,16 +275,18 @@
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-400 mb-2">Username</label>
+                        <label for="qbittorrent_username" class="block text-sm font-medium text-gray-400 mb-2">Username</label>
                         <input
+                            id="qbittorrent_username"
                             type="text"
                             name="qbittorrent_username"
                             value="{{.Config.Services.QBittorrent.Username}}"
                             class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-400 mb-2">Password</label>
+                        <label for="qbittorrent_password" class="block text-sm font-medium text-gray-400 mb-2">Password</label>
                         <input
+                            id="qbittorrent_password"
                             type="password"
                             name="qbittorrent_password"
                             value="{{.Config.Services.QBittorrent.Password}}"
@@ -283,8 +294,9 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-400 mb-2">Qui Proxy URL (Optional)</label>
+                    <label for="qbittorrent_qui_proxy_url" class="block text-sm font-medium text-gray-400 mb-2">Qui Proxy URL (Optional)</label>
                     <input
+                        id="qbittorrent_qui_proxy_url"
                         type="text"
                         name="qbittorrent_qui_proxy_url"
                         value="{{.Config.Services.QBittorrent.QuiProxyURL}}"

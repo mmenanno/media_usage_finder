@@ -87,7 +87,7 @@
                     <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition cursor-pointer">
                         Apply Filters
                     </button>
-                    <a href="/files" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition">
+                    <a href="/files" class="inline-block px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition">
                         Clear
                     </a>
                 </div>
@@ -187,14 +187,15 @@
                         <td class="px-6 py-4 text-sm">
                             <div class="flex flex-col sm:flex-row sm:space-x-2 space-y-1 sm:space-y-0">
                                 <button
-                                    onclick="showFileDetails({{.File.ID}})"
-                                    aria-label="View details for {{.File.Path}}"
+                                    data-file-id="{{.File.ID}}"
+                                    data-action="show-details"
+                                    aria-label="View file details"
                                     class="text-green-400 hover:text-green-300 whitespace-nowrap text-left sm:text-center">
                                     Details
                                 </button>
                                 <button
                                     hx-post="/api/files/mark-rescan?id={{.File.ID}}"
-                                    aria-label="Mark {{.File.Path}} for rescan"
+                                    aria-label="Mark file for rescan"
                                     class="text-blue-400 hover:text-blue-300 whitespace-nowrap text-left sm:text-center">
                                     Rescan
                                 </button>
@@ -203,7 +204,7 @@
                                     hx-confirm="Are you sure you want to delete this file? This action cannot be undone."
                                     hx-target="closest tr"
                                     hx-swap="outerHTML"
-                                    aria-label="Delete {{.File.Path}}"
+                                    aria-label="Delete file"
                                     class="text-red-400 hover:text-red-300 whitespace-nowrap text-left sm:text-center">
                                     Delete
                                 </button>
@@ -319,12 +320,12 @@
                 <h4 class="text-sm font-medium text-gray-400 mb-2">Export</h4>
                 <div class="flex space-x-4">
                     <a href="/api/export?format=json{{if .Orphaned}}&orphaned=true{{end}}"
-                       class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
+                       class="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
                        download>
                         Export as JSON
                     </a>
                     <a href="/api/export?format=csv{{if .Orphaned}}&orphaned=true{{end}}"
-                       class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition"
+                       class="inline-block px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition"
                        download>
                         Export as CSV
                     </a>

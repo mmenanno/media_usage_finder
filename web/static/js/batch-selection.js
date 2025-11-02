@@ -46,6 +46,13 @@ class BatchSelection {
             // Only handle shortcuts on files page
             if (!window.location.pathname.includes('/files')) return;
 
+            // Don't intercept shortcuts when typing in input fields, textareas, or contenteditable
+            if (e.target.tagName === 'INPUT' ||
+                e.target.tagName === 'TEXTAREA' ||
+                e.target.isContentEditable) {
+                return;
+            }
+
             // Ctrl+A or Cmd+A: Select all
             if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
                 const table = document.getElementById('files-table');
