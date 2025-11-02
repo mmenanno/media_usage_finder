@@ -449,3 +449,115 @@ func (s *Scanner) updateServiceUsageWithTimeout(serviceName string, getFiles fun
 func (s *Scanner) GetProgress() *Progress {
 	return s.progress
 }
+
+// UpdateAllServices manually updates all service usage information
+// This can be called independently without a full scan
+func (s *Scanner) UpdateAllServices() error {
+	// Create temporary progress for logging
+	tempProgress := NewProgress()
+	tempProgress.SetPhase("Updating services")
+	originalProgress := s.progress
+	s.progress = tempProgress
+	defer func() {
+		s.progress = originalProgress
+		tempProgress.Stop()
+	}()
+
+	s.progress.Log("Manually updating all services...")
+
+	// Update each service
+	s.progress.Log("Checking Plex...")
+	if err := s.updatePlexUsage(); err != nil {
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update Plex usage: %v", err))
+	}
+
+	s.progress.Log("Checking Sonarr...")
+	if err := s.updateSonarrUsage(); err != nil {
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update Sonarr usage: %v", err))
+	}
+
+	s.progress.Log("Checking Radarr...")
+	if err := s.updateRadarrUsage(); err != nil {
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update Radarr usage: %v", err))
+	}
+
+	s.progress.Log("Checking qBittorrent...")
+	if err := s.updateQBittorrentUsage(); err != nil {
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update qBittorrent usage: %v", err))
+	}
+
+	// Update orphaned status after service checks
+	s.progress.Log("Recalculating orphaned status...")
+	if err := s.db.UpdateOrphanedStatus(); err != nil {
+		return fmt.Errorf("failed to update orphaned status: %w", err)
+	}
+
+	s.progress.Log("All services updated successfully!")
+	return nil
+}
+
+// UpdateSingleService manually updates a specific service's usage information
+// serviceName should be one of: plex, sonarr, radarr, qbittorrent
+func (s *Scanner) UpdateSingleService(serviceName string) error {
+	// Create temporary progress for logging
+	tempProgress := NewProgress()
+	tempProgress.SetPhase(fmt.Sprintf("Updating %s", serviceName))
+	originalProgress := s.progress
+	s.progress = tempProgress
+	defer func() {
+		s.progress = originalProgress
+		tempProgress.Stop()
+	}()
+
+	s.progress.Log(fmt.Sprintf("Manually updating %s...", serviceName))
+
+	var err error
+	switch serviceName {
+	case "plex":
+		err = s.updatePlexUsage()
+	case "sonarr":
+		err = s.updateSonarrUsage()
+	case "radarr":
+		err = s.updateRadarrUsage()
+	case "qbittorrent":
+		err = s.updateQBittorrentUsage()
+	default:
+		return fmt.Errorf("unknown service: %s", serviceName)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to update %s usage: %w", serviceName, err)
+	}
+
+	// Update orphaned status after service check
+	s.progress.Log("Recalculating orphaned status...")
+	if err := s.db.UpdateOrphanedStatus(); err != nil {
+		return fmt.Errorf("failed to update orphaned status: %w", err)
+	}
+
+	s.progress.Log(fmt.Sprintf("%s updated successfully!", serviceName))
+	return nil
+}
+
+// RecalculateOrphanedStatus manually recalculates which files are orphaned
+// This can be called independently without updating services
+func (s *Scanner) RecalculateOrphanedStatus() error {
+	// Create temporary progress for logging
+	tempProgress := NewProgress()
+	tempProgress.SetPhase("Recalculating orphaned status")
+	originalProgress := s.progress
+	s.progress = tempProgress
+	defer func() {
+		s.progress = originalProgress
+		tempProgress.Stop()
+	}()
+
+	s.progress.Log("Manually recalculating orphaned status...")
+
+	if err := s.db.UpdateOrphanedStatus(); err != nil {
+		return fmt.Errorf("failed to update orphaned status: %w", err)
+	}
+
+	s.progress.Log("Orphaned status recalculated successfully!")
+	return nil
+}

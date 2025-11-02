@@ -559,6 +559,124 @@ func (s *Server) HandleForceStopScan(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandleUpdateAllServices manually updates all service usage information
+func (s *Server) HandleUpdateAllServices(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Check if a scan is already running
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check scan status", "scan_check_failed")
+		return
+	}
+
+	if currentScan != nil {
+		respondError(w, http.StatusConflict, "Cannot update services while a scan is running", "scan_running")
+		return
+	}
+
+	// Run service updates in background
+	go func() {
+		if err := s.scanner.UpdateAllServices(); err != nil {
+			log.Printf("ERROR: Failed to update all services: %v", err)
+		} else {
+			log.Printf("INFO: All services updated successfully")
+		}
+	}()
+
+	w.Header().Set("X-Toast-Message", "Updating all services...")
+	w.Header().Set("X-Toast-Type", "info")
+
+	respondSuccess(w, "Service update started", nil)
+}
+
+// HandleUpdateSingleService manually updates a specific service's usage information
+func (s *Server) HandleUpdateSingleService(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Get service name from query parameter
+	serviceName := r.URL.Query().Get("service")
+	if serviceName == "" {
+		respondError(w, http.StatusBadRequest, "Service name is required", "missing_service")
+		return
+	}
+
+	// Validate service name
+	validServices := map[string]bool{
+		"plex":        true,
+		"sonarr":      true,
+		"radarr":      true,
+		"qbittorrent": true,
+	}
+	if !validServices[serviceName] {
+		respondError(w, http.StatusBadRequest, "Invalid service name", "invalid_service")
+		return
+	}
+
+	// Check if a scan is already running
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check scan status", "scan_check_failed")
+		return
+	}
+
+	if currentScan != nil {
+		respondError(w, http.StatusConflict, "Cannot update service while a scan is running", "scan_running")
+		return
+	}
+
+	// Run service update in background
+	go func() {
+		if err := s.scanner.UpdateSingleService(serviceName); err != nil {
+			log.Printf("ERROR: Failed to update %s: %v", serviceName, err)
+		} else {
+			log.Printf("INFO: %s updated successfully", serviceName)
+		}
+	}()
+
+	w.Header().Set("X-Toast-Message", fmt.Sprintf("Updating %s...", serviceName))
+	w.Header().Set("X-Toast-Type", "info")
+
+	respondSuccess(w, fmt.Sprintf("%s update started", serviceName), nil)
+}
+
+// HandleRecalculateOrphaned manually recalculates which files are orphaned
+func (s *Server) HandleRecalculateOrphaned(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Check if a scan is already running
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check scan status", "scan_check_failed")
+		return
+	}
+
+	if currentScan != nil {
+		respondError(w, http.StatusConflict, "Cannot recalculate while a scan is running", "scan_running")
+		return
+	}
+
+	// Run recalculation in background
+	go func() {
+		if err := s.scanner.RecalculateOrphanedStatus(); err != nil {
+			log.Printf("ERROR: Failed to recalculate orphaned status: %v", err)
+		} else {
+			log.Printf("INFO: Orphaned status recalculated successfully")
+		}
+	}()
+
+	w.Header().Set("X-Toast-Message", "Recalculating orphaned status...")
+	w.Header().Set("X-Toast-Type", "info")
+
+	respondSuccess(w, "Recalculation started", nil)
+}
+
 // HandleScanProgress returns the current scan progress
 func (s *Server) HandleScanProgress(w http.ResponseWriter, r *http.Request) {
 	progress := s.scanner.GetProgress()
