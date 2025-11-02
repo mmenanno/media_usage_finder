@@ -92,7 +92,7 @@ func (s *Server) Run() error {
 		Addr:         addr,
 		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 5 * time.Minute, // Increased for SSE endpoints (logs streaming)
 		IdleTimeout:  60 * time.Second,
 	}
 

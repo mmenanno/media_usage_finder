@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/xml"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -66,17 +67,23 @@ func (p *PlexClient) GetAllFiles() ([]PlexFile, error) {
 		return nil, fmt.Errorf("failed to get library sections: %w", err)
 	}
 
+	log.Printf("Found %d Plex library sections", len(sections))
+
 	var allFiles []PlexFile
 
 	// For each section, get all items
 	for _, section := range sections {
-		files, err := p.getFilesForSection(section.Key)
+		log.Printf("Processing Plex section: %s (type: %s, key: %s)", section.Title, section.Type, section.Key)
+		files, err := p.getFilesForSection(section.Key, section.Type)
 		if err != nil {
+			log.Printf("ERROR: Failed to get files for section %s: %v", section.Title, err)
 			return nil, fmt.Errorf("failed to get files for section %s: %w", section.Title, err)
 		}
+		log.Printf("Found %d files in section %s", len(files), section.Title)
 		allFiles = append(allFiles, files...)
 	}
 
+	log.Printf("Total Plex files found: %d", len(allFiles))
 	return allFiles, nil
 }
 
@@ -91,6 +98,7 @@ type libraryResponse struct {
 func (p *PlexClient) getLibrarySections() ([]struct {
 	Key   string
 	Title string
+	Type  string
 }, error) {
 	req, err := http.NewRequest("GET", p.baseURL+"/library/sections", nil)
 	if err != nil {
@@ -120,14 +128,17 @@ func (p *PlexClient) getLibrarySections() ([]struct {
 	var sections []struct {
 		Key   string
 		Title string
+		Type  string
 	}
 	for _, dir := range libResp.Directory {
 		sections = append(sections, struct {
 			Key   string
 			Title string
+			Type  string
 		}{
 			Key:   dir.Key,
 			Title: dir.Title,
+			Type:  dir.Type,
 		})
 	}
 
@@ -143,9 +154,25 @@ type mediaContainerResponse struct {
 			} `xml:"Part"`
 		} `xml:"Media"`
 	} `xml:"Video"`
+	Track []struct {
+		Media []struct {
+			Part []struct {
+				File string `xml:"file,attr"`
+				Size int64  `xml:"size,attr"`
+			} `xml:"Part"`
+		} `xml:"Media"`
+	} `xml:"Track"`
+	Photo []struct {
+		Media []struct {
+			Part []struct {
+				File string `xml:"file,attr"`
+				Size int64  `xml:"size,attr"`
+			} `xml:"Part"`
+		} `xml:"Media"`
+	} `xml:"Photo"`
 }
 
-func (p *PlexClient) getFilesForSection(sectionKey string) ([]PlexFile, error) {
+func (p *PlexClient) getFilesForSection(sectionKey, sectionType string) ([]PlexFile, error) {
 	// Build URL with all items in section
 	u, err := url.Parse(p.baseURL + "/library/sections/" + sectionKey + "/all")
 	if err != nil {
@@ -178,6 +205,8 @@ func (p *PlexClient) getFilesForSection(sectionKey string) ([]PlexFile, error) {
 	}
 
 	var files []PlexFile
+
+	// Process Video elements (movies, TV shows)
 	for _, video := range container.Video {
 		for _, media := range video.Media {
 			for _, part := range media.Part {
@@ -190,6 +219,37 @@ func (p *PlexClient) getFilesForSection(sectionKey string) ([]PlexFile, error) {
 			}
 		}
 	}
+
+	// Process Track elements (music)
+	for _, track := range container.Track {
+		for _, media := range track.Media {
+			for _, part := range media.Part {
+				if part.File != "" {
+					files = append(files, PlexFile{
+						Path: part.File,
+						Size: part.Size,
+					})
+				}
+			}
+		}
+	}
+
+	// Process Photo elements (photos)
+	for _, photo := range container.Photo {
+		for _, media := range photo.Media {
+			for _, part := range media.Part {
+				if part.File != "" {
+					files = append(files, PlexFile{
+						Path: part.File,
+						Size: part.Size,
+					})
+				}
+			}
+		}
+	}
+
+	log.Printf("Section %s (type: %s): found %d videos, %d tracks, %d photos = %d total files",
+		sectionKey, sectionType, len(container.Video), len(container.Track), len(container.Photo), len(files))
 
 	return files, nil
 }

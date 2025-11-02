@@ -28,38 +28,39 @@ func NewSonarrClient(baseURL, apiKey string, timeout time.Duration) *SonarrClien
 
 // GetAllFiles retrieves all episode files tracked by Sonarr
 func (s *SonarrClient) GetAllFiles() ([]SonarrFile, error) {
-	var episodeFiles []struct {
-		ID           int64  `json:"id"`
-		SeriesID     int64  `json:"seriesId"`
-		SeasonNumber int    `json:"seasonNumber"`
-		Path         string `json:"path"`
-		Size         int64  `json:"size"`
-	}
-
-	if err := s.doRequest("/api/v3/episodefile", &episodeFiles); err != nil {
-		return nil, err
-	}
-
-	// Get series information for each file
+	// First, get all series
 	seriesMap, err := s.getAllSeries()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get series: %w", err)
 	}
 
+	// Then, get episode files for each series
 	var files []SonarrFile
-	for _, ef := range episodeFiles {
-		seriesTitle := ""
-		if series, ok := seriesMap[ef.SeriesID]; ok {
-			seriesTitle = series
+	for seriesID, seriesTitle := range seriesMap {
+		var episodeFiles []struct {
+			ID           int64  `json:"id"`
+			SeriesID     int64  `json:"seriesId"`
+			SeasonNumber int    `json:"seasonNumber"`
+			Path         string `json:"path"`
+			Size         int64  `json:"size"`
 		}
 
-		files = append(files, SonarrFile{
-			Path:         ef.Path,
-			Size:         ef.Size,
-			SeriesTitle:  seriesTitle,
-			SeasonNumber: ef.SeasonNumber,
-			EpisodeID:    ef.ID,
-		})
+		// Query episode files for this specific series
+		endpoint := fmt.Sprintf("/api/v3/episodefile?seriesId=%d", seriesID)
+		if err := s.doRequest(endpoint, &episodeFiles); err != nil {
+			return nil, fmt.Errorf("failed to get episode files for series %d: %w", seriesID, err)
+		}
+
+		// Add all episode files for this series
+		for _, ef := range episodeFiles {
+			files = append(files, SonarrFile{
+				Path:         ef.Path,
+				Size:         ef.Size,
+				SeriesTitle:  seriesTitle,
+				SeasonNumber: ef.SeasonNumber,
+				EpisodeID:    ef.ID,
+			})
+		}
 	}
 
 	return files, nil

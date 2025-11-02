@@ -149,39 +149,56 @@ func buildInClause(count int) string {
 }
 
 // GetFilesByPaths retrieves multiple files by their paths in one query (batch lookup)
+// Handles SQLite variable limit by batching queries into chunks of 900 parameters
 func (db *DB) GetFilesByPaths(paths []string) (map[string]*File, error) {
 	if len(paths) == 0 {
 		return make(map[string]*File), nil
 	}
 
-	// Build IN clause with placeholders
-	args := make([]interface{}, len(paths))
-	for i, path := range paths {
-		args[i] = path
-	}
-
-	query := fmt.Sprintf(`
-		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, created_at
-		FROM files
-		WHERE path IN (%s)
-	`, buildInClause(len(paths)))
-
-	rows, err := db.conn.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+	const batchSize = 900 // SQLite default limit is 999, use 900 to be safe
 	fileMap := make(map[string]*File)
-	for rows.Next() {
-		file, err := scanFileRow(rows)
+
+	// Process paths in batches
+	for i := 0; i < len(paths); i += batchSize {
+		end := i + batchSize
+		if end > len(paths) {
+			end = len(paths)
+		}
+		batch := paths[i:end]
+
+		// Build IN clause with placeholders for this batch
+		args := make([]interface{}, len(batch))
+		for j, path := range batch {
+			args[j] = path
+		}
+
+		query := fmt.Sprintf(`
+			SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, created_at
+			FROM files
+			WHERE path IN (%s)
+		`, buildInClause(len(batch)))
+
+		rows, err := db.conn.Query(query, args...)
 		if err != nil {
 			return nil, err
 		}
-		fileMap[file.Path] = file
+
+		for rows.Next() {
+			file, err := scanFileRow(rows)
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+			fileMap[file.Path] = file
+		}
+		rows.Close()
+
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
 	}
 
-	return fileMap, rows.Err()
+	return fileMap, nil
 }
 
 // CreateScan creates a new scan record
@@ -601,60 +618,77 @@ func (db *DB) GetUsageByFileID(fileID int64) ([]*Usage, error) {
 }
 
 // GetUsageByFileIDs retrieves all usage records for multiple files in one query (fixes N+1)
+// Handles SQLite variable limit by batching queries into chunks of 900 parameters
 func (db *DB) GetUsageByFileIDs(fileIDs []int64) (map[int64][]*Usage, error) {
 	if len(fileIDs) == 0 {
 		return make(map[int64][]*Usage), nil
 	}
 
-	// Build IN clause with placeholders
-	args := make([]interface{}, len(fileIDs))
-	for i, id := range fileIDs {
-		args[i] = id
-	}
-
-	query := fmt.Sprintf(`
-		SELECT id, file_id, service, reference_path, metadata, created_at, updated_at
-		FROM usage
-		WHERE file_id IN (%s)
-		ORDER BY file_id, service
-	`, buildInClause(len(fileIDs)))
-
-	rows, err := db.conn.Query(query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
+	const batchSize = 900 // SQLite default limit is 999, use 900 to be safe
 	usageMap := make(map[int64][]*Usage)
-	for rows.Next() {
-		usage := &Usage{}
-		var metadataJSON string
-		var createdAt, updatedAt int64
 
-		err := rows.Scan(
-			&usage.ID,
-			&usage.FileID,
-			&usage.Service,
-			&usage.ReferencePath,
-			&metadataJSON,
-			&createdAt,
-			&updatedAt,
-		)
+	// Process file IDs in batches
+	for i := 0; i < len(fileIDs); i += batchSize {
+		end := i + batchSize
+		if end > len(fileIDs) {
+			end = len(fileIDs)
+		}
+		batch := fileIDs[i:end]
+
+		// Build IN clause with placeholders for this batch
+		args := make([]interface{}, len(batch))
+		for j, id := range batch {
+			args[j] = id
+		}
+
+		query := fmt.Sprintf(`
+			SELECT id, file_id, service, reference_path, metadata, created_at, updated_at
+			FROM usage
+			WHERE file_id IN (%s)
+			ORDER BY file_id, service
+		`, buildInClause(len(batch)))
+
+		rows, err := db.conn.Query(query, args...)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := json.Unmarshal([]byte(metadataJSON), &usage.Metadata); err != nil {
-			usage.Metadata = make(map[string]interface{})
+		for rows.Next() {
+			usage := &Usage{}
+			var metadataJSON string
+			var createdAt, updatedAt int64
+
+			err := rows.Scan(
+				&usage.ID,
+				&usage.FileID,
+				&usage.Service,
+				&usage.ReferencePath,
+				&metadataJSON,
+				&createdAt,
+				&updatedAt,
+			)
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+
+			if err := json.Unmarshal([]byte(metadataJSON), &usage.Metadata); err != nil {
+				usage.Metadata = make(map[string]interface{})
+			}
+
+			usage.CreatedAt = time.Unix(createdAt, 0)
+			usage.UpdatedAt = time.Unix(updatedAt, 0)
+
+			usageMap[usage.FileID] = append(usageMap[usage.FileID], usage)
 		}
+		rows.Close()
 
-		usage.CreatedAt = time.Unix(createdAt, 0)
-		usage.UpdatedAt = time.Unix(updatedAt, 0)
-
-		usageMap[usage.FileID] = append(usageMap[usage.FileID], usage)
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
 	}
 
-	return usageMap, rows.Err()
+	return usageMap, nil
 }
 
 // UpdateOrphanedStatus updates the orphaned status of all files

@@ -899,8 +899,8 @@ func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	defer progress.Unsubscribe(logChan)
 
-	// Create ticker for keep-alive heartbeat (every 10 seconds to prevent 15s write timeout)
-	ticker := time.NewTicker(10 * time.Second)
+	// Create ticker for keep-alive heartbeat (every 30 seconds to keep connection alive)
+	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	// Stream log messages
