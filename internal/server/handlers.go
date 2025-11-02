@@ -871,20 +871,24 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 func (s *Server) HandleScanLogs(w http.ResponseWriter, r *http.Request) {
 	// Check if scanner exists
 	if s.scanner == nil {
+		log.Printf("ERROR: Scanner not initialized for SSE logs endpoint")
 		http.Error(w, "Scanner not initialized", http.StatusInternalServerError)
 		return
 	}
 
+	// Check if streaming is supported BEFORE writing any headers
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		log.Printf("ERROR: Streaming not supported for SSE logs endpoint")
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Now it's safe to write headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no") // Disable buffering for nginx
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
-		return
-	}
 
 	// Send initial connection message
 	fmt.Fprintf(w, "data: Connected to log stream\n\n")
