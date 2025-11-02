@@ -125,6 +125,7 @@ type StatsData struct {
 type HardlinksData struct {
 	Groups     interface{}
 	Total      int
+	Showing    int   // Number of groups shown on current page
 	Page       int64
 	TotalPages int
 	Title      string

@@ -260,9 +260,10 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 
 // HardlinkGroup represents a group of hardlinked files
 type HardlinkGroup struct {
-	Key   string
-	Files []*database.File
-	Size  int64
+	Key       string
+	Files     []*database.File
+	LinkCount int   // Number of linked files in the group
+	Size      int64 // Space saved by hardlinks
 }
 
 // HandleHardlinks serves the hardlinks page with pagination
@@ -300,9 +301,10 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 			}
 
 			groups = append(groups, HardlinkGroup{
-				Key:   key,
-				Files: files,
-				Size:  baseSize * int64(len(files)-1), // Space saved
+				Key:       key,
+				Files:     files,
+				LinkCount: len(files),
+				Size:      baseSize * int64(len(files)-1), // Space saved
 			})
 		}
 	}
@@ -328,6 +330,7 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 	data := HardlinksData{
 		Groups:     paginatedGroups,
 		Total:      total,
+		Showing:    len(paginatedGroups),
 		Page:       int64(page),
 		TotalPages: CalculateTotalPages(total, limit),
 		Title:      "Hardlink Groups",
