@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 )
@@ -797,6 +795,7 @@ func ValidateHardlinkOrderBy(orderBy string) string {
 
 // GetFileExtensions returns a list of distinct file extensions in the database
 // Optionally filtered by orphaned status and service
+// Uses the extension column for efficient querying with index support
 func (db *DB) GetFileExtensions(orphanedOnly bool, service string) ([]string, error) {
 	var conditions []string
 	args := []interface{}{}
@@ -811,15 +810,17 @@ func (db *DB) GetFileExtensions(orphanedOnly bool, service string) ([]string, er
 		args = append(args, service)
 	}
 
-	// Add condition to ensure file has an extension (contains a dot)
-	conditions = append(conditions, "f.path LIKE '%.%'")
+	// Ensure we only get non-empty extensions
+	conditions = append(conditions, "f.extension != ''")
 
 	whereClause := ""
 	if len(conditions) > 0 {
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	query := `SELECT DISTINCT f.path FROM files f ` + whereClause
+	// Query directly from the extension column - much more efficient!
+	// Uses idx_files_extension or idx_files_orphaned_extension index
+	query := `SELECT DISTINCT f.extension FROM files f ` + whereClause + ` ORDER BY f.extension`
 
 	rows, err := db.conn.Query(query, args...)
 	if err != nil {
@@ -827,33 +828,20 @@ func (db *DB) GetFileExtensions(orphanedOnly bool, service string) ([]string, er
 	}
 	defer rows.Close()
 
-	// Use a map to collect unique extensions
-	extMap := make(map[string]bool)
+	extensions := []string{}
 	for rows.Next() {
-		var path string
-		if err := rows.Scan(&path); err != nil {
+		var ext string
+		if err := rows.Scan(&ext); err != nil {
 			return nil, err
 		}
-		// Extract extension using filepath.Ext() and remove the leading dot
-		ext := filepath.Ext(path)
-		if len(ext) > 1 { // Ensure we have more than just the dot
-			ext = strings.ToLower(ext[1:]) // Remove leading dot and lowercase
-			extMap[ext] = true
+		// Remove leading dot if present (extension column includes the dot)
+		if len(ext) > 1 && ext[0] == '.' {
+			ext = ext[1:]
 		}
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
-	// Convert map to sorted slice
-	extensions := make([]string, 0, len(extMap))
-	for ext := range extMap {
 		extensions = append(extensions, ext)
 	}
-	sort.Strings(extensions)
 
-	return extensions, nil
+	return extensions, rows.Err()
 }
 
 // ListFiles retrieves files with filtering and pagination
@@ -916,15 +904,19 @@ func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode 
 		)`)
 	}
 
-	// Filter by file extensions using GLOB patterns (SQLite-compatible)
+	// Filter by file extensions using the extension column (much faster than GLOB!)
+	// Uses idx_files_extension or idx_files_orphaned_extension index
 	if len(extensions) > 0 {
-		extConditions := make([]string, len(extensions))
+		placeholders := make([]string, len(extensions))
 		for i, ext := range extensions {
-			extConditions[i] = "f.path GLOB ?"
-			// Add GLOB pattern: *.<ext> (case-insensitive by checking both cases)
-			args = append(args, "*.["+strings.ToLower(string(ext[0]))+strings.ToUpper(string(ext[0]))+"]"+strings.ToLower(ext[1:]))
+			placeholders[i] = "?"
+			// Ensure extension has leading dot for comparison with stored values
+			if !strings.HasPrefix(ext, ".") {
+				ext = "." + ext
+			}
+			args = append(args, strings.ToLower(ext))
 		}
-		conditions = append(conditions, "("+strings.Join(extConditions, " OR ")+")")
+		conditions = append(conditions, fmt.Sprintf("f.extension IN (%s)", strings.Join(placeholders, ", ")))
 	}
 
 	whereClause := ""
