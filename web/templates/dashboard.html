@@ -4,9 +4,9 @@
 <div class="space-y-8">
     <div class="flex justify-between items-end">
         <h2 class="text-3xl font-bold">Dashboard</h2>
-        <div class="space-x-2">
+        <div class="flex items-end gap-2">
             {{if .HasInterruptedScan}}
-            <div class="inline-block mr-2">
+            <div>
                 <button
                     hx-post="/api/scan/resume"
                     hx-swap="none"
