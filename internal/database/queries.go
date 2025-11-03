@@ -842,7 +842,7 @@ func (db *DB) GetFileExtensions(orphanedOnly bool, service string) ([]string, er
 }
 
 // ListFiles retrieves files with filtering and pagination
-func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, extensions []string, limit, offset int, orderBy, direction string) ([]*File, int, error) {
+func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode string, hardlinksOnly bool, extensions []string, limit, offset int, orderBy, direction string) ([]*File, int, error) {
 	var conditions []string
 	args := []interface{}{}
 
@@ -850,9 +850,49 @@ func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, e
 		conditions = append(conditions, "f.is_orphaned = 1")
 	}
 
-	if service != "" {
-		conditions = append(conditions, "EXISTS (SELECT 1 FROM usage u WHERE u.file_id = f.id AND u.service = ?)")
-		args = append(args, service)
+	// Multi-service filtering with three modes
+	if len(services) > 0 {
+		switch serviceFilterMode {
+		case "any":
+			// File must be tracked by at least one of the selected services
+			placeholders := make([]string, len(services))
+			for i, svc := range services {
+				placeholders[i] = "?"
+				args = append(args, svc)
+			}
+			conditions = append(conditions, fmt.Sprintf(
+				"EXISTS (SELECT 1 FROM usage u WHERE u.file_id = f.id AND u.service IN (%s))",
+				strings.Join(placeholders, ", "),
+			))
+
+		case "all":
+			// File must be tracked by ALL selected services (may have others too)
+			placeholders := make([]string, len(services))
+			for i, svc := range services {
+				placeholders[i] = "?"
+				args = append(args, svc)
+			}
+			args = append(args, len(services))
+			conditions = append(conditions, fmt.Sprintf(
+				"(SELECT COUNT(DISTINCT u.service) FROM usage u WHERE u.file_id = f.id AND u.service IN (%s)) = ?",
+				strings.Join(placeholders, ", "),
+			))
+
+		case "exact":
+			// File must be tracked by ONLY these services (exact match, no others)
+			placeholders := make([]string, len(services))
+			for i, svc := range services {
+				placeholders[i] = "?"
+				args = append(args, svc)
+			}
+			args = append(args, len(services)) // Total count must match
+			args = append(args, len(services)) // Count of matching services must match
+			conditions = append(conditions, fmt.Sprintf(
+				"(SELECT COUNT(DISTINCT u.service) FROM usage u WHERE u.file_id = f.id) = ? AND "+
+					"(SELECT COUNT(DISTINCT u.service) FROM usage u WHERE u.file_id = f.id AND u.service IN (%s)) = ?",
+				strings.Join(placeholders, ", "),
+			))
+		}
 	}
 
 	if hardlinksOnly {

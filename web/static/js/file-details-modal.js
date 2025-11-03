@@ -203,12 +203,16 @@ class FileDetailsModal {
             return '<span class="text-gray-500">No metadata available</span>';
         }
 
-        return Object.entries(metadata).map(([key, value]) => `
-            <div class="flex justify-between">
-                <span class="text-gray-400 capitalize">${key.replace(/_/g, ' ')}:</span>
-                <span class="text-gray-200">${value}</span>
-            </div>
-        `).join('');
+        return Object.entries(metadata).map(([key, value]) => {
+            // Format size values (from Plex metadata) as human-readable
+            const displayValue = key === 'size' ? this.formatSize(value) : value;
+            return `
+                <div class="flex justify-between">
+                    <span class="text-gray-400 capitalize">${key.replace(/_/g, ' ')}:</span>
+                    <span class="text-gray-200">${displayValue}</span>
+                </div>
+            `;
+        }).join('');
     }
 
     getServiceColor(service) {

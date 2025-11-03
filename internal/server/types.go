@@ -103,19 +103,21 @@ type DashboardData struct {
 
 // FilesData represents data for the files list template
 type FilesData struct {
-	Files      interface{}
-	Total      int
-	Page       int64
-	Limit      int
-	TotalPages int
-	Title      string
-	Orphaned   bool
-	Hardlinks  bool
-	Service    string
-	Search     string
-	OrderBy    string
-	Direction  string
-	Extensions []string
+	Files             interface{}
+	Total             int
+	Page              int64
+	Limit             int
+	TotalPages        int
+	Title             string
+	Orphaned          bool
+	Hardlinks         bool
+	Service           string   // Deprecated: Use Services instead (kept for backward compatibility)
+	Services          []string
+	ServiceFilterMode string
+	Search            string
+	OrderBy           string
+	Direction         string
+	Extensions        []string
 }
 
 // ConfigData represents data for the configuration template

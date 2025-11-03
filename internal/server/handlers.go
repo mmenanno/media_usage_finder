@@ -191,10 +191,32 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 
 	orphanedOnly := r.URL.Query().Get("orphaned") == "true"
 	hardlinksOnly := r.URL.Query().Get("hardlink") == "true"
-	service := r.URL.Query().Get("service")
 	search := r.URL.Query().Get("search")
 	orderBy := r.URL.Query().Get("order")
 	direction := r.URL.Query().Get("direction")
+
+	// Parse services filter (can be comma-separated or multiple params)
+	var services []string
+	if servicesParam := r.URL.Query().Get("services"); servicesParam != "" {
+		for _, svc := range strings.Split(servicesParam, ",") {
+			svc = strings.TrimSpace(strings.ToLower(svc))
+			if svc != "" {
+				services = append(services, svc)
+			}
+		}
+	}
+	// Support legacy single service parameter for backward compatibility
+	if len(services) == 0 {
+		if service := r.URL.Query().Get("service"); service != "" {
+			services = []string{service}
+		}
+	}
+
+	// Parse service filter mode: "any", "all", or "exact"
+	serviceFilterMode := r.URL.Query().Get("service_filter_mode")
+	if serviceFilterMode == "" {
+		serviceFilterMode = "any" // default
+	}
 
 	// Parse extensions filter (can be comma-separated or multiple params)
 	var extensions []string
@@ -214,7 +236,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	if search != "" {
 		files, total, err = s.db.SearchFiles(search, limit, offset)
 	} else {
-		files, total, err = s.db.ListFiles(orphanedOnly, service, hardlinksOnly, extensions, limit, offset, orderBy, direction)
+		files, total, err = s.db.ListFiles(orphanedOnly, services, serviceFilterMode, hardlinksOnly, extensions, limit, offset, orderBy, direction)
 	}
 
 	if err != nil {
@@ -243,20 +265,28 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	// For backward compatibility, set Service if there's exactly one service
+	legacyService := ""
+	if len(services) == 1 {
+		legacyService = services[0]
+	}
+
 	data := FilesData{
-		Files:      filesWithUsage,
-		Total:      total,
-		Page:       int64(page),
-		Limit:      limit,
-		TotalPages: CalculateTotalPages(total, limit),
-		Title:      "Files",
-		Orphaned:   orphanedOnly,
-		Hardlinks:  hardlinksOnly,
-		Service:    service,
-		Search:     search,
-		OrderBy:    orderBy,
-		Direction:  direction,
-		Extensions: extensions,
+		Files:             filesWithUsage,
+		Total:             total,
+		Page:              int64(page),
+		Limit:             limit,
+		TotalPages:        CalculateTotalPages(total, limit),
+		Title:             "Files",
+		Orphaned:          orphanedOnly,
+		Hardlinks:         hardlinksOnly,
+		Service:           legacyService,
+		Services:          services,
+		ServiceFilterMode: serviceFilterMode,
+		Search:            search,
+		OrderBy:           orderBy,
+		Direction:         direction,
+		Extensions:        extensions,
 	}
 
 	s.renderTemplate(w, "files.html", data)
@@ -1817,7 +1847,7 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 
 		first := true
 		for {
-			files, _, err := s.db.ListFiles(orphanedOnly, "", false, nil, batchSize, offset, "path", "asc")
+			files, _, err := s.db.ListFiles(orphanedOnly, nil, "any", false, nil, batchSize, offset, "path", "asc")
 			if err != nil {
 				if offset == 0 {
 					http.Error(w, "Failed to list files", http.StatusInternalServerError)
@@ -1870,7 +1900,7 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for {
-			files, _, err := s.db.ListFiles(orphanedOnly, "", false, nil, batchSize, offset, "path", "asc")
+			files, _, err := s.db.ListFiles(orphanedOnly, nil, "any", false, nil, batchSize, offset, "path", "asc")
 			if err != nil {
 				if offset == 0 {
 					http.Error(w, "Failed to list files", http.StatusInternalServerError)
@@ -1940,7 +1970,7 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 
 	// Bulk orphaned files deletion
 	if orphaned {
-		files, _, err := s.db.ListFiles(true, "", false, nil, constants.MaxExportFiles, 0, "path", "asc")
+		files, _, err := s.db.ListFiles(true, nil, "any", false, nil, constants.MaxExportFiles, 0, "path", "asc")
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to list orphaned files", "list_failed")
 			return

@@ -45,26 +45,63 @@
 
                 <!-- Service Filter -->
                 <div>
-                    <span class="block text-sm font-medium text-gray-400 mb-2">Service</span>
-                    <div class="relative z-30" data-custom-dropdown>
-                        <input type="hidden" name="service" value="{{.Service}}" data-dropdown-input>
+                    <span class="block text-sm font-medium text-gray-400 mb-2">Services</span>
+                    <div class="relative z-30" data-service-multiselect>
+                        <input type="hidden" name="services" value="{{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}" data-services-input>
+                        <input type="hidden" name="service_filter_mode" value="{{.ServiceFilterMode}}" data-service-mode-input>
                         <button
                             type="button"
-                            data-dropdown-button
+                            data-services-button
                             aria-expanded="false"
                             class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
-                            <span data-dropdown-text>{{if .Service}}{{if eq .Service "plex"}}Plex{{else if eq .Service "sonarr"}}Sonarr{{else if eq .Service "radarr"}}Radarr{{else if eq .Service "qbittorrent"}}qBittorrent{{else if eq .Service "stash"}}Stash{{end}}{{else}}All Services{{end}}</span>
+                            <span data-services-text>{{if .Services}}{{len .Services}} service(s){{else}}All Services{{end}}</span>
                             <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
                         </button>
-                        <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
-                            <div data-dropdown-option data-value="" class="px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if not .Service}}bg-blue-600{{end}}" aria-selected="{{if not .Service}}true{{else}}false{{end}}">All Services</div>
-                            <div data-dropdown-option data-value="plex" class="px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Service "plex"}}bg-blue-600{{end}}" aria-selected="{{if eq .Service "plex"}}true{{else}}false{{end}}">Plex</div>
-                            <div data-dropdown-option data-value="sonarr" class="px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Service "sonarr"}}bg-blue-600{{end}}" aria-selected="{{if eq .Service "sonarr"}}true{{else}}false{{end}}">Sonarr</div>
-                            <div data-dropdown-option data-value="radarr" class="px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Service "radarr"}}bg-blue-600{{end}}" aria-selected="{{if eq .Service "radarr"}}true{{else}}false{{end}}">Radarr</div>
-                            <div data-dropdown-option data-value="qbittorrent" class="px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Service "qbittorrent"}}bg-blue-600{{end}}" aria-selected="{{if eq .Service "qbittorrent"}}true{{else}}false{{end}}">qBittorrent</div>
-                            <div data-dropdown-option data-value="stash" class="px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Service "stash"}}bg-blue-600{{end}}" aria-selected="{{if eq .Service "stash"}}true{{else}}false{{end}}">Stash</div>
+                        <div data-services-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-80 overflow-auto">
+                            <!-- Filter Mode Selection -->
+                            <div class="px-4 py-3 border-b border-gray-600">
+                                <div class="text-xs font-medium text-gray-400 mb-2">Filter Mode:</div>
+                                <div class="space-y-1">
+                                    <label class="flex items-center space-x-2 cursor-pointer text-sm">
+                                        <input type="radio" name="service_filter_mode_radio" value="any" {{if or (not .ServiceFilterMode) (eq .ServiceFilterMode "any")}}checked{{end}} class="service-mode-radio w-3 h-3">
+                                        <span class="text-gray-300">Any of selected</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 cursor-pointer text-sm">
+                                        <input type="radio" name="service_filter_mode_radio" value="all" {{if eq .ServiceFilterMode "all"}}checked{{end}} class="service-mode-radio w-3 h-3">
+                                        <span class="text-gray-300">All of selected</span>
+                                    </label>
+                                    <label class="flex items-center space-x-2 cursor-pointer text-sm">
+                                        <input type="radio" name="service_filter_mode_radio" value="exact" {{if eq .ServiceFilterMode "exact"}}checked{{end}} class="service-mode-radio w-3 h-3">
+                                        <span class="text-gray-300">Only selected (exact)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Service Checkboxes -->
+                            <div class="px-4 py-2 border-b border-gray-600">
+                                <div class="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        data-select-all-services
+                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded cursor-pointer">
+                                    <label class="text-sm font-medium text-gray-300 cursor-pointer">Select All</label>
+                                </div>
+                            </div>
+                            <div data-services-list>
+                                {{$selectedServices := .Services}}
+                                {{range $svc := (list "plex" "sonarr" "radarr" "qbittorrent" "stash")}}
+                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        value="{{$svc}}"
+                                        {{range $selectedServices}}{{if eq . $svc}}checked{{end}}{{end}}
+                                        class="service-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                                    <span class="text-gray-100 capitalize">{{$svc}}</span>
+                                </label>
+                                {{end}}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -169,19 +206,19 @@
                     <tr role="row">
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             {{if and (eq .OrderBy "path") (eq .Direction "asc")}}
-                            <a href="/files?order=path&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                            <a href="/files?order=path&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
                                class="hover:text-gray-200 cursor-pointer"
                                aria-label="Sort by path descending">
                                 Path ↑
                             </a>
                             {{else if and (eq .OrderBy "path") (eq .Direction "desc")}}
-                            <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                            <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
                                class="hover:text-gray-200 cursor-pointer"
                                aria-label="Sort by path ascending">
                                 Path ↓
                             </a>
                             {{else}}
-                            <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                            <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
                                class="hover:text-gray-200 cursor-pointer"
                                aria-label="Sort by path">
                                 Path
@@ -190,19 +227,19 @@
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             {{if and (eq .OrderBy "size") (eq .Direction "asc")}}
-                            <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                            <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
                                class="hover:text-gray-200 cursor-pointer"
                                aria-label="Sort by size descending">
                                 Size ↑
                             </a>
                             {{else if and (eq .OrderBy "size") (eq .Direction "desc")}}
-                            <a href="/files?order=size&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                            <a href="/files?order=size&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
                                class="hover:text-gray-200 cursor-pointer"
                                aria-label="Sort by size ascending">
                                 Size ↓
                             </a>
                             {{else}}
-                            <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}"
+                            <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
                                class="hover:text-gray-200 cursor-pointer"
                                aria-label="Sort by size">
                                 Size
@@ -287,10 +324,10 @@
                                         <p class="text-lg font-medium text-gray-400">No orphaned files found</p>
                                         <p class="text-sm text-gray-500">All your files are being tracked by at least one service!</p>
                                     </div>
-                                {{else if .Service}}
+                                {{else if .Services}}
                                     <div class="space-y-2">
-                                        <p class="text-lg font-medium text-gray-400">No files found for {{.Service}}</p>
-                                        <p class="text-sm text-gray-500">This service hasn't indexed any files yet</p>
+                                        <p class="text-lg font-medium text-gray-400">No files found for selected services</p>
+                                        <p class="text-sm text-gray-500">{{if eq (len .Services) 1}}This service hasn't indexed any files yet{{else}}No files match the selected service filter{{end}}</p>
                                     </div>
                                 {{else}}
                                     <div class="space-y-3">
@@ -323,7 +360,7 @@
             </div>
             <div class="flex space-x-2">
                 {{if gt .Page 1}}
-                <a href="/files?page={{sub .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
+                <a href="/files?page={{sub .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
                     Previous
                 </a>
@@ -331,9 +368,9 @@
 
                 {{if lt .Page .TotalPages}}
                 <a id="next-page-btn"
-                   href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
+                   href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition"
-                   hx-get="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
+                   hx-get="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    hx-trigger="revealed"
                    hx-target="#files-table tbody"
                    hx-swap="beforeend"
@@ -369,9 +406,11 @@
                 nextPageBtn.removeAttribute('hx-disabled');
                 nextPageBtn.classList.add('hidden');
                 document.getElementById('pagination-container').classList.add('border-t-2', 'border-blue-500');
+                // Re-initialize htmx on this element to pick up the attribute change
+                htmx.process(nextPageBtn);
             } else {
                 // Disable infinite scroll
-                nextPageBtn.setAttribute('hx-disabled', '');
+                nextPageBtn.setAttribute('hx-disabled', 'true');
                 nextPageBtn.classList.remove('hidden');
                 document.getElementById('pagination-container').classList.remove('border-t-2', 'border-blue-500');
             }
@@ -379,7 +418,13 @@
 
         // Update next page URL after each infinite scroll load
         document.body.addEventListener('htmx:afterSwap', function(event) {
-            if (event.detail.target.id === 'files-table' || event.target.matches('#files-table tbody')) {
+            // Only process infinite scroll swaps when enabled
+            const isInfiniteScrollEnabled = infiniteScrollToggle && infiniteScrollToggle.checked;
+            if (!isInfiniteScrollEnabled) return;
+
+            // Check if this was an infinite scroll load (tbody swap)
+            if (event.detail.target && event.detail.target.matches &&
+                event.detail.target.matches('#files-table tbody')) {
                 const btn = document.getElementById('next-page-btn');
                 if (!btn) return;
 
@@ -391,12 +436,15 @@
                     // Update page number in data attribute
                     btn.setAttribute('data-current-page', nextPage);
 
-                    // Update URLs
+                    // Update URLs for the NEXT page to load (not the one we just loaded)
                     const currentUrl = new URL(btn.getAttribute('hx-get'), window.location.origin);
-                    currentUrl.searchParams.set('page', nextPage + 1);
+                    currentUrl.searchParams.set('page', nextPage);
 
                     btn.setAttribute('hx-get', currentUrl.pathname + currentUrl.search);
                     btn.setAttribute('href', currentUrl.pathname + currentUrl.search);
+
+                    // Re-process the element so HTMX picks up the new URL
+                    htmx.process(btn);
                 } else {
                     // No more pages, disable infinite scroll
                     btn.setAttribute('hx-disabled', 'true');
@@ -451,21 +499,30 @@
             extensionsList.innerHTML = '<div class="text-gray-400 text-sm">Loading...</div>';
 
             fetch('/api/files/extensions')
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Extensions API response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Extensions API data:', data);
                     availableExtensions = data.extensions || [];
+                    console.log('Available extensions:', availableExtensions);
                     renderExtensions();
                 })
                 .catch(error => {
                     console.error('Failed to load extensions:', error);
-                    extensionsList.innerHTML = '<div class="text-red-400 text-sm">Failed to load</div>';
+                    extensionsList.innerHTML = '<div class="text-red-400 text-sm px-4 py-2">Failed to load extensions</div>';
                 });
         }
 
         // Render extension checkboxes
         function renderExtensions() {
+            console.log('Rendering extensions, count:', availableExtensions.length);
             if (availableExtensions.length === 0) {
-                extensionsList.innerHTML = '<div class="text-gray-400 text-sm">No extensions found</div>';
+                extensionsList.innerHTML = '<div class="text-gray-400 text-sm px-4 py-2">No extensions found. Files may not have been scanned yet.</div>';
                 return;
             }
 
@@ -538,6 +595,106 @@
                 textSpan.textContent = `${selectedExtensions.size} extensions`;
             }
         }
+    }
+
+    // Service multiselect functionality
+    const serviceMultiselect = document.querySelector('[data-service-multiselect]');
+    if (serviceMultiselect) {
+        const button = serviceMultiselect.querySelector('[data-services-button]');
+        const menu = serviceMultiselect.querySelector('[data-services-menu]');
+        const servicesInput = serviceMultiselect.querySelector('[data-services-input]');
+        const modeInput = serviceMultiselect.querySelector('[data-service-mode-input]');
+        const textSpan = serviceMultiselect.querySelector('[data-services-text]');
+        const servicesList = serviceMultiselect.querySelector('[data-services-list]');
+        const selectAllCheckbox = serviceMultiselect.querySelector('[data-select-all-services]');
+        const modeRadios = serviceMultiselect.querySelectorAll('.service-mode-radio');
+
+        let selectedServices = new Set();
+
+        // Parse initial selected services from hidden input
+        if (servicesInput.value) {
+            servicesInput.value.split(',').forEach(svc => {
+                if (svc.trim()) selectedServices.add(svc.trim());
+            });
+        }
+
+        // Toggle dropdown
+        button.addEventListener('click', function() {
+            const isOpen = menu.classList.contains('hidden');
+            menu.classList.toggle('hidden');
+            button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+
+        // Close on click outside
+        document.addEventListener('click', function(e) {
+            if (!serviceMultiselect.contains(e.target)) {
+                menu.classList.add('hidden');
+                button.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        // Handle individual checkbox change
+        servicesList.querySelectorAll('.service-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function(e) {
+                const svc = e.target.value;
+                if (e.target.checked) {
+                    selectedServices.add(svc);
+                } else {
+                    selectedServices.delete(svc);
+                }
+                updateServicesInput();
+                updateSelectAllServicesState();
+            });
+        });
+
+        // Handle select all checkbox
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function(e) {
+                const checkboxes = servicesList.querySelectorAll('.service-checkbox');
+                checkboxes.forEach(cb => {
+                    cb.checked = e.target.checked;
+                    if (e.target.checked) {
+                        selectedServices.add(cb.value);
+                    } else {
+                        selectedServices.delete(cb.value);
+                    }
+                });
+                updateServicesInput();
+            });
+        }
+
+        // Handle mode radio change
+        modeRadios.forEach(radio => {
+            radio.addEventListener('change', function(e) {
+                modeInput.value = e.target.value;
+            });
+        });
+
+        // Update select all checkbox state
+        function updateSelectAllServicesState() {
+            if (!selectAllCheckbox) return;
+            const checkboxes = servicesList.querySelectorAll('.service-checkbox');
+            const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            selectAllCheckbox.checked = checkedCount === checkboxes.length && checkboxes.length > 0;
+            selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+        }
+
+        // Update hidden input and button text
+        function updateServicesInput() {
+            const values = Array.from(selectedServices).join(',');
+            servicesInput.value = values;
+
+            if (selectedServices.size === 0) {
+                textSpan.textContent = 'All Services';
+            } else if (selectedServices.size === 1) {
+                textSpan.textContent = '1 service';
+            } else {
+                textSpan.textContent = `${selectedServices.size} services`;
+            }
+        }
+
+        // Initial state
+        updateSelectAllServicesState();
     }
     </script>
 
