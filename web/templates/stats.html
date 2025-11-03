@@ -320,6 +320,41 @@ function formatServiceName(service) {
     return names[service] || service;
 }
 
+// Helper function to format numbers with thousand separators
+function formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+// Helper function to format bytes with smart units
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const value = bytes / Math.pow(k, i);
+
+    // Format with appropriate precision
+    let formatted;
+    if (value >= 100) {
+        formatted = Math.round(value); // No decimals for large numbers
+    } else if (value >= 10) {
+        formatted = value.toFixed(1); // 1 decimal for medium numbers
+    } else {
+        formatted = value.toFixed(2); // 2 decimals for small numbers
+    }
+
+    return formatNumber(formatted) + ' ' + sizes[i];
+}
+
+// Helper function to format GB values with smart units
+function formatGBValue(gbValue) {
+    if (gbValue === 0) return '0 GB';
+
+    const bytes = gbValue * 1073741824; // Convert GB to bytes
+    return formatBytes(bytes);
+}
+
 // Check if we have service data
 const hasServiceData = {{.Stats.ActiveServiceCount}} > 0;
 
@@ -371,7 +406,7 @@ if (filesCtx && hasServiceData) {
                             const value = context.parsed || 0;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
                             const percentage = ((value / total) * 100).toFixed(1);
-                            return label + ': ' + value + ' files (' + percentage + '%)';
+                            return label + ': ' + formatNumber(value) + ' files (' + percentage + '%)';
                         }
                     }
                 }
@@ -419,7 +454,7 @@ if (storageCtx && hasServiceData) {
                     },
                     ticks: {
                         callback: function(value) {
-                            return value.toFixed(1) + ' GB';
+                            return formatGBValue(value);
                         }
                     }
                 },
@@ -436,7 +471,7 @@ if (storageCtx && hasServiceData) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return context.parsed.y.toFixed(2) + ' GB';
+                            return formatGBValue(context.parsed.y);
                         }
                     }
                 }
@@ -477,7 +512,7 @@ if (extensionsCtx) {
                     },
                     ticks: {
                         callback: function(value) {
-                            return value.toFixed(1) + ' GB';
+                            return formatGBValue(value);
                         }
                     }
                 },
@@ -497,8 +532,8 @@ if (extensionsCtx) {
                             const idx = context.dataIndex;
                             const data = extensionData[idx];
                             return [
-                                'Size: ' + data.size.toFixed(2) + ' GB',
-                                'Files: ' + data.count
+                                'Size: ' + formatGBValue(data.size),
+                                'Files: ' + formatNumber(data.count)
                             ];
                         }
                     }
@@ -558,8 +593,8 @@ if (ageCtx) {
                             const percentage = ((data.size / total) * 100).toFixed(1);
                             return [
                                 data.age + ':',
-                                data.size.toFixed(2) + ' GB (' + percentage + '%)',
-                                data.count + ' files'
+                                formatGBValue(data.size) + ' (' + percentage + '%)',
+                                formatNumber(data.count) + ' files'
                             ];
                         }
                     }

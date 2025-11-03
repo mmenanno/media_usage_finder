@@ -223,3 +223,15 @@ CREATE INDEX idx_usage_file_id ON usage(file_id);
 CREATE INDEX idx_usage_service ON usage(service);
 CREATE INDEX idx_usage_reference_path ON usage(reference_path);
 `
+
+// Migration to add extension column to files table
+const migrateAddExtensionColumn = `
+-- Add extension column to files table
+ALTER TABLE files ADD COLUMN extension TEXT DEFAULT '';
+
+-- Create index on extension for fast filtering
+CREATE INDEX IF NOT EXISTS idx_files_extension ON files(extension);
+
+-- Create composite index for orphaned files by extension (common query pattern)
+CREATE INDEX IF NOT EXISTS idx_files_orphaned_extension ON files(is_orphaned, extension);
+`

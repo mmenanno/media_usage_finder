@@ -86,6 +86,7 @@ func (w *Worker) processFile(fileInfo FileInfo) error {
 		ScanID:       w.scanID,
 		LastVerified: time.Now(),
 		IsOrphaned:   true, // Will be updated later when we check services
+		Extension:    database.ExtractExtension(fileInfo.Path),
 	}
 
 	// Preserve existing ID if file already exists

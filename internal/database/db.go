@@ -189,6 +189,26 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 5: Add extension column to files table if it doesn't exist
+	var hasExtension int
+	err = db.conn.QueryRow(`
+		SELECT COUNT(*)
+		FROM pragma_table_info('files')
+		WHERE name = 'extension'
+	`).Scan(&hasExtension)
+
+	if err != nil {
+		return fmt.Errorf("failed to check for extension column: %w", err)
+	}
+
+	// If extension column doesn't exist, add it
+	if hasExtension == 0 {
+		_, err = db.conn.Exec(migrateAddExtensionColumn)
+		if err != nil {
+			return fmt.Errorf("failed to add extension column: %w", err)
+		}
+	}
+
 	return nil
 }
 

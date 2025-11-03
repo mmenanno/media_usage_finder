@@ -22,6 +22,7 @@ type File struct {
 	ScanID       int64
 	LastVerified time.Time
 	IsOrphaned   bool
+	Extension    string
 	CreatedAt    time.Time
 }
 
@@ -42,6 +43,7 @@ func scanFileRow(scanner interface {
 		&file.ScanID,
 		&lastVerified,
 		&file.IsOrphaned,
+		&file.Extension,
 		&createdAt,
 	)
 	if err != nil {
@@ -84,8 +86,8 @@ type Scan struct {
 // UpsertFile inserts or updates a file record
 func (db *DB) UpsertFile(file *File) error {
 	query := `
-		INSERT INTO files (path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO files (path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, extension)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(path) DO UPDATE SET
 			size = excluded.size,
 			inode = excluded.inode,
@@ -93,7 +95,8 @@ func (db *DB) UpsertFile(file *File) error {
 			modified_time = excluded.modified_time,
 			scan_id = excluded.scan_id,
 			last_verified = excluded.last_verified,
-			is_orphaned = excluded.is_orphaned
+			is_orphaned = excluded.is_orphaned,
+			extension = excluded.extension
 		RETURNING id
 	`
 
@@ -107,6 +110,7 @@ func (db *DB) UpsertFile(file *File) error {
 		file.ScanID,
 		file.LastVerified.Unix(),
 		file.IsOrphaned,
+		file.Extension,
 	).Scan(&file.ID)
 
 	if err != nil {
@@ -119,7 +123,7 @@ func (db *DB) UpsertFile(file *File) error {
 // GetFileByID retrieves a file by its ID
 func (db *DB) GetFileByID(id int64) (*File, error) {
 	query := `
-		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, created_at
+		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, extension, created_at
 		FROM files
 		WHERE id = ?
 	`
@@ -130,7 +134,7 @@ func (db *DB) GetFileByID(id int64) (*File, error) {
 // GetFileByPath retrieves a file by its path
 func (db *DB) GetFileByPath(path string) (*File, error) {
 	query := `
-		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, created_at
+		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, extension, created_at
 		FROM files
 		WHERE path = ?
 	`
@@ -725,7 +729,7 @@ func (db *DB) SearchFiles(searchQuery string, limit, offset int) ([]*File, int, 
 	// Get paginated results
 	query := `
 		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
-		       f.scan_id, f.last_verified, f.is_orphaned, f.created_at
+		       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
 		FROM files f
 		WHERE f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)
 		ORDER BY f.path
@@ -945,7 +949,7 @@ func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode 
 
 	query := fmt.Sprintf(`
 		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
-		       f.scan_id, f.last_verified, f.is_orphaned, f.created_at
+		       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
 		FROM files f
 		%s
 		ORDER BY f.%s %s
@@ -975,7 +979,7 @@ func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode 
 func (db *DB) GetHardlinkGroups() (map[string][]*File, error) {
 	query := `
 		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
-		       f.scan_id, f.last_verified, f.is_orphaned, f.created_at
+		       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
 		FROM files f
 		WHERE (f.device_id, f.inode) IN (
 			SELECT device_id, inode
@@ -1070,7 +1074,7 @@ func (db *DB) GetHardlinkGroupsFiltered(search, orderBy, direction string, limit
 				LIMIT ? OFFSET ?
 			)
 			SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
-			       f.scan_id, f.last_verified, f.is_orphaned, f.created_at
+			       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
 			FROM files f
 			INNER JOIN hardlink_groups hg
 				ON f.device_id = hg.device_id AND f.inode = hg.inode
@@ -1099,7 +1103,7 @@ func (db *DB) GetHardlinkGroupsFiltered(search, orderBy, direction string, limit
 				LIMIT ? OFFSET ?
 			)
 			SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
-			       f.scan_id, f.last_verified, f.is_orphaned, f.created_at
+			       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
 			FROM files f
 			INNER JOIN ranked_groups rg
 				ON f.device_id = rg.device_id AND f.inode = rg.inode
@@ -1134,7 +1138,7 @@ func (db *DB) GetHardlinkGroupsFiltered(search, orderBy, direction string, limit
 func (db *DB) GetHardlinksByInodeDevice(inode, deviceID int64) ([]*File, error) {
 	query := `
 		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
-		       f.scan_id, f.last_verified, f.is_orphaned, f.created_at
+		       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
 		FROM files f
 		WHERE f.device_id = ? AND f.inode = ?
 		ORDER BY f.path
@@ -1666,4 +1670,45 @@ func (db *DB) ClearAuditLog(olderThanDays int) (int64, error) {
 	}
 
 	return count, nil
+}
+
+// ExtractExtension extracts the file extension from a path
+// Returns lowercase extension including the dot (e.g., ".mkv")
+// Returns empty string if no extension found
+func ExtractExtension(path string) string {
+	// Find the last occurrence of '.' after the last '/'
+	lastSlash := -1
+	lastDot := -1
+
+	for i := len(path) - 1; i >= 0; i-- {
+		if path[i] == '/' && lastSlash == -1 {
+			lastSlash = i
+			break // Stop after finding the last slash
+		}
+		if path[i] == '.' && lastDot == -1 {
+			lastDot = i
+		}
+	}
+
+	// If we found a dot and it's after the last slash (or no slash found)
+	if lastDot > lastSlash {
+		ext := path[lastDot:]
+		// Convert to lowercase for consistency
+		return toLower(ext)
+	}
+
+	return ""
+}
+
+// toLower converts a string to lowercase (simple ASCII version)
+func toLower(s string) string {
+	result := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 'A' && s[i] <= 'Z' {
+			result[i] = s[i] + 32
+		} else {
+			result[i] = s[i]
+		}
+	}
+	return string(result)
 }
