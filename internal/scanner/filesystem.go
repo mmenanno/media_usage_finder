@@ -93,10 +93,10 @@ func WalkFiles(ctx context.Context, paths []string, out chan<- FileInfo, progres
 		}(path)
 	}
 
-	// Wait for all walkers to complete, then close the output channel
+	// Wait for all walkers to complete, then close the error channel
+	// Note: We don't close 'out' here because it's owned by the caller (WorkerPool)
 	go func() {
 		wg.Wait()
-		close(out)
 		close(errChan)
 	}()
 
