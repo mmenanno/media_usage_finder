@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -85,6 +86,32 @@ func (p *PlexClient) GetAllFiles() ([]PlexFile, error) {
 
 	log.Printf("Total Plex files found: %d", len(allFiles))
 	return allFiles, nil
+}
+
+// GetSampleFile retrieves a single sample file from Plex that matches the path prefix
+// This is optimized for path mapping validation - it stops as soon as it finds one matching file
+func (p *PlexClient) GetSampleFile(pathPrefix string) (string, error) {
+	// Get library sections
+	sections, err := p.getLibrarySections()
+	if err != nil {
+		return "", fmt.Errorf("failed to get library sections: %w", err)
+	}
+
+	// Try each section until we find a matching file
+	for _, section := range sections {
+		samplePath, err := p.getSampleFileFromSection(section.Key, section.Type, pathPrefix)
+		if err != nil {
+			// Log but continue to next section
+			log.Printf("Failed to get sample from section %s: %v", section.Title, err)
+			continue
+		}
+		if samplePath != "" {
+			return samplePath, nil
+		}
+	}
+
+	// No matching file found in any section
+	return "", nil
 }
 
 type libraryResponse struct {
@@ -316,4 +343,131 @@ func (p *PlexClient) getFilesForTVSection(sectionKey string) ([]PlexFile, error)
 	log.Printf("TV Section %s: found %d episode files", sectionKey, len(files))
 
 	return files, nil
+}
+
+// getSampleFileFromSection retrieves a single sample file from a Plex section that matches the path prefix
+// Returns empty string if no matching file found
+func (p *PlexClient) getSampleFileFromSection(sectionKey, sectionType, pathPrefix string) (string, error) {
+	// For TV shows, use the TV-specific endpoint
+	if sectionType == "show" {
+		return p.getSampleFileFromTVSection(sectionKey, pathPrefix)
+	}
+
+	// Build URL to get items from section
+	u, err := url.Parse(p.baseURL + "/library/sections/" + sectionKey + "/all")
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("X-Plex-Token", p.token)
+	req.Header.Set("Accept", "application/xml")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("plex API returned status %d", resp.StatusCode)
+	}
+
+	// Parse response and find first matching file
+	var container mediaContainerResponse
+	decoder := xml.NewDecoder(resp.Body)
+	if err := decoder.Decode(&container); err != nil {
+		return "", fmt.Errorf("failed to parse media container: %w", err)
+	}
+
+	// Check Video elements (movies)
+	for _, video := range container.Video {
+		for _, media := range video.Media {
+			for _, part := range media.Part {
+				if part.File != "" && (pathPrefix == "" || strings.HasPrefix(part.File, pathPrefix)) {
+					return part.File, nil
+				}
+			}
+		}
+	}
+
+	// Check Track elements (music)
+	for _, track := range container.Track {
+		for _, media := range track.Media {
+			for _, part := range media.Part {
+				if part.File != "" && (pathPrefix == "" || strings.HasPrefix(part.File, pathPrefix)) {
+					return part.File, nil
+				}
+			}
+		}
+	}
+
+	// Check Photo elements
+	for _, photo := range container.Photo {
+		for _, media := range photo.Media {
+			for _, part := range media.Part {
+				if part.File != "" && (pathPrefix == "" || strings.HasPrefix(part.File, pathPrefix)) {
+					return part.File, nil
+				}
+			}
+		}
+	}
+
+	return "", nil
+}
+
+// getSampleFileFromTVSection retrieves a single sample TV episode file that matches the path prefix
+func (p *PlexClient) getSampleFileFromTVSection(sectionKey, pathPrefix string) (string, error) {
+	// Build URL to get all episodes in section
+	u, err := url.Parse(p.baseURL + "/library/sections/" + sectionKey + "/all")
+	if err != nil {
+		return "", err
+	}
+
+	// Add query parameters to get episode-level data
+	q := u.Query()
+	q.Set("type", "4") // 4 = episodes in Plex
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("X-Plex-Token", p.token)
+	req.Header.Set("Accept", "application/xml")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("plex API returned status %d", resp.StatusCode)
+	}
+
+	// Parse response and find first matching file
+	var container mediaContainerResponse
+	decoder := xml.NewDecoder(resp.Body)
+	if err := decoder.Decode(&container); err != nil {
+		return "", fmt.Errorf("failed to parse TV episodes: %w", err)
+	}
+
+	// TV episodes are returned as Video elements
+	for _, video := range container.Video {
+		for _, media := range video.Media {
+			for _, part := range media.Part {
+				if part.File != "" && (pathPrefix == "" || strings.HasPrefix(part.File, pathPrefix)) {
+					return part.File, nil
+				}
+			}
+		}
+	}
+
+	return "", nil
 }

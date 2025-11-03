@@ -1492,6 +1492,33 @@ func (s *Server) collectServiceConfigsFromForm(r *http.Request) map[string]inter
 		}
 	}
 
+	// qBittorrent config
+	if qbitURL := strings.TrimSpace(r.FormValue("qbittorrent_url")); qbitURL != "" {
+		// qBittorrent requires username and password
+		qbitUsername := strings.TrimSpace(r.FormValue("qbittorrent_username"))
+		qbitPassword := strings.TrimSpace(r.FormValue("qbittorrent_password"))
+		qbitQuiProxy := strings.TrimSpace(r.FormValue("qbittorrent_qui_proxy_url"))
+
+		if qbitUsername != "" && qbitPassword != "" {
+			configs["qbittorrent"] = map[string]string{
+				"url":           qbitURL,
+				"username":      qbitUsername,
+				"password":      qbitPassword,
+				"qui_proxy_url": qbitQuiProxy, // May be empty
+			}
+		}
+	}
+
+	// Stash config
+	if stashURL := strings.TrimSpace(r.FormValue("stash_url")); stashURL != "" {
+		if stashKey := strings.TrimSpace(r.FormValue("stash_api_key")); stashKey != "" {
+			configs["stash"] = map[string]string{
+				"url":     stashURL,
+				"api_key": stashKey,
+			}
+		}
+	}
+
 	return configs
 }
 
@@ -1512,6 +1539,12 @@ func (s *Server) testServicePathMapping(serviceName, containerPath, servicePath 
 	case "radarr":
 		configMap := cfg.(map[string]string)
 		sampleFilePath, err = s.getSampleArrFilePath(configMap["url"], configMap["api_key"], servicePath, "radarr")
+	case "qbittorrent":
+		configMap := cfg.(map[string]string)
+		sampleFilePath, err = s.getSampleQBittorrentFilePath(configMap["url"], configMap["username"], configMap["password"], configMap["qui_proxy_url"], servicePath)
+	case "stash":
+		configMap := cfg.(map[string]string)
+		sampleFilePath, err = s.getSampleStashFilePath(configMap["url"], configMap["api_key"], servicePath)
 	default:
 		return fmt.Errorf("unsupported service: %s", serviceName)
 	}
@@ -1556,25 +1589,14 @@ func (s *Server) getSamplePlexFilePath(url, token, pathPrefix string) (string, e
 		return "", err
 	}
 
-	// Cast to PlexClient to access GetAllFiles
+	// Cast to PlexClient to access GetSampleFile
 	plexClient, ok := client.(*api.PlexClient)
 	if !ok {
 		return "", fmt.Errorf("failed to cast to PlexClient")
 	}
 
-	// Get all files and find one that matches the path prefix
-	files, err := plexClient.GetAllFiles()
-	if err != nil {
-		return "", err
-	}
-
-	for _, file := range files {
-		if strings.HasPrefix(file.Path, pathPrefix) {
-			return file.Path, nil
-		}
-	}
-
-	return "", nil
+	// Get a sample file that matches the path prefix (optimized - stops at first match)
+	return plexClient.GetSampleFile(pathPrefix)
 }
 
 // getSampleArrFilePath gets a sample file path from Sonarr/Radarr
@@ -1598,7 +1620,7 @@ func (s *Server) getSampleArrFilePath(url, apiKey, pathPrefix, serviceType strin
 		return "", err
 	}
 
-	// Cast to appropriate client type to access GetAllFiles
+	// Cast to appropriate client type to access GetSampleFile
 	switch serviceType {
 	case "sonarr":
 		sonarrClient, ok := client.(*api.SonarrClient)
@@ -1606,35 +1628,69 @@ func (s *Server) getSampleArrFilePath(url, apiKey, pathPrefix, serviceType strin
 			return "", fmt.Errorf("failed to cast to SonarrClient")
 		}
 
-		files, err := sonarrClient.GetAllFiles()
-		if err != nil {
-			return "", err
-		}
-
-		for _, file := range files {
-			if strings.HasPrefix(file.Path, pathPrefix) {
-				return file.Path, nil
-			}
-		}
+		// Get a sample file that matches the path prefix (optimized - stops at first match)
+		return sonarrClient.GetSampleFile(pathPrefix)
 	case "radarr":
 		radarrClient, ok := client.(*api.RadarrClient)
 		if !ok {
 			return "", fmt.Errorf("failed to cast to RadarrClient")
 		}
 
-		files, err := radarrClient.GetAllFiles()
-		if err != nil {
-			return "", err
-		}
-
-		for _, file := range files {
-			if strings.HasPrefix(file.Path, pathPrefix) {
-				return file.Path, nil
-			}
-		}
+		// Get a sample file that matches the path prefix (optimized - stops at first match)
+		return radarrClient.GetSampleFile(pathPrefix)
 	}
 
 	return "", nil
+}
+
+// getSampleQBittorrentFilePath gets a sample file path from qBittorrent
+func (s *Server) getSampleQBittorrentFilePath(url, username, password, quiProxyURL, pathPrefix string) (string, error) {
+	// Create temporary config for testing
+	testConfig := *s.config
+	testConfig.Services.QBittorrent.URL = url
+	testConfig.Services.QBittorrent.Username = username
+	testConfig.Services.QBittorrent.Password = password
+	testConfig.Services.QBittorrent.QuiProxyURL = quiProxyURL
+
+	// Create client via factory
+	factory := api.NewClientFactory(&testConfig)
+	client, err := factory.CreateClient("qbittorrent", testConfig.APITimeout)
+	if err != nil {
+		return "", err
+	}
+
+	// Cast to QBittorrentClient to access GetSampleFile
+	qbitClient, ok := client.(*api.QBittorrentClient)
+	if !ok {
+		return "", fmt.Errorf("failed to cast to QBittorrentClient")
+	}
+
+	// Get a sample file that matches the path prefix (optimized - stops at first match)
+	return qbitClient.GetSampleFile(pathPrefix)
+}
+
+// getSampleStashFilePath gets a sample file path from Stash
+func (s *Server) getSampleStashFilePath(url, apiKey, pathPrefix string) (string, error) {
+	// Create temporary config for testing
+	testConfig := *s.config
+	testConfig.Services.Stash.URL = url
+	testConfig.Services.Stash.APIKey = apiKey
+
+	// Create client via factory
+	factory := api.NewClientFactory(&testConfig)
+	client, err := factory.CreateClient("stash", testConfig.APITimeout)
+	if err != nil {
+		return "", err
+	}
+
+	// Cast to StashClient to access GetSampleFile
+	stashClient, ok := client.(*api.StashClient)
+	if !ok {
+		return "", fmt.Errorf("failed to cast to StashClient")
+	}
+
+	// Get a sample file that matches the path prefix (optimized - stops at first match)
+	return stashClient.GetSampleFile(pathPrefix)
 }
 
 // HandleExport exports files list using streaming for memory efficiency

@@ -230,6 +230,47 @@ func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
 	return allFiles, nil
 }
 
+// GetSampleFile retrieves a single sample file from qBittorrent that matches the path prefix
+// This is optimized for path mapping validation - it stops as soon as it finds one matching file
+func (q *QBittorrentClient) GetSampleFile(pathPrefix string) (string, error) {
+	if err := q.login(); err != nil {
+		return "", err
+	}
+
+	// Get list of all torrents
+	torrents, err := q.getTorrents()
+	if err != nil {
+		return "", fmt.Errorf("failed to get torrents: %w", err)
+	}
+
+	// Try each torrent until we find a matching file
+	for _, torrent := range torrents {
+		// Get torrent files and properties
+		files, err := q.getTorrentFiles(torrent.Hash)
+		if err != nil {
+			// Skip this torrent on error
+			continue
+		}
+
+		props, err := q.getTorrentProperties(torrent.Hash)
+		if err != nil {
+			// Skip this torrent on error
+			continue
+		}
+
+		// Check each file
+		for _, f := range files {
+			fullPath := filepath.Join(props.SavePath, f.Name)
+			if fullPath != "" && (pathPrefix == "" || strings.HasPrefix(fullPath, pathPrefix)) {
+				return fullPath, nil
+			}
+		}
+	}
+
+	// No matching file found
+	return "", nil
+}
+
 type torrentInfo struct {
 	Hash string `json:"hash"`
 	Name string `json:"name"`

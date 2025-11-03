@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -100,6 +101,38 @@ func (s *StashClient) GetAllFiles() ([]StashFile, error) {
 
 	log.Printf("Total Stash files found: %d", len(allFiles))
 	return allFiles, nil
+}
+
+// GetSampleFile retrieves a single sample file from Stash that matches the path prefix
+// This is optimized for path mapping validation - it stops as soon as it finds one matching file
+func (s *StashClient) GetSampleFile(pathPrefix string) (string, error) {
+	// Just fetch first page with small page size for efficiency
+	page := 1
+	perPage := 10
+
+	for page <= 10 { // Limit to checking first 10 pages (100 files max) to avoid long waits
+		files, totalCount, err := s.getFilesPage(page, perPage)
+		if err != nil {
+			return "", fmt.Errorf("failed to get scenes page %d: %w", page, err)
+		}
+
+		// Check if any file matches
+		for _, file := range files {
+			if file.Path != "" && (pathPrefix == "" || strings.HasPrefix(file.Path, pathPrefix)) {
+				return file.Path, nil
+			}
+		}
+
+		// If we've checked all available files, stop
+		if len(files) == 0 || len(files) < perPage || page*perPage >= totalCount {
+			break
+		}
+
+		page++
+	}
+
+	// No matching file found
+	return "", nil
 }
 
 type graphQLRequest struct {

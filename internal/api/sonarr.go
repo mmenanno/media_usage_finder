@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -64,6 +65,40 @@ func (s *SonarrClient) GetAllFiles() ([]SonarrFile, error) {
 	}
 
 	return files, nil
+}
+
+// GetSampleFile retrieves a single sample file from Sonarr that matches the path prefix
+// This is optimized for path mapping validation - it stops as soon as it finds one matching file
+func (s *SonarrClient) GetSampleFile(pathPrefix string) (string, error) {
+	// Get all series
+	seriesMap, err := s.getAllSeries()
+	if err != nil {
+		return "", fmt.Errorf("failed to get series: %w", err)
+	}
+
+	// Try each series until we find a matching file
+	for seriesID := range seriesMap {
+		var episodeFiles []struct {
+			Path string `json:"path"`
+		}
+
+		// Query episode files for this specific series
+		endpoint := fmt.Sprintf("/api/v3/episodefile?seriesId=%d", seriesID)
+		if err := s.doRequest(endpoint, &episodeFiles); err != nil {
+			// Log and continue to next series
+			continue
+		}
+
+		// Check if any file matches the path prefix
+		for _, ef := range episodeFiles {
+			if ef.Path != "" && (pathPrefix == "" || strings.HasPrefix(ef.Path, pathPrefix)) {
+				return ef.Path, nil
+			}
+		}
+	}
+
+	// No matching file found
+	return "", nil
 }
 
 func (s *SonarrClient) getAllSeries() (map[int64]string, error) {

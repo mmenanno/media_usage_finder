@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -63,6 +64,40 @@ func (r *RadarrClient) GetAllFiles() ([]RadarrFile, error) {
 	}
 
 	return files, nil
+}
+
+// GetSampleFile retrieves a single sample file from Radarr that matches the path prefix
+// This is optimized for path mapping validation - it stops as soon as it finds one matching file
+func (r *RadarrClient) GetSampleFile(pathPrefix string) (string, error) {
+	// Get all movies
+	movieMap, err := r.getAllMovies()
+	if err != nil {
+		return "", fmt.Errorf("failed to get movies: %w", err)
+	}
+
+	// Try each movie until we find a matching file
+	for movieID := range movieMap {
+		var movieFiles []struct {
+			Path string `json:"path"`
+		}
+
+		// Query movie files for this specific movie
+		endpoint := fmt.Sprintf("/api/v3/moviefile?movieId=%d", movieID)
+		if err := r.doRequest(endpoint, &movieFiles); err != nil {
+			// Log and continue to next movie
+			continue
+		}
+
+		// Check if any file matches the path prefix
+		for _, mf := range movieFiles {
+			if mf.Path != "" && (pathPrefix == "" || strings.HasPrefix(mf.Path, pathPrefix)) {
+				return mf.Path, nil
+			}
+		}
+	}
+
+	// No matching file found
+	return "", nil
 }
 
 type movieInfo struct {
