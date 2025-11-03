@@ -11,13 +11,14 @@ import (
 // Note: Size fields use int64 and have a theoretical limit of ~9 exabytes.
 // For filesystems with total sizes exceeding this, overflow may occur.
 type Stats struct {
-	TotalFiles       int64
-	TotalSize        int64 // In bytes, max ~9 EB before overflow
-	OrphanedFiles    int64
-	OrphanedSize     int64 // In bytes, max ~9 EB before overflow
-	HardlinkGroups   int64
-	ServiceBreakdown map[string]ServiceStats
-	HardlinkSavings  int64 // In bytes, max ~9 EB before overflow
+	TotalFiles         int64
+	TotalSize          int64 // In bytes, max ~9 EB before overflow
+	OrphanedFiles      int64
+	OrphanedSize       int64 // In bytes, max ~9 EB before overflow
+	HardlinkGroups     int64
+	ServiceBreakdown   map[string]ServiceStats
+	HardlinkSavings    int64 // In bytes, max ~9 EB before overflow
+	ActiveServiceCount int64 // Number of services with files
 }
 
 // ServiceStats contains statistics for a specific service
@@ -124,6 +125,15 @@ func (c *Calculator) calculateServiceBreakdown(stats *Stats) error {
 		}
 		stats.ServiceBreakdown[service] = serviceStats
 	}
+
+	// Count active services (services with files)
+	activeCount := int64(0)
+	for _, serviceStats := range stats.ServiceBreakdown {
+		if serviceStats.FileCount > 0 {
+			activeCount++
+		}
+	}
+	stats.ActiveServiceCount = activeCount
 
 	return rows.Err()
 }
