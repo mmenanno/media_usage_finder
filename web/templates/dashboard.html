@@ -75,7 +75,7 @@
         <!-- Services -->
         <div class="bg-gray-800 rounded-lg p-6">
             <div class="text-gray-400 text-sm font-medium">Active Services</div>
-            <div class="text-3xl font-bold mt-2">{{len .Stats.ServiceBreakdown}}</div>
+            <div class="text-3xl font-bold mt-2">{{$activeCount := 0}}{{range $service, $stats := .Stats.ServiceBreakdown}}{{if gt $stats.FileCount 0}}{{$activeCount = add $activeCount 1}}{{end}}{{end}}{{$activeCount}}</div>
             <div class="text-gray-500 text-sm mt-1">Tracking files</div>
         </div>
     </div>

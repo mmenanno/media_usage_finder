@@ -1,6 +1,9 @@
 package server
 
-import "github.com/mmenanno/media-usage-finder/internal/database"
+import (
+	"github.com/mmenanno/media-usage-finder/internal/database"
+	"github.com/mmenanno/media-usage-finder/internal/stats"
+)
 
 // API Response Types - Typed structs instead of map[string]interface{}
 
@@ -90,7 +93,7 @@ type TestServiceResponse struct {
 
 // DashboardData represents data for the dashboard template
 type DashboardData struct {
-	Stats                interface{}
+	Stats                *stats.Stats
 	Title                string
 	HasActiveScan        bool
 	HasInterruptedScan   bool
