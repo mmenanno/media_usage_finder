@@ -87,7 +87,7 @@
             {{range $service, $stats := .Stats.ServiceBreakdown}}
             <div class="bg-gray-700 rounded p-4">
                 <div class="flex justify-between items-center">
-                    <span class="text-lg font-medium capitalize">{{$service}}</span>
+                    <span class="text-lg font-medium">{{formatServiceName $service}}</span>
                     <span class="text-gray-400">{{$stats.FileCount}} files</span>
                 </div>
                 <div class="text-sm text-gray-500 mt-1">{{formatSize $stats.TotalSize}}</div>

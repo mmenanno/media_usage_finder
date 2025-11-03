@@ -98,7 +98,7 @@
                                         value="{{$svc}}"
                                         {{range $selectedServices}}{{if eq . $svc}}checked{{end}}{{end}}
                                         class="service-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded">
-                                    <span class="text-gray-100 capitalize">{{$svc}}</span>
+                                    <span class="text-gray-100">{{formatServiceName $svc}}</span>
                                 </label>
                                 {{end}}
                             </div>
@@ -266,7 +266,7 @@
                             {{if .Usage}}
                                 <div class="flex flex-wrap gap-1">
                                     {{range .Usage}}
-                                    <span class="px-2 py-1 bg-gray-600 rounded text-xs capitalize">{{.Service}}</span>
+                                    <span class="px-2 py-1 bg-gray-600 rounded text-xs">{{formatServiceName .Service}}</span>
                                     {{end}}
                                 </div>
                             {{else}}

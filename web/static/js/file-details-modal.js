@@ -60,8 +60,8 @@ class FileDetailsModal {
         // Build usage badges
         const usageBadges = fileData.usage && fileData.usage.length > 0
             ? fileData.usage.map(u => `
-                <span class="px-2 py-1 bg-${this.getServiceColor(u.service)}-600 rounded text-xs capitalize">
-                    ${u.service}
+                <span class="px-2 py-1 bg-${this.getServiceColor(u.service)}-600 rounded text-xs">
+                    ${this.formatServiceName(u.service)}
                 </span>
               `).join('')
             : '<span class="text-gray-500 text-sm">Not tracked by any service</span>';
@@ -70,7 +70,7 @@ class FileDetailsModal {
         const metadataSections = fileData.usage && fileData.usage.length > 0
             ? fileData.usage.map(u => `
                 <div class="border-t border-gray-700 pt-4">
-                    <h4 class="text-sm font-medium text-gray-400 mb-2 capitalize">${u.service} Metadata</h4>
+                    <h4 class="text-sm font-medium text-gray-400 mb-2">${this.formatServiceName(u.service)} Metadata</h4>
                     <div class="space-y-1 text-sm">
                         ${this.renderMetadata(u.metadata)}
                     </div>
@@ -213,6 +213,17 @@ class FileDetailsModal {
                 </div>
             `;
         }).join('');
+    }
+
+    formatServiceName(service) {
+        const names = {
+            qbittorrent: 'qBittorrent',
+            plex: 'Plex',
+            sonarr: 'Sonarr',
+            radarr: 'Radarr',
+            stash: 'Stash'
+        };
+        return names[service] || service;
     }
 
     getServiceColor(service) {

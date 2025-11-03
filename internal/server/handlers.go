@@ -2523,6 +2523,23 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"formatSize":     stats.FormatSize,
 		"formatDuration": stats.FormatDuration,
+		"formatServiceName": func(service string) string {
+			// Map internal service names to proper display names
+			switch service {
+			case "qbittorrent":
+				return "qBittorrent"
+			case "plex":
+				return "Plex"
+			case "sonarr":
+				return "Sonarr"
+			case "radarr":
+				return "Radarr"
+			case "stash":
+				return "Stash"
+			default:
+				return service
+			}
+		},
 		"add": func(a, b int64) int64 {
 			return a + b
 		},
