@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"log"
@@ -61,9 +62,9 @@ func (p *PlexClient) Test() error {
 }
 
 // GetAllFiles retrieves all files tracked by Plex
-func (p *PlexClient) GetAllFiles() ([]PlexFile, error) {
+func (p *PlexClient) GetAllFiles(ctx context.Context) ([]PlexFile, error) {
 	// First, get all library sections
-	sections, err := p.getLibrarySections()
+	sections, err := p.getLibrarySections(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get library sections: %w", err)
 	}
@@ -74,8 +75,15 @@ func (p *PlexClient) GetAllFiles() ([]PlexFile, error) {
 
 	// For each section, get all items
 	for _, section := range sections {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		log.Printf("Processing Plex section: %s (type: %s, key: %s)", section.Title, section.Type, section.Key)
-		files, err := p.getFilesForSection(section.Key, section.Type)
+		files, err := p.getFilesForSection(ctx, section.Key, section.Type)
 		if err != nil {
 			log.Printf("ERROR: Failed to get files for section %s: %v", section.Title, err)
 			return nil, fmt.Errorf("failed to get files for section %s: %w", section.Title, err)
@@ -91,8 +99,9 @@ func (p *PlexClient) GetAllFiles() ([]PlexFile, error) {
 // GetSampleFile retrieves a single sample file from Plex that matches the path prefix
 // This is optimized for path mapping validation - it stops as soon as it finds one matching file
 func (p *PlexClient) GetSampleFile(pathPrefix string) (string, error) {
-	// Get library sections
-	sections, err := p.getLibrarySections()
+	// Get library sections with background context (not cancellable)
+	ctx := context.Background()
+	sections, err := p.getLibrarySections(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get library sections: %w", err)
 	}
@@ -122,12 +131,12 @@ type libraryResponse struct {
 	} `xml:"Directory"`
 }
 
-func (p *PlexClient) getLibrarySections() ([]struct {
+func (p *PlexClient) getLibrarySections(ctx context.Context) ([]struct {
 	Key   string
 	Title string
 	Type  string
 }, error) {
-	req, err := http.NewRequest("GET", p.baseURL+"/library/sections", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", p.baseURL+"/library/sections", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -199,10 +208,10 @@ type mediaContainerResponse struct {
 	} `xml:"Photo"`
 }
 
-func (p *PlexClient) getFilesForSection(sectionKey, sectionType string) ([]PlexFile, error) {
+func (p *PlexClient) getFilesForSection(ctx context.Context, sectionKey, sectionType string) ([]PlexFile, error) {
 	// For TV shows, we need to get episodes using a different endpoint
 	if sectionType == "show" {
-		return p.getFilesForTVSection(sectionKey)
+		return p.getFilesForTVSection(ctx, sectionKey)
 	}
 
 	// Build URL with all items in section
@@ -211,7 +220,7 @@ func (p *PlexClient) getFilesForSection(sectionKey, sectionType string) ([]PlexF
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +296,7 @@ func (p *PlexClient) getFilesForSection(sectionKey, sectionType string) ([]PlexF
 }
 
 // getFilesForTVSection gets all episode files for a TV show library section
-func (p *PlexClient) getFilesForTVSection(sectionKey string) ([]PlexFile, error) {
+func (p *PlexClient) getFilesForTVSection(ctx context.Context, sectionKey string) ([]PlexFile, error) {
 	// For TV shows, we need to query all episodes using type=4 (episodes)
 	u, err := url.Parse(p.baseURL + "/library/sections/" + sectionKey + "/all")
 	if err != nil {
@@ -299,7 +308,7 @@ func (p *PlexClient) getFilesForTVSection(sectionKey string) ([]PlexFile, error)
 	q.Set("type", "4")
 	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -41,7 +42,8 @@ func NewStashClient(baseURL, apiKey string, timeout time.Duration) *StashClient 
 
 // Test tests the connection to Stash
 func (s *StashClient) Test() error {
-	// Use a simple GraphQL query to test connectivity
+	// Use a simple GraphQL query to test connectivity with a background context
+	ctx := context.Background()
 	query := `query { version { version } }`
 
 	reqBody := graphQLRequest{
@@ -57,7 +59,7 @@ func (s *StashClient) Test() error {
 		Errors []graphQLError `json:"errors"`
 	}
 
-	if err := s.doGraphQLRequest(reqBody, &resp); err != nil {
+	if err := s.doGraphQLRequest(ctx, reqBody, &resp); err != nil {
 		return fmt.Errorf("failed to connect to Stash at %s: %w. Check the URL is reachable and the API key is valid", s.baseURL, err)
 	}
 
@@ -74,15 +76,22 @@ func (s *StashClient) Test() error {
 }
 
 // GetAllFiles retrieves all files tracked by Stash
-func (s *StashClient) GetAllFiles() ([]StashFile, error) {
+func (s *StashClient) GetAllFiles(ctx context.Context) ([]StashFile, error) {
 	var allFiles []StashFile
 	page := 1
 	perPage := 100
 
 	for {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		log.Printf("Fetching Stash scenes page %d (per_page: %d)", page, perPage)
 
-		files, totalCount, err := s.getFilesPage(page, perPage)
+		files, totalCount, err := s.getFilesPage(ctx, page, perPage)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get scenes page %d: %w", page, err)
 		}
@@ -106,12 +115,15 @@ func (s *StashClient) GetAllFiles() ([]StashFile, error) {
 // GetSampleFile retrieves a single sample file from Stash that matches the path prefix
 // This is optimized for path mapping validation - it stops as soon as it finds one matching file
 func (s *StashClient) GetSampleFile(pathPrefix string) (string, error) {
+	// Use background context (not cancellable)
+	ctx := context.Background()
+
 	// Just fetch first page with small page size for efficiency
 	page := 1
 	perPage := 10
 
 	for page <= 10 { // Limit to checking first 10 pages (100 files max) to avoid long waits
-		files, totalCount, err := s.getFilesPage(page, perPage)
+		files, totalCount, err := s.getFilesPage(ctx, page, perPage)
 		if err != nil {
 			return "", fmt.Errorf("failed to get scenes page %d: %w", page, err)
 		}
@@ -150,7 +162,7 @@ type graphQLResponse struct {
 	Errors []graphQLError  `json:"errors"`
 }
 
-func (s *StashClient) getFilesPage(page, perPage int) ([]StashFile, int, error) {
+func (s *StashClient) getFilesPage(ctx context.Context, page, perPage int) ([]StashFile, int, error) {
 	query := `
 		query FindScenes($filter: FindFilterType) {
 			findScenes(filter: $filter) {
@@ -210,7 +222,7 @@ func (s *StashClient) getFilesPage(page, perPage int) ([]StashFile, int, error) 
 		Errors []graphQLError `json:"errors"`
 	}
 
-	if err := s.doGraphQLRequest(reqBody, &resp); err != nil {
+	if err := s.doGraphQLRequest(ctx, reqBody, &resp); err != nil {
 		return nil, 0, err
 	}
 
@@ -253,13 +265,13 @@ func (s *StashClient) getFilesPage(page, perPage int) ([]StashFile, int, error) 
 	return files, resp.Data.FindScenes.Count, nil
 }
 
-func (s *StashClient) doGraphQLRequest(reqBody graphQLRequest, respData interface{}) error {
+func (s *StashClient) doGraphQLRequest(ctx context.Context, reqBody graphQLRequest, respData interface{}) error {
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", s.baseURL+"/graphql", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", s.baseURL+"/graphql", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

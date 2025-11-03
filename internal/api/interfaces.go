@@ -1,6 +1,9 @@
 package api
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // ServiceClient is a common interface for all media service clients
 // This enables polymorphic usage and simplifies testing
@@ -15,7 +18,8 @@ type FileProvider interface {
 
 	// GetAllFiles retrieves all files tracked by the service
 	// The return type varies by service, but all implement basic file info
-	GetAllFiles() (interface{}, error)
+	// Context allows for cancellation during long-running operations
+	GetAllFiles(ctx context.Context) (interface{}, error)
 }
 
 // Ensure all clients implement ServiceClient

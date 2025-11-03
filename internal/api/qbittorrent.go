@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -131,13 +132,13 @@ func (q *QBittorrentClient) Test() error {
 // - Collects all results into a single slice protected by a mutex
 // - If any API call fails for a torrent, that torrent is skipped (logged but doesn't fail entire operation)
 // - This approach significantly improves performance for users with many torrents
-func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
+func (q *QBittorrentClient) GetAllFiles(ctx context.Context) ([]QBittorrentFile, error) {
 	if err := q.login(); err != nil {
 		return nil, err
 	}
 
 	// Get list of all torrents
-	torrents, err := q.getTorrents()
+	torrents, err := q.getTorrents(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get torrents: %w", err)
 	}
@@ -154,13 +155,24 @@ func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
 	var wg sync.WaitGroup
 
 	for _, torrent := range torrents {
+		// Check for context cancellation before starting new worker
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		wg.Add(1)
 		go func(t torrentInfo) {
 			defer wg.Done()
 
 			// Acquire semaphore
-			sem <- struct{}{}
-			defer func() { <-sem }()
+			select {
+			case <-ctx.Done():
+				return
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			}
 
 			// Get torrent files and properties concurrently with proper error handling
 			type result struct {
@@ -178,12 +190,12 @@ func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
 				wg.Add(2)
 				go func() {
 					defer wg.Done()
-					r.files, filesErr = q.getTorrentFiles(t.Hash)
+					r.files, filesErr = q.getTorrentFiles(ctx, t.Hash)
 				}()
 
 				go func() {
 					defer wg.Done()
-					r.props, propsErr = q.getTorrentProperties(t.Hash)
+					r.props, propsErr = q.getTorrentProperties(ctx, t.Hash)
 				}()
 
 				wg.Wait()
@@ -198,31 +210,35 @@ func (q *QBittorrentClient) GetAllFiles() ([]QBittorrentFile, error) {
 				resultCh <- r
 			}()
 
-			// Wait for result
-			res := <-resultCh
-			if res.err != nil || res.files == nil || res.props == nil {
-				// Skip this torrent on error
+			// Wait for result or context cancellation
+			select {
+			case <-ctx.Done():
 				return
+			case res := <-resultCh:
+				if res.err != nil || res.files == nil || res.props == nil {
+					// Skip this torrent on error
+					return
+				}
+
+				// Process files
+				var torrentQBFiles []QBittorrentFile
+				for _, f := range res.files {
+					// Build full file path using filepath.Join for safety
+					fullPath := filepath.Join(res.props.SavePath, f.Name)
+
+					torrentQBFiles = append(torrentQBFiles, QBittorrentFile{
+						Path:        fullPath,
+						Size:        f.Size,
+						TorrentHash: t.Hash,
+						TorrentName: t.Name,
+					})
+				}
+
+				// Append to results with mutex
+				mu.Lock()
+				allFiles = append(allFiles, torrentQBFiles...)
+				mu.Unlock()
 			}
-
-			// Process files
-			var torrentQBFiles []QBittorrentFile
-			for _, f := range res.files {
-				// Build full file path using filepath.Join for safety
-				fullPath := filepath.Join(res.props.SavePath, f.Name)
-
-				torrentQBFiles = append(torrentQBFiles, QBittorrentFile{
-					Path:        fullPath,
-					Size:        f.Size,
-					TorrentHash: t.Hash,
-					TorrentName: t.Name,
-				})
-			}
-
-			// Append to results with mutex
-			mu.Lock()
-			allFiles = append(allFiles, torrentQBFiles...)
-			mu.Unlock()
 		}(torrent)
 	}
 
@@ -237,8 +253,11 @@ func (q *QBittorrentClient) GetSampleFile(pathPrefix string) (string, error) {
 		return "", err
 	}
 
+	// Use background context (not cancellable)
+	ctx := context.Background()
+
 	// Get list of all torrents
-	torrents, err := q.getTorrents()
+	torrents, err := q.getTorrents(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get torrents: %w", err)
 	}
@@ -246,13 +265,13 @@ func (q *QBittorrentClient) GetSampleFile(pathPrefix string) (string, error) {
 	// Try each torrent until we find a matching file
 	for _, torrent := range torrents {
 		// Get torrent files and properties
-		files, err := q.getTorrentFiles(torrent.Hash)
+		files, err := q.getTorrentFiles(ctx, torrent.Hash)
 		if err != nil {
 			// Skip this torrent on error
 			continue
 		}
 
-		props, err := q.getTorrentProperties(torrent.Hash)
+		props, err := q.getTorrentProperties(ctx, torrent.Hash)
 		if err != nil {
 			// Skip this torrent on error
 			continue
@@ -276,8 +295,8 @@ type torrentInfo struct {
 	Name string `json:"name"`
 }
 
-func (q *QBittorrentClient) getTorrents() ([]torrentInfo, error) {
-	req, err := http.NewRequest("GET", q.getEffectiveURL()+"/api/v2/torrents/info", nil)
+func (q *QBittorrentClient) getTorrents(ctx context.Context) ([]torrentInfo, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", q.getEffectiveURL()+"/api/v2/torrents/info", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +325,7 @@ type fileInfo struct {
 	Size int64  `json:"size"`
 }
 
-func (q *QBittorrentClient) getTorrentFiles(hash string) ([]fileInfo, error) {
+func (q *QBittorrentClient) getTorrentFiles(ctx context.Context, hash string) ([]fileInfo, error) {
 	u, err := url.Parse(q.getEffectiveURL() + "/api/v2/torrents/files")
 	if err != nil {
 		return nil, err
@@ -316,7 +335,7 @@ func (q *QBittorrentClient) getTorrentFiles(hash string) ([]fileInfo, error) {
 	params.Add("hash", hash)
 	u.RawQuery = params.Encode()
 
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -343,7 +362,7 @@ type torrentProperties struct {
 	SavePath string `json:"save_path"`
 }
 
-func (q *QBittorrentClient) getTorrentProperties(hash string) (*torrentProperties, error) {
+func (q *QBittorrentClient) getTorrentProperties(ctx context.Context, hash string) (*torrentProperties, error) {
 	u, err := url.Parse(q.getEffectiveURL() + "/api/v2/torrents/properties")
 	if err != nil {
 		return nil, err
@@ -353,7 +372,7 @@ func (q *QBittorrentClient) getTorrentProperties(hash string) (*torrentPropertie
 	params.Add("hash", hash)
 	u.RawQuery = params.Encode()
 
-	req, err := http.NewRequest("GET", u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if err != nil {
 		return nil, err
 	}

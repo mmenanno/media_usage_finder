@@ -2217,7 +2217,7 @@ func (s *Server) HandleAdminClearUsage(w http.ResponseWriter, r *http.Request) {
 	var message string
 
 	if service != "" {
-		err = s.db.DeleteUsageByService(service)
+		err = s.db.DeleteUsageByService(r.Context(), service)
 		if err != nil {
 			log.Printf("Failed to clear usage for service %s: %v", service, err)
 			respondError(w, http.StatusInternalServerError, "Failed to clear usage", "clear_failed")
@@ -2320,7 +2320,7 @@ func (s *Server) HandleAdminRecalculateOrphaned(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if err := s.db.UpdateOrphanedStatus(); err != nil {
+	if err := s.db.UpdateOrphanedStatus(r.Context()); err != nil {
 		log.Printf("Failed to recalculate orphaned status: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to recalculate orphaned status", "recalc_failed")
 		return

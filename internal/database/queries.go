@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -118,6 +119,103 @@ func (db *DB) UpsertFile(file *File) error {
 	return nil
 }
 
+// BatchUpsertFiles inserts or updates multiple file records in a single transaction
+// This is significantly faster than individual UpsertFile calls for large batches
+func (db *DB) BatchUpsertFiles(ctx context.Context, files []*File) error {
+	if len(files) == 0 {
+		return nil
+	}
+
+	// SQLite has a parameter limit (default 999), with 9 params per file
+	// we batch at most 100 files at a time to stay well under the limit
+	const maxBatchSize = 100
+
+	for i := 0; i < len(files); i += maxBatchSize {
+		end := i + maxBatchSize
+		if end > len(files) {
+			end = len(files)
+		}
+		batch := files[i:end]
+
+		if err := db.batchUpsertFilesChunk(ctx, batch); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// batchUpsertFilesChunk upserts a single chunk of files (≤100)
+func (db *DB) batchUpsertFilesChunk(ctx context.Context, files []*File) error {
+	// Check for context cancellation
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	// Start transaction
+	tx, err := db.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Prepare the statement
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO files (path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, extension)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(path) DO UPDATE SET
+			size = excluded.size,
+			inode = excluded.inode,
+			device_id = excluded.device_id,
+			modified_time = excluded.modified_time,
+			scan_id = excluded.scan_id,
+			last_verified = excluded.last_verified,
+			is_orphaned = excluded.is_orphaned,
+			extension = excluded.extension
+		RETURNING id
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	// Execute for each file
+	for _, file := range files {
+		// Check for cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		err := stmt.QueryRowContext(
+			ctx,
+			file.Path,
+			file.Size,
+			file.Inode,
+			file.DeviceID,
+			file.ModifiedTime.Unix(),
+			file.ScanID,
+			file.LastVerified.Unix(),
+			file.IsOrphaned,
+			file.Extension,
+		).Scan(&file.ID)
+
+		if err != nil {
+			return fmt.Errorf("failed to upsert file %s: %w", file.Path, err)
+		}
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
 // GetFileByID retrieves a file by its ID
 func (db *DB) GetFileByID(id int64) (*File, error) {
 	query := `
@@ -154,7 +252,7 @@ func buildInClause(count int) string {
 
 // GetFilesByPaths retrieves multiple files by their paths in one query (batch lookup)
 // Handles SQLite variable limit by batching queries into chunks of 900 parameters
-func (db *DB) GetFilesByPaths(paths []string) (map[string]*File, error) {
+func (db *DB) GetFilesByPaths(ctx context.Context, paths []string) (map[string]*File, error) {
 	if len(paths) == 0 {
 		return make(map[string]*File), nil
 	}
@@ -164,6 +262,13 @@ func (db *DB) GetFilesByPaths(paths []string) (map[string]*File, error) {
 
 	// Process paths in batches
 	for i := 0; i < len(paths); i += batchSize {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		end := i + batchSize
 		if end > len(paths) {
 			end = len(paths)
@@ -182,7 +287,7 @@ func (db *DB) GetFilesByPaths(paths []string) (map[string]*File, error) {
 			WHERE path IN (%s)
 		`, buildInClause(len(batch)))
 
-		rows, err := db.conn.Query(query, args...)
+		rows, err := db.conn.QueryContext(ctx, query, args...)
 		if err != nil {
 			return nil, err
 		}
@@ -200,6 +305,44 @@ func (db *DB) GetFilesByPaths(paths []string) (map[string]*File, error) {
 		if err := rows.Err(); err != nil {
 			return nil, err
 		}
+	}
+
+	return fileMap, nil
+}
+
+// GetAllFilesMap loads all files from the database into memory as a map
+// This is optimized for incremental scans where we need fast lookups for every file
+// WARNING: This loads the entire files table into memory - use only when appropriate
+func (db *DB) GetAllFilesMap(ctx context.Context) (map[string]*File, error) {
+	query := `
+		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, extension, created_at
+		FROM files
+	`
+
+	rows, err := db.conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all files: %w", err)
+	}
+	defer rows.Close()
+
+	fileMap := make(map[string]*File)
+	for rows.Next() {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		file, err := scanFileRow(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan file row: %w", err)
+		}
+		fileMap[file.Path] = file
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating files: %w", err)
 	}
 
 	return fileMap, nil
@@ -524,18 +667,18 @@ func (db *DB) UpsertUsage(usage *Usage) error {
 }
 
 // BatchUpsertUsage inserts or updates multiple usage records in a single transaction
-func (db *DB) BatchUpsertUsage(usages []*Usage) error {
+func (db *DB) BatchUpsertUsage(ctx context.Context, usages []*Usage) error {
 	if len(usages) == 0 {
 		return nil
 	}
 
-	tx, err := db.BeginTx()
+	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.Prepare(`
+	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO usage (file_id, service, reference_path, metadata)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(file_id, service) DO UPDATE SET
@@ -549,12 +692,19 @@ func (db *DB) BatchUpsertUsage(usages []*Usage) error {
 	defer stmt.Close()
 
 	for _, usage := range usages {
+		// Check for context cancellation in the loop
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		metadataJSON, err := json.Marshal(usage.Metadata)
 		if err != nil {
 			return fmt.Errorf("failed to marshal metadata: %w", err)
 		}
 
-		_, err = stmt.Exec(
+		_, err = stmt.ExecContext(ctx,
 			usage.FileID,
 			usage.Service,
 			usage.ReferencePath,
@@ -569,9 +719,9 @@ func (db *DB) BatchUpsertUsage(usages []*Usage) error {
 }
 
 // DeleteUsageByService deletes all usage records for a service
-func (db *DB) DeleteUsageByService(service string) error {
+func (db *DB) DeleteUsageByService(ctx context.Context, service string) error {
 	query := `DELETE FROM usage WHERE service = ?`
-	_, err := db.conn.Exec(query, service)
+	_, err := db.conn.ExecContext(ctx, query, service)
 	return err
 }
 
@@ -696,7 +846,7 @@ func (db *DB) GetUsageByFileIDs(fileIDs []int64) (map[int64][]*Usage, error) {
 }
 
 // UpdateOrphanedStatus updates the orphaned status of all files
-func (db *DB) UpdateOrphanedStatus() error {
+func (db *DB) UpdateOrphanedStatus(ctx context.Context) error {
 	query := `
 		UPDATE files
 		SET is_orphaned = CASE
@@ -705,7 +855,7 @@ func (db *DB) UpdateOrphanedStatus() error {
 			ELSE 0
 		END
 	`
-	_, err := db.conn.Exec(query)
+	_, err := db.conn.ExecContext(ctx, query)
 	return err
 }
 

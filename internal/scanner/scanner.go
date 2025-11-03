@@ -228,19 +228,8 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 	// Store scan context for service updates to respect cancellation
 	s.scanCtx = ctx
 
-	// Phase 1: Count files
-	s.updatePhase(scanID, "Counting files")
-	s.progress.Log("Counting files...")
-
-	totalFiles, err := CountFiles(s.config.ScanPaths)
-	if err != nil {
-		return fmt.Errorf("failed to count files: %w", err)
-	}
-
-	s.progress.SetTotalFiles(totalFiles)
-	s.progress.Log(fmt.Sprintf("Found %d files to scan", totalFiles))
-
-	// Phase 2: Scan filesystem
+	// Scan filesystem immediately (no file counting phase)
+	// Files are counted dynamically as they're processed
 	s.updatePhase(scanID, "Scanning filesystem")
 	if incremental {
 		s.progress.Log("Starting incremental filesystem scan (only changed files)...")
@@ -287,7 +276,7 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 	s.updatePhase(scanID, "Updating orphaned status")
 	s.progress.Log("Calculating orphaned file status...")
 
-	if err := s.db.UpdateOrphanedStatus(); err != nil {
+	if err := s.db.UpdateOrphanedStatus(ctx); err != nil {
 		return fmt.Errorf("failed to update orphaned status: %w", err)
 	}
 
@@ -305,26 +294,11 @@ func (s *Scanner) runScanWithResume(ctx context.Context, scanID int64, increment
 	// Store scan context for service updates to respect cancellation
 	s.scanCtx = ctx
 
-	// Phase 1: Count files
-	s.updatePhase(scanID, "Counting files")
-	if resumeFromPath != nil {
-		s.progress.Log(fmt.Sprintf("Resuming from checkpoint: %s", *resumeFromPath))
-	} else {
-		s.progress.Log("Counting files...")
-	}
-
-	totalFiles, err := CountFiles(s.config.ScanPaths)
-	if err != nil {
-		return fmt.Errorf("failed to count files: %w", err)
-	}
-
-	s.progress.SetTotalFiles(totalFiles)
-	s.progress.Log(fmt.Sprintf("Found %d files to scan", totalFiles))
-
-	// Phase 2: Scan filesystem
+	// Scan filesystem immediately (no file counting phase)
+	// Files are counted dynamically as they're processed
 	s.updatePhase(scanID, "Scanning filesystem")
 	if resumeFromPath != nil {
-		s.progress.Log("Resuming filesystem scan from last checkpoint...")
+		s.progress.Log(fmt.Sprintf("Resuming from checkpoint: %s", *resumeFromPath))
 	} else if incremental {
 		s.progress.Log("Starting incremental filesystem scan (only changed files)...")
 	} else {
@@ -397,7 +371,7 @@ func (s *Scanner) runScanWithResume(ctx context.Context, scanID int64, increment
 	s.updatePhase(scanID, "Updating orphaned status")
 	s.progress.Log("Calculating orphaned file status...")
 
-	if err := s.db.UpdateOrphanedStatus(); err != nil {
+	if err := s.db.UpdateOrphanedStatus(ctx); err != nil {
 		return fmt.Errorf("failed to update orphaned status: %w", err)
 	}
 
@@ -470,7 +444,7 @@ func (f stashServiceFile) GetMetadata() map[string]interface{} {
 }
 
 // updateServiceUsage is a generic method to update usage information for any service
-func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) error {
+func (s *Scanner) updateServiceUsage(ctx context.Context, serviceName string, files []serviceFile) error {
 	if len(files) == 0 {
 		log.Printf("%s: No files returned from service", serviceName)
 		return nil
@@ -479,7 +453,7 @@ func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) er
 	log.Printf("%s: Starting update with %d files from service", serviceName, len(files))
 
 	// Clear old usage records
-	if err := s.db.DeleteUsageByService(serviceName); err != nil {
+	if err := s.db.DeleteUsageByService(ctx, serviceName); err != nil {
 		return err
 	}
 	log.Printf("%s: Cleared old usage records", serviceName)
@@ -489,6 +463,13 @@ func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) er
 	pathToFile := make(map[string]serviceFile)
 
 	for i, file := range files {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		originalPath := file.GetPath()
 		hostPath := s.config.TranslatePathToHost(originalPath, serviceName)
 
@@ -504,7 +485,7 @@ func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) er
 	log.Printf("%s: Translated %d paths, querying database...", serviceName, len(hostPaths))
 
 	// Batch load all files from database
-	dbFiles, err := s.db.GetFilesByPaths(hostPaths)
+	dbFiles, err := s.db.GetFilesByPaths(ctx, hostPaths)
 	if err != nil {
 		return fmt.Errorf("failed to batch load files: %w", err)
 	}
@@ -515,6 +496,13 @@ func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) er
 	var usages []*database.Usage
 	notFoundCount := 0
 	for hostPath, file := range pathToFile {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		dbFile, ok := dbFiles[hostPath]
 		if !ok {
 			// Log first few missing files for debugging
@@ -537,7 +525,7 @@ func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) er
 
 	// Batch insert all usage records
 	if len(usages) > 0 {
-		if err := s.db.BatchUpsertUsage(usages); err != nil {
+		if err := s.db.BatchUpsertUsage(ctx, usages); err != nil {
 			return fmt.Errorf("failed to batch insert %s usage: %w", serviceName, err)
 		}
 		log.Printf("%s: Successfully inserted %d usage records", serviceName, len(usages))
@@ -552,8 +540,21 @@ func (s *Scanner) updateServiceUsage(serviceName string, files []serviceFile) er
 
 // scanFilesystem scans the filesystem and processes files
 func (s *Scanner) scanFilesystem(ctx context.Context, scanID int64, incremental bool) error {
-	// Create worker pool with configurable buffer size
-	pool := NewWorkerPool(s.config.ScanWorkers, s.config.ScanBufferSize, s.db, scanID, s.progress, incremental)
+	// For incremental scans, pre-load all files into memory for fast lookups
+	// This eliminates individual database queries for each file during processing
+	var fileMap map[string]*database.File
+	if incremental {
+		s.progress.Log("Pre-loading file index for incremental scan...")
+		var err error
+		fileMap, err = s.db.GetAllFilesMap(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to pre-load file index: %w", err)
+		}
+		s.progress.Log(fmt.Sprintf("Loaded %d files into memory index", len(fileMap)))
+	}
+
+	// Create worker pool with configurable buffer size and optional file map
+	pool := NewWorkerPool(s.config.ScanWorkers, s.config.ScanBufferSize, s.db, fileMap, scanID, s.progress, incremental)
 	pool.Start()
 
 	// Walk filesystem in goroutine
@@ -581,9 +582,9 @@ func (s *Scanner) updatePlexUsage() error {
 
 	return s.updateServiceUsageWithTimeout(
 		"plex",
-		func() ([]serviceFile, error) {
+		func(ctx context.Context) ([]serviceFile, error) {
 			client := api.NewPlexClient(s.config.Services.Plex.URL, s.config.Services.Plex.Token, s.config.APITimeout)
-			files, err := client.GetAllFiles()
+			files, err := client.GetAllFiles(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -604,9 +605,9 @@ func (s *Scanner) updateSonarrUsage() error {
 
 	return s.updateServiceUsageWithTimeout(
 		"sonarr",
-		func() ([]serviceFile, error) {
+		func(ctx context.Context) ([]serviceFile, error) {
 			client := api.NewSonarrClient(s.config.Services.Sonarr.URL, s.config.Services.Sonarr.APIKey, s.config.APITimeout)
-			files, err := client.GetAllFiles()
+			files, err := client.GetAllFiles(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -627,9 +628,9 @@ func (s *Scanner) updateRadarrUsage() error {
 
 	return s.updateServiceUsageWithTimeout(
 		"radarr",
-		func() ([]serviceFile, error) {
+		func(ctx context.Context) ([]serviceFile, error) {
 			client := api.NewRadarrClient(s.config.Services.Radarr.URL, s.config.Services.Radarr.APIKey, s.config.APITimeout)
-			files, err := client.GetAllFiles()
+			files, err := client.GetAllFiles(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -651,9 +652,9 @@ func (s *Scanner) updateQBittorrentUsage() error {
 
 	return s.updateServiceUsageWithTimeout(
 		"qbittorrent",
-		func() ([]serviceFile, error) {
+		func(ctx context.Context) ([]serviceFile, error) {
 			client := api.NewQBittorrentClient(qbConfig.URL, qbConfig.Username, qbConfig.Password, qbConfig.QuiProxyURL, s.config.APITimeout)
-			files, err := client.GetAllFiles()
+			files, err := client.GetAllFiles(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -674,9 +675,9 @@ func (s *Scanner) updateStashUsage() error {
 
 	return s.updateServiceUsageWithTimeout(
 		"stash",
-		func() ([]serviceFile, error) {
+		func(ctx context.Context) ([]serviceFile, error) {
 			client := api.NewStashClient(s.config.Services.Stash.URL, s.config.Services.Stash.APIKey, s.config.APITimeout)
-			files, err := client.GetAllFiles()
+			files, err := client.GetAllFiles(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -691,7 +692,7 @@ func (s *Scanner) updateStashUsage() error {
 
 // updateServiceUsageWithTimeout is a generic helper to update service usage with timeout handling
 // This eliminates duplication across all service update methods
-func (s *Scanner) updateServiceUsageWithTimeout(serviceName string, getFiles func() ([]serviceFile, error)) error {
+func (s *Scanner) updateServiceUsageWithTimeout(serviceName string, getFiles func(context.Context) ([]serviceFile, error)) error {
 	// Use scan context if available (for cancellation during full scans), otherwise use Background (for manual updates)
 	baseCtx := s.scanCtx
 	if baseCtx == nil {
@@ -703,12 +704,12 @@ func (s *Scanner) updateServiceUsageWithTimeout(serviceName string, getFiles fun
 
 	resultChan := make(chan error, 1)
 	go func() {
-		files, err := getFiles()
+		files, err := getFiles(ctx)
 		if err != nil {
 			resultChan <- err
 			return
 		}
-		resultChan <- s.updateServiceUsage(serviceName, files)
+		resultChan <- s.updateServiceUsage(ctx, serviceName, files)
 	}()
 
 	select {
@@ -787,7 +788,7 @@ func (s *Scanner) UpdateAllServices() error {
 
 	// Update orphaned status after service checks
 	s.progress.Log("Recalculating orphaned status...")
-	if err := s.db.UpdateOrphanedStatus(); err != nil {
+	if err := s.db.UpdateOrphanedStatus(context.Background()); err != nil {
 		return fmt.Errorf("failed to update orphaned status: %w", err)
 	}
 
@@ -832,7 +833,7 @@ func (s *Scanner) UpdateSingleService(serviceName string) error {
 
 	// Update orphaned status after service check
 	s.progress.Log("Recalculating orphaned status...")
-	if err := s.db.UpdateOrphanedStatus(); err != nil {
+	if err := s.db.UpdateOrphanedStatus(context.Background()); err != nil {
 		return fmt.Errorf("failed to update orphaned status: %w", err)
 	}
 
@@ -855,7 +856,7 @@ func (s *Scanner) RecalculateOrphanedStatus() error {
 
 	s.progress.Log("Manually recalculating orphaned status...")
 
-	if err := s.db.UpdateOrphanedStatus(); err != nil {
+	if err := s.db.UpdateOrphanedStatus(context.Background()); err != nil {
 		return fmt.Errorf("failed to update orphaned status: %w", err)
 	}
 

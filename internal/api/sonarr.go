@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -28,9 +29,9 @@ func NewSonarrClient(baseURL, apiKey string, timeout time.Duration) *SonarrClien
 }
 
 // GetAllFiles retrieves all episode files tracked by Sonarr
-func (s *SonarrClient) GetAllFiles() ([]SonarrFile, error) {
+func (s *SonarrClient) GetAllFiles(ctx context.Context) ([]SonarrFile, error) {
 	// First, get all series
-	seriesMap, err := s.getAllSeries()
+	seriesMap, err := s.getAllSeries(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get series: %w", err)
 	}
@@ -38,6 +39,13 @@ func (s *SonarrClient) GetAllFiles() ([]SonarrFile, error) {
 	// Then, get episode files for each series
 	var files []SonarrFile
 	for seriesID, seriesTitle := range seriesMap {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		var episodeFiles []struct {
 			ID           int64  `json:"id"`
 			SeriesID     int64  `json:"seriesId"`
@@ -48,7 +56,7 @@ func (s *SonarrClient) GetAllFiles() ([]SonarrFile, error) {
 
 		// Query episode files for this specific series
 		endpoint := fmt.Sprintf("/api/v3/episodefile?seriesId=%d", seriesID)
-		if err := s.doRequest(endpoint, &episodeFiles); err != nil {
+		if err := s.doRequest(ctx, endpoint, &episodeFiles); err != nil {
 			return nil, fmt.Errorf("failed to get episode files for series %d: %w", seriesID, err)
 		}
 
@@ -70,8 +78,11 @@ func (s *SonarrClient) GetAllFiles() ([]SonarrFile, error) {
 // GetSampleFile retrieves a single sample file from Sonarr that matches the path prefix
 // This is optimized for path mapping validation - it stops as soon as it finds one matching file
 func (s *SonarrClient) GetSampleFile(pathPrefix string) (string, error) {
+	// Use background context (not cancellable)
+	ctx := context.Background()
+
 	// Get all series
-	seriesMap, err := s.getAllSeries()
+	seriesMap, err := s.getAllSeries(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get series: %w", err)
 	}
@@ -84,7 +95,7 @@ func (s *SonarrClient) GetSampleFile(pathPrefix string) (string, error) {
 
 		// Query episode files for this specific series
 		endpoint := fmt.Sprintf("/api/v3/episodefile?seriesId=%d", seriesID)
-		if err := s.doRequest(endpoint, &episodeFiles); err != nil {
+		if err := s.doRequest(ctx, endpoint, &episodeFiles); err != nil {
 			// Log and continue to next series
 			continue
 		}
@@ -101,13 +112,13 @@ func (s *SonarrClient) GetSampleFile(pathPrefix string) (string, error) {
 	return "", nil
 }
 
-func (s *SonarrClient) getAllSeries() (map[int64]string, error) {
+func (s *SonarrClient) getAllSeries(ctx context.Context) (map[int64]string, error) {
 	var series []struct {
 		ID    int64  `json:"id"`
 		Title string `json:"title"`
 	}
 
-	if err := s.doRequest("/api/v3/series", &series); err != nil {
+	if err := s.doRequest(ctx, "/api/v3/series", &series); err != nil {
 		return nil, err
 	}
 

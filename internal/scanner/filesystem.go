@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 )
 
@@ -19,8 +20,99 @@ type FileInfo struct {
 }
 
 // WalkFiles walks the filesystem and sends file info to the channel
+// Walks multiple paths in parallel for improved performance
 func WalkFiles(ctx context.Context, paths []string, out chan<- FileInfo, progress *Progress) error {
-	defer close(out)
+	// Use WaitGroup to track all walking goroutines
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(paths))
+
+	// Walk each path in parallel
+	for _, path := range paths {
+		wg.Add(1)
+		go func(p string) {
+			defer wg.Done()
+
+			err := filepath.WalkDir(p, func(filePath string, d fs.DirEntry, err error) error {
+				// Check for context cancellation
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+				}
+
+				if err != nil {
+					progress.AddError(fmt.Sprintf("Error accessing %s: %v", filePath, err))
+					return nil // Continue walking
+				}
+
+				// Skip directories
+				if d.IsDir() {
+					return nil
+				}
+
+				// Skip symlinks (we track the actual files they point to)
+				if d.Type()&fs.ModeSymlink != 0 {
+					return nil
+				}
+
+				// Get file info
+				info, err := d.Info()
+				if err != nil {
+					progress.AddError(fmt.Sprintf("Error getting info for %s: %v", filePath, err))
+					return nil
+				}
+
+				// Get inode and device ID for hardlink detection
+				stat, ok := info.Sys().(*syscall.Stat_t)
+				if !ok {
+					progress.AddError(fmt.Sprintf("Unable to get system stats for %s", filePath))
+					return nil
+				}
+
+				fileInfo := FileInfo{
+					Path:         filePath,
+					Size:         info.Size(),
+					ModifiedTime: info.ModTime().Unix(),
+					Inode:        int64(stat.Ino),
+					DeviceID:     int64(stat.Dev),
+				}
+
+				// Send to workers - block until space is available to ensure no files are dropped
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case out <- fileInfo:
+				}
+
+				return nil
+			})
+
+			if err != nil {
+				errChan <- fmt.Errorf("failed to walk %s: %w", p, err)
+			}
+		}(path)
+	}
+
+	// Wait for all walkers to complete, then close the output channel
+	go func() {
+		wg.Wait()
+		close(out)
+		close(errChan)
+	}()
+
+	// Check for any errors from walkers
+	for err := range errChan {
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// CountFiles counts the total number of files in the given paths
+func CountFiles(ctx context.Context, paths []string) (int64, error) {
+	var count int64
 
 	for _, path := range paths {
 		err := filepath.WalkDir(path, func(filePath string, d fs.DirEntry, err error) error {
@@ -31,67 +123,6 @@ func WalkFiles(ctx context.Context, paths []string, out chan<- FileInfo, progres
 			default:
 			}
 
-			if err != nil {
-				progress.AddError(fmt.Sprintf("Error accessing %s: %v", filePath, err))
-				return nil // Continue walking
-			}
-
-			// Skip directories
-			if d.IsDir() {
-				return nil
-			}
-
-			// Skip symlinks (we track the actual files they point to)
-			if d.Type()&fs.ModeSymlink != 0 {
-				return nil
-			}
-
-			// Get file info
-			info, err := d.Info()
-			if err != nil {
-				progress.AddError(fmt.Sprintf("Error getting info for %s: %v", filePath, err))
-				return nil
-			}
-
-			// Get inode and device ID for hardlink detection
-			stat, ok := info.Sys().(*syscall.Stat_t)
-			if !ok {
-				progress.AddError(fmt.Sprintf("Unable to get system stats for %s", filePath))
-				return nil
-			}
-
-			fileInfo := FileInfo{
-				Path:         filePath,
-				Size:         info.Size(),
-				ModifiedTime: info.ModTime().Unix(),
-				Inode:        int64(stat.Ino),
-				DeviceID:     int64(stat.Dev),
-			}
-
-			// Send to workers - block until space is available to ensure no files are dropped
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case out <- fileInfo:
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			return fmt.Errorf("failed to walk %s: %w", path, err)
-		}
-	}
-
-	return nil
-}
-
-// CountFiles counts the total number of files in the given paths
-func CountFiles(paths []string) (int64, error) {
-	var count int64
-
-	for _, path := range paths {
-		err := filepath.WalkDir(path, func(filePath string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return nil // Continue counting
 			}

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -56,8 +57,8 @@ func (a *ArrClient) Test() error {
 }
 
 // doRequest performs an API request
-func (a *ArrClient) doRequest(endpoint string, result interface{}) error {
-	req, err := http.NewRequest("GET", a.baseURL+endpoint, nil)
+func (a *ArrClient) doRequest(ctx context.Context, endpoint string, result interface{}) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", a.baseURL+endpoint, nil)
 	if err != nil {
 		return err
 	}

@@ -1,12 +1,42 @@
+# ===========================
+# Performance Configuration
+# ===========================
+
 database_path: /data/media-finder.db
+
+# Scan Workers: Number of concurrent file processors
+# - Default: 10 (good for most systems)
+# - Increase to 20-30 for fast NVMe/SSD storage
+# - Decrease to 5 for slow/network storage to avoid overwhelming the disk
 scan_workers: 10
-scan_buffer_size: 100  # Buffer size for file processing queue
+
+# Scan Buffer Size: File processing queue buffer
+# - Default: 100 (good balance)
+# - Increase to 500-1000 for very fast storage
+# - Decrease to 50 for systems with limited memory
+scan_buffer_size: 100
+
+# API Timeout: Timeout for external service API calls
+# - Default: 30s
+# - Increase to 60s if services are slow or over network
+# - Decrease to 15s for local, fast services
 api_timeout: 30s
+
+# Server Configuration
 server_port: 8080
 cors_allowed_origin: "http://localhost:8080"  # Set to "*" for development
-stats_cache_ttl: 30s  # How long to cache statistics
 
-# Database connection pool settings
+# Statistics Cache TTL: How long to cache expensive statistics queries
+# - Default: 30s
+# - Increase to 60s-120s for large databases (100K+ files)
+# - Decrease to 10s for smaller databases if you need real-time stats
+stats_cache_ttl: 30s
+
+# Database Connection Pool Settings
+# - Defaults are optimized for SQLite with WAL mode
+# - max_open_conns: Maximum concurrent database connections
+# - max_idle_conns: Idle connections kept in pool
+# - conn_max_lifetime: Maximum connection lifetime before recycling
 db_max_open_conns: 25
 db_max_idle_conns: 5
 db_conn_max_lifetime: 5m

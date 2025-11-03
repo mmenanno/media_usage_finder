@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -28,9 +29,9 @@ func NewRadarrClient(baseURL, apiKey string, timeout time.Duration) *RadarrClien
 }
 
 // GetAllFiles retrieves all movie files tracked by Radarr
-func (r *RadarrClient) GetAllFiles() ([]RadarrFile, error) {
+func (r *RadarrClient) GetAllFiles(ctx context.Context) ([]RadarrFile, error) {
 	// First, get all movies
-	movieMap, err := r.getAllMovies()
+	movieMap, err := r.getAllMovies(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get movies: %w", err)
 	}
@@ -38,6 +39,13 @@ func (r *RadarrClient) GetAllFiles() ([]RadarrFile, error) {
 	// Then, get movie files for each movie
 	var files []RadarrFile
 	for movieID, movieInfo := range movieMap {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		var movieFiles []struct {
 			ID      int64  `json:"id"`
 			MovieID int64  `json:"movieId"`
@@ -47,7 +55,7 @@ func (r *RadarrClient) GetAllFiles() ([]RadarrFile, error) {
 
 		// Query movie files for this specific movie
 		endpoint := fmt.Sprintf("/api/v3/moviefile?movieId=%d", movieID)
-		if err := r.doRequest(endpoint, &movieFiles); err != nil {
+		if err := r.doRequest(ctx, endpoint, &movieFiles); err != nil {
 			return nil, fmt.Errorf("failed to get movie files for movie %d: %w", movieID, err)
 		}
 
@@ -69,8 +77,11 @@ func (r *RadarrClient) GetAllFiles() ([]RadarrFile, error) {
 // GetSampleFile retrieves a single sample file from Radarr that matches the path prefix
 // This is optimized for path mapping validation - it stops as soon as it finds one matching file
 func (r *RadarrClient) GetSampleFile(pathPrefix string) (string, error) {
+	// Use background context (not cancellable)
+	ctx := context.Background()
+
 	// Get all movies
-	movieMap, err := r.getAllMovies()
+	movieMap, err := r.getAllMovies(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get movies: %w", err)
 	}
@@ -83,7 +94,7 @@ func (r *RadarrClient) GetSampleFile(pathPrefix string) (string, error) {
 
 		// Query movie files for this specific movie
 		endpoint := fmt.Sprintf("/api/v3/moviefile?movieId=%d", movieID)
-		if err := r.doRequest(endpoint, &movieFiles); err != nil {
+		if err := r.doRequest(ctx, endpoint, &movieFiles); err != nil {
 			// Log and continue to next movie
 			continue
 		}
@@ -105,14 +116,14 @@ type movieInfo struct {
 	Year  int
 }
 
-func (r *RadarrClient) getAllMovies() (map[int64]movieInfo, error) {
+func (r *RadarrClient) getAllMovies(ctx context.Context) (map[int64]movieInfo, error) {
 	var movies []struct {
 		ID    int64  `json:"id"`
 		Title string `json:"title"`
 		Year  int    `json:"year"`
 	}
 
-	if err := r.doRequest("/api/v3/movie", &movies); err != nil {
+	if err := r.doRequest(ctx, "/api/v3/movie", &movies); err != nil {
 		return nil, err
 	}
 
