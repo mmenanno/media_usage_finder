@@ -191,10 +191,17 @@ func (c *Calculator) calculateServiceBreakdown(stats *Stats) error {
 
 func (c *Calculator) calculateOrphanedExtensions(stats *Stats) error {
 	// Query to get top 10 file extensions among orphaned files
-	// Extract extension by finding the last dot and taking everything after it
+	// Extract extension using a simple heuristic: get last 10 chars, find first dot, extract from there
+	// This works for all reasonable file extensions (up to 9 characters)
 	query := `
 		SELECT
-			LOWER(SUBSTR(path, LENGTH(path) - INSTR(REVERSE(path), '.') + 2)) as extension,
+			LOWER(
+				CASE
+					WHEN INSTR(SUBSTR(path, -10), '.') > 0
+					THEN SUBSTR(path, LENGTH(path) - 10 + INSTR(SUBSTR(path, -10), '.'))
+					ELSE ''
+				END
+			) as extension,
 			COUNT(*) as count,
 			COALESCE(SUM(size), 0) as total_size
 		FROM files
@@ -202,6 +209,7 @@ func (c *Calculator) calculateOrphanedExtensions(stats *Stats) error {
 			AND path LIKE '%.%'
 			AND INSTR(path, '.') > 0
 		GROUP BY extension
+		HAVING extension != ''
 		ORDER BY total_size DESC
 		LIMIT 10
 	`
