@@ -86,7 +86,7 @@
                     <span>{{if gt $.Stats.TotalFiles 0}}{{printf "%.1f%%" (div (mul $stats.FileCount 100.0) $.Stats.TotalFiles)}}{{else}}0%{{end}} of total files</span>
                 </div>
                 <div class="mt-2 text-xs text-gray-500">
-                    Average: {{formatSize (int64 $stats.AverageSize)}} per file
+                    Average: {{formatSize (toInt64 $stats.AverageSize)}} per file
                 </div>
             </div>
             {{end}}
