@@ -11,20 +11,47 @@ import (
 // Note: Size fields use int64 and have a theoretical limit of ~9 exabytes.
 // For filesystems with total sizes exceeding this, overflow may occur.
 type Stats struct {
-	TotalFiles         int64
-	TotalSize          int64 // In bytes, max ~9 EB before overflow
-	OrphanedFiles      int64
-	OrphanedSize       int64 // In bytes, max ~9 EB before overflow
-	HardlinkGroups     int64
-	ServiceBreakdown   map[string]ServiceStats
-	HardlinkSavings    int64 // In bytes, max ~9 EB before overflow
-	ActiveServiceCount int64 // Number of services with files
+	TotalFiles          int64
+	TotalSize           int64 // In bytes, max ~9 EB before overflow
+	OrphanedFiles       int64
+	OrphanedSize        int64 // In bytes, max ~9 EB before overflow
+	HardlinkGroups      int64
+	ServiceBreakdown    map[string]ServiceStats
+	HardlinkSavings     int64 // In bytes, max ~9 EB before overflow
+	ActiveServiceCount  int64 // Number of services with files
+	OrphanedExtensions  []ExtensionStats
+	OrphanedByAge       []AgeGroupStats
+	MultiServiceUsage   []ServiceUsageCount
+	LargestOrphanedPath string // Path of largest orphaned file
+	LargestOrphanedSize int64  // Size of largest orphaned file
 }
 
 // ServiceStats contains statistics for a specific service
 type ServiceStats struct {
+	FileCount   int64
+	TotalSize   int64   // In bytes, max ~9 EB before overflow
+	AverageSize float64 // Average file size in bytes
+}
+
+// ExtensionStats contains statistics for a specific file extension
+type ExtensionStats struct {
+	Extension string
 	FileCount int64
 	TotalSize int64 // In bytes, max ~9 EB before overflow
+}
+
+// AgeGroupStats contains statistics for files grouped by age
+type AgeGroupStats struct {
+	AgeGroup  string
+	FileCount int64
+	TotalSize int64 // In bytes, max ~9 EB before overflow
+}
+
+// ServiceUsageCount contains statistics for multi-service file usage
+type ServiceUsageCount struct {
+	ServiceCount int64 // Number of services using the files
+	FileCount    int64
+	TotalSize    int64 // In bytes, max ~9 EB before overflow
 }
 
 // Calculator calculates statistics from the database
@@ -51,6 +78,26 @@ func (c *Calculator) Calculate() (*Stats, error) {
 	// Get service breakdown (requires separate queries per service)
 	if err := c.calculateServiceBreakdown(stats); err != nil {
 		return nil, fmt.Errorf("failed to calculate service breakdown: %w", err)
+	}
+
+	// Calculate orphaned file extensions breakdown
+	if err := c.calculateOrphanedExtensions(stats); err != nil {
+		return nil, fmt.Errorf("failed to calculate orphaned extensions: %w", err)
+	}
+
+	// Calculate orphaned files by age
+	if err := c.calculateOrphanedByAge(stats); err != nil {
+		return nil, fmt.Errorf("failed to calculate orphaned by age: %w", err)
+	}
+
+	// Calculate multi-service usage
+	if err := c.calculateMultiServiceUsage(stats); err != nil {
+		return nil, fmt.Errorf("failed to calculate multi-service usage: %w", err)
+	}
+
+	// Find largest orphaned file
+	if err := c.calculateLargestOrphaned(stats); err != nil {
+		return nil, fmt.Errorf("failed to calculate largest orphaned: %w", err)
 	}
 
 	return stats, nil
@@ -123,6 +170,10 @@ func (c *Calculator) calculateServiceBreakdown(stats *Stats) error {
 		if err := rows.Scan(&service, &serviceStats.FileCount, &serviceStats.TotalSize); err != nil {
 			return err
 		}
+		// Calculate average file size
+		if serviceStats.FileCount > 0 {
+			serviceStats.AverageSize = float64(serviceStats.TotalSize) / float64(serviceStats.FileCount)
+		}
 		stats.ServiceBreakdown[service] = serviceStats
 	}
 
@@ -136,6 +187,136 @@ func (c *Calculator) calculateServiceBreakdown(stats *Stats) error {
 	stats.ActiveServiceCount = activeCount
 
 	return rows.Err()
+}
+
+func (c *Calculator) calculateOrphanedExtensions(stats *Stats) error {
+	// Query to get top 10 file extensions among orphaned files
+	query := `
+		SELECT
+			LOWER(SUBSTR(path, INSTR(path, '.', LENGTH(path) - INSTR(REVERSE(path), '.')))) as extension,
+			COUNT(*) as count,
+			COALESCE(SUM(size), 0) as total_size
+		FROM files
+		WHERE is_orphaned = 1
+			AND path LIKE '%.%'
+			AND LENGTH(path) - LENGTH(REPLACE(path, '.', '')) > 0
+		GROUP BY extension
+		ORDER BY total_size DESC
+		LIMIT 10
+	`
+
+	rows, err := c.db.Conn().Query(query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	stats.OrphanedExtensions = []ExtensionStats{}
+	for rows.Next() {
+		var ext ExtensionStats
+		if err := rows.Scan(&ext.Extension, &ext.FileCount, &ext.TotalSize); err != nil {
+			return err
+		}
+		stats.OrphanedExtensions = append(stats.OrphanedExtensions, ext)
+	}
+
+	return rows.Err()
+}
+
+func (c *Calculator) calculateOrphanedByAge(stats *Stats) error {
+	// Query to group orphaned files by age
+	query := `
+		SELECT
+			CASE
+				WHEN modified_time >= strftime('%s', 'now', '-30 days') THEN 'Last 30 days'
+				WHEN modified_time >= strftime('%s', 'now', '-90 days') THEN '30-90 days ago'
+				WHEN modified_time >= strftime('%s', 'now', '-1 year') THEN '90 days - 1 year ago'
+				ELSE 'Over 1 year ago'
+			END as age_group,
+			COUNT(*) as count,
+			COALESCE(SUM(size), 0) as total_size
+		FROM files
+		WHERE is_orphaned = 1
+		GROUP BY age_group
+		ORDER BY
+			CASE age_group
+				WHEN 'Last 30 days' THEN 1
+				WHEN '30-90 days ago' THEN 2
+				WHEN '90 days - 1 year ago' THEN 3
+				ELSE 4
+			END
+	`
+
+	rows, err := c.db.Conn().Query(query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	stats.OrphanedByAge = []AgeGroupStats{}
+	for rows.Next() {
+		var age AgeGroupStats
+		if err := rows.Scan(&age.AgeGroup, &age.FileCount, &age.TotalSize); err != nil {
+			return err
+		}
+		stats.OrphanedByAge = append(stats.OrphanedByAge, age)
+	}
+
+	return rows.Err()
+}
+
+func (c *Calculator) calculateMultiServiceUsage(stats *Stats) error {
+	// Query to count files by number of services using them
+	query := `
+		SELECT
+			service_count,
+			COUNT(*) as file_count,
+			COALESCE(SUM(size), 0) as total_size
+		FROM (
+			SELECT f.id, f.size, COUNT(u.service) as service_count
+			FROM files f
+			INNER JOIN usage u ON f.id = u.file_id
+			GROUP BY f.id
+		)
+		GROUP BY service_count
+		ORDER BY service_count DESC
+	`
+
+	rows, err := c.db.Conn().Query(query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	stats.MultiServiceUsage = []ServiceUsageCount{}
+	for rows.Next() {
+		var usage ServiceUsageCount
+		if err := rows.Scan(&usage.ServiceCount, &usage.FileCount, &usage.TotalSize); err != nil {
+			return err
+		}
+		stats.MultiServiceUsage = append(stats.MultiServiceUsage, usage)
+	}
+
+	return rows.Err()
+}
+
+func (c *Calculator) calculateLargestOrphaned(stats *Stats) error {
+	// Query to find the largest orphaned file
+	query := `
+		SELECT path, size
+		FROM files
+		WHERE is_orphaned = 1
+		ORDER BY size DESC
+		LIMIT 1
+	`
+
+	err := c.db.Conn().QueryRow(query).Scan(&stats.LargestOrphanedPath, &stats.LargestOrphanedSize)
+	if err != nil && err.Error() != "sql: no rows in result set" {
+		return err
+	}
+
+	// It's okay if there are no orphaned files
+	return nil
 }
 
 var sizeUnits = []string{"B", "KB", "MB", "GB", "TB", "PB"}

@@ -49,7 +49,7 @@
         <h3 class="text-xl font-semibold mb-6">Service Usage</h3>
 
         <!-- Charts -->
-        {{if gt (len .Stats.ServiceBreakdown) 0}}
+        {{if gt .Stats.ActiveServiceCount 0}}
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <div class="bg-gray-700 rounded-lg p-4">
                 <h4 class="text-sm font-medium text-gray-400 mb-4 text-center">Files by Service</h4>
@@ -72,6 +72,7 @@
         <!-- Detailed Breakdown -->
         <div class="space-y-4">
             {{range $service, $stats := .Stats.ServiceBreakdown}}
+            {{if gt $stats.FileCount 0}}
             <div class="bg-gray-700 rounded-lg p-4">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-lg font-medium">{{formatServiceName $service}}</span>
@@ -84,14 +85,96 @@
                     <span>{{formatSize $stats.TotalSize}}</span>
                     <span>{{if gt $.Stats.TotalFiles 0}}{{printf "%.1f%%" (div (mul $stats.FileCount 100.0) $.Stats.TotalFiles)}}{{else}}0%{{end}} of total files</span>
                 </div>
+                <div class="mt-2 text-xs text-gray-500">
+                    Average: {{formatSize (int64 $stats.AverageSize)}} per file
+                </div>
             </div>
-            {{else}}
-            <div class="text-center text-gray-500 py-8">
-                No service data available
+            {{end}}
+            {{end}}
+        </div>
+    </div>
+
+    <!-- Orphaned File Analysis -->
+    {{if gt .Stats.OrphanedFiles 0}}
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-xl font-semibold mb-6">Orphaned File Analysis</h3>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Orphaned Files by Extension -->
+            {{if gt (len .Stats.OrphanedExtensions) 0}}
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="text-sm font-medium text-gray-400 mb-4 text-center">Top Extensions (Orphaned)</h4>
+                <canvas id="extensionsChart" class="max-h-64"></canvas>
+            </div>
+            {{end}}
+
+            <!-- Orphaned Files by Age -->
+            {{if gt (len .Stats.OrphanedByAge) 0}}
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="text-sm font-medium text-gray-400 mb-4 text-center">Orphaned Files by Age</h4>
+                <canvas id="ageChart" class="max-h-64"></canvas>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Detailed Extension Breakdown -->
+        {{if gt (len .Stats.OrphanedExtensions) 0}}
+        <div class="mt-6">
+            <h4 class="text-sm font-medium text-gray-400 mb-4">Extension Details</h4>
+            <div class="space-y-2">
+                {{range .Stats.OrphanedExtensions}}
+                <div class="flex justify-between items-center p-3 bg-gray-700 rounded text-sm">
+                    <span class="font-mono text-yellow-400">{{.Extension}}</span>
+                    <div class="flex items-center space-x-4 text-gray-400">
+                        <span>{{.FileCount}} files</span>
+                        <span class="font-medium text-white">{{formatSize .TotalSize}}</span>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
+        <!-- Largest Orphaned File -->
+        {{if ne .Stats.LargestOrphanedPath ""}}
+        <div class="mt-6">
+            <h4 class="text-sm font-medium text-gray-400 mb-4">Largest Orphaned File</h4>
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm text-gray-400 mb-1">Path</div>
+                        <div class="font-mono text-xs text-white truncate">{{.Stats.LargestOrphanedPath}}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm text-gray-400 mb-1">Size</div>
+                        <div class="font-semibold text-yellow-400">{{formatSize .Stats.LargestOrphanedSize}}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{end}}
+
+    <!-- Multi-Service Usage -->
+    {{if gt (len .Stats.MultiServiceUsage) 0}}
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-xl font-semibold mb-4">Cross-Seeding Efficiency</h3>
+        <p class="text-sm text-gray-400 mb-4">Files tracked by multiple services (shows cross-seeding strategy effectiveness)</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {{range .Stats.MultiServiceUsage}}
+            <div class="bg-gray-700 rounded-lg p-4">
+                <div class="text-3xl font-bold text-blue-400 mb-1">{{.ServiceCount}}</div>
+                <div class="text-sm text-gray-400 mb-2">
+                    {{if eq .ServiceCount 1}}service{{else}}services{{end}}
+                </div>
+                <div class="text-lg font-medium">{{.FileCount}} files</div>
+                <div class="text-sm text-gray-500">{{formatSize .TotalSize}}</div>
             </div>
             {{end}}
         </div>
     </div>
+    {{end}}
 
     <!-- Space Distribution -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -238,17 +321,25 @@ function formatServiceName(service) {
 }
 
 // Check if we have service data
-const hasServiceData = {{if .Stats.ServiceBreakdown}}{{len .Stats.ServiceBreakdown}}{{else}}0{{end}} > 0;
+const hasServiceData = {{.Stats.ActiveServiceCount}} > 0;
 
 // Files by Service Chart
 const filesCtx = document.getElementById('filesChart');
 if (filesCtx && hasServiceData) {
+    const serviceData = [
+        {{range $service, $stats := .Stats.ServiceBreakdown}}
+        {{if gt $stats.FileCount 0}}
+        { service: '{{$service}}', count: {{$stats.FileCount}} },
+        {{end}}
+        {{end}}
+    ];
+
     new Chart(filesCtx, {
         type: 'doughnut',
         data: {
-            labels: [{{range $service, $stats := .Stats.ServiceBreakdown}}'{{$service}}',{{end}}].map(formatServiceName),
+            labels: serviceData.map(s => formatServiceName(s.service)),
             datasets: [{
-                data: [{{range $service, $stats := .Stats.ServiceBreakdown}}{{$stats.FileCount}},{{end}}],
+                data: serviceData.map(s => s.count),
                 backgroundColor: [
                     '#3B82F6', // blue
                     '#10B981', // green
@@ -292,13 +383,21 @@ if (filesCtx && hasServiceData) {
 // Storage by Service Chart
 const storageCtx = document.getElementById('storageChart');
 if (storageCtx && hasServiceData) {
+    const storageData = [
+        {{range $service, $stats := .Stats.ServiceBreakdown}}
+        {{if gt $stats.FileCount 0}}
+        { service: '{{$service}}', size: {{div $stats.TotalSize 1073741824.0}} },
+        {{end}}
+        {{end}}
+    ];
+
     new Chart(storageCtx, {
         type: 'bar',
         data: {
-            labels: [{{range $service, $stats := .Stats.ServiceBreakdown}}'{{$service}}',{{end}}].map(formatServiceName),
+            labels: storageData.map(s => formatServiceName(s.service)),
             datasets: [{
                 label: 'Storage (GB)',
-                data: [{{range $service, $stats := .Stats.ServiceBreakdown}}{{div $stats.TotalSize 1073741824.0}},{{end}}],
+                data: storageData.map(s => s.size),
                 backgroundColor: [
                     '#3B82F6', // blue
                     '#10B981', // green
@@ -338,6 +437,130 @@ if (storageCtx && hasServiceData) {
                     callbacks: {
                         label: function(context) {
                             return context.parsed.y.toFixed(2) + ' GB';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Orphaned Extensions Chart
+const extensionsCtx = document.getElementById('extensionsChart');
+if (extensionsCtx) {
+    const extensionData = [
+        {{range .Stats.OrphanedExtensions}}
+        { ext: '{{.Extension}}', count: {{.FileCount}}, size: {{div .TotalSize 1073741824.0}} },
+        {{end}}
+    ];
+
+    new Chart(extensionsCtx, {
+        type: 'bar',
+        data: {
+            labels: extensionData.map(e => e.ext),
+            datasets: [{
+                label: 'Storage (GB)',
+                data: extensionData.map(e => e.size),
+                backgroundColor: '#F59E0B', // yellow/amber for orphaned
+                borderWidth: 0
+            }]
+        },
+        options: {
+            indexAxis: 'y', // Horizontal bar chart
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: {
+                        color: '#374151'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toFixed(1) + ' GB';
+                        }
+                    }
+                },
+                y: {
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const idx = context.dataIndex;
+                            const data = extensionData[idx];
+                            return [
+                                'Size: ' + data.size.toFixed(2) + ' GB',
+                                'Files: ' + data.count
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Orphaned Files by Age Chart
+const ageCtx = document.getElementById('ageChart');
+if (ageCtx) {
+    const ageData = [
+        {{range .Stats.OrphanedByAge}}
+        { age: '{{.AgeGroup}}', count: {{.FileCount}}, size: {{div .TotalSize 1073741824.0}} },
+        {{end}}
+    ];
+
+    // Use different colors for different age groups
+    const ageColors = {
+        'Last 30 days': '#EF4444',      // red (recent - might be processing)
+        '30-90 days ago': '#F59E0B',    // amber
+        '90 days - 1 year ago': '#10B981', // green (older - safer to delete)
+        'Over 1 year ago': '#3B82F6'    // blue (very old - safe to delete)
+    };
+
+    new Chart(ageCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ageData.map(a => a.age),
+            datasets: [{
+                data: ageData.map(a => a.size),
+                backgroundColor: ageData.map(a => ageColors[a.age] || '#6B7280'),
+                borderWidth: 2,
+                borderColor: '#1F2937'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const idx = context.dataIndex;
+                            const data = ageData[idx];
+                            const total = ageData.reduce((sum, item) => sum + item.size, 0);
+                            const percentage = ((data.size / total) * 100).toFixed(1);
+                            return [
+                                data.age + ':',
+                                data.size.toFixed(2) + ' GB (' + percentage + '%)',
+                                data.count + ' files'
+                            ];
                         }
                     }
                 }
