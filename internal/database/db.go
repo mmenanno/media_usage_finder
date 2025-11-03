@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -144,6 +145,47 @@ func (db *DB) runMigrations() error {
 		_, err = db.conn.Exec(migrateAddResumeTracking)
 		if err != nil {
 			return fmt.Errorf("failed to add resume tracking columns: %w", err)
+		}
+	}
+
+	// Migration 4: Update usage table CHECK constraint to include 'stash'
+	// We detect if migration is needed by trying to insert a test record with service='stash'
+	// If it fails with CHECK constraint error, we need to run the migration
+	needsUsageMigration := false
+
+	// Start a transaction for the test
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction for usage migration check: %w", err)
+	}
+	defer tx.Rollback() // Will be a no-op if we commit
+
+	// Try to insert a test record with service='stash'
+	// Use a file_id that's unlikely to exist (999999999)
+	_, err = tx.Exec(`
+		INSERT INTO usage (file_id, service, reference_path)
+		VALUES (999999999, 'stash', '/migration-test')
+	`)
+
+	if err != nil {
+		// Check if the error is a CHECK constraint failure
+		if strings.Contains(err.Error(), "CHECK constraint failed") {
+			needsUsageMigration = true
+		}
+		// Foreign key errors are expected and mean no migration is needed
+	} else {
+		// If insert succeeded, delete the test record
+		_, _ = tx.Exec(`DELETE FROM usage WHERE file_id = 999999999 AND service = 'stash'`)
+	}
+
+	// Rollback the test transaction
+	tx.Rollback()
+
+	// Run migration if needed
+	if needsUsageMigration {
+		_, err = db.conn.Exec(migrateAddStashToUsageCheck)
+		if err != nil {
+			return fmt.Errorf("failed to update usage table CHECK constraint: %w", err)
 		}
 	}
 

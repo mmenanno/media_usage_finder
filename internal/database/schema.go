@@ -190,3 +190,36 @@ ALTER TABLE scans ADD COLUMN last_processed_path TEXT;
 -- Add resume_from_scan_id column to scans table
 ALTER TABLE scans ADD COLUMN resume_from_scan_id INTEGER REFERENCES scans(id);
 `
+
+// Migration to update usage table CHECK constraint to include 'stash'
+const migrateAddStashToUsageCheck = `
+-- Create new usage table with updated CHECK constraint
+CREATE TABLE IF NOT EXISTS usage_new (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	file_id INTEGER NOT NULL,
+	service TEXT NOT NULL CHECK(service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash')),
+	reference_path TEXT NOT NULL,
+	metadata TEXT,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
+	UNIQUE(file_id, service)
+);
+
+-- Copy data from old table
+INSERT INTO usage_new SELECT * FROM usage;
+
+-- Drop old table and indexes
+DROP INDEX IF EXISTS idx_usage_file_id;
+DROP INDEX IF EXISTS idx_usage_service;
+DROP INDEX IF EXISTS idx_usage_reference_path;
+DROP TABLE usage;
+
+-- Rename new table
+ALTER TABLE usage_new RENAME TO usage;
+
+-- Recreate indexes
+CREATE INDEX idx_usage_file_id ON usage(file_id);
+CREATE INDEX idx_usage_service ON usage(service);
+CREATE INDEX idx_usage_reference_path ON usage(reference_path);
+`
