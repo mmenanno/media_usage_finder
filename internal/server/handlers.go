@@ -1130,7 +1130,7 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Parse local path mappings (format: container=host, one per line)
+	// Parse local path mappings (format: service=local, one per line)
 	if localMappingsStr := r.FormValue("local_path_mappings"); localMappingsStr != "" {
 		lines := strings.Split(localMappingsStr, "\n")
 		s.config.LocalPathMappings = []config.PathMapping{}
@@ -1149,7 +1149,7 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Parse service path mappings (format: service:container=host, one per line)
+	// Parse service path mappings (format: servicename:service=local, one per line)
 	if serviceMappingsStr := r.FormValue("service_path_mappings"); serviceMappingsStr != "" {
 		lines := strings.Split(serviceMappingsStr, "\n")
 		s.config.ServicePathMappings = make(map[string][]config.PathMapping)
@@ -1424,23 +1424,23 @@ func (s *Server) HandleTestPathMappings(w http.ResponseWriter, r *http.Request) 
 
 			parts := strings.SplitN(line, "=", 2)
 			if len(parts) != 2 {
-				errors = append(errors, fmt.Sprintf("Line %d: invalid format (expected 'container=host')", i+1))
+				errors = append(errors, fmt.Sprintf("Line %d: invalid format (expected 'service=local')", i+1))
 				continue
 			}
 
-			container := strings.TrimSpace(parts[0])
-			host := strings.TrimSpace(parts[1])
+			service := strings.TrimSpace(parts[0])
+			local := strings.TrimSpace(parts[1])
 
-			if container == "" || host == "" {
-				errors = append(errors, fmt.Sprintf("Line %d: empty container or host path", i+1))
+			if service == "" || local == "" {
+				errors = append(errors, fmt.Sprintf("Line %d: empty service or local path", i+1))
 				continue
 			}
 
-			// Test container path (left side - what we can see from inside the container)
-			if _, err := os.Stat(container); err != nil {
-				errors = append(errors, fmt.Sprintf("%s=%s: container path error: %v", container, host, err))
+			// Test service path (left side - what media-finder can see)
+			if _, err := os.Stat(service); err != nil {
+				errors = append(errors, fmt.Sprintf("%s=%s: service path error: %v", service, local, err))
 			} else {
-				successes = append(successes, fmt.Sprintf("%s=%s: OK (container path accessible)", container, host))
+				successes = append(successes, fmt.Sprintf("%s=%s: OK (service path accessible)", service, local))
 			}
 		}
 	}
@@ -1458,44 +1458,44 @@ func (s *Server) HandleTestPathMappings(w http.ResponseWriter, r *http.Request) 
 			}
 			mappingCount++
 
-			// Split service:container_path=service_path
+			// Split servicename:service=local
 			parts := strings.SplitN(line, ":", 2)
 			if len(parts) != 2 {
-				errors = append(errors, fmt.Sprintf("Service line %d: invalid format (expected 'service:container_path=service_path')", i+1))
+				errors = append(errors, fmt.Sprintf("Service line %d: invalid format (expected 'servicename:service=local')", i+1))
 				continue
 			}
 
-			service := strings.TrimSpace(parts[0])
+			serviceName := strings.TrimSpace(parts[0])
 			pathParts := strings.SplitN(parts[1], "=", 2)
 			if len(pathParts) != 2 {
-				errors = append(errors, fmt.Sprintf("Service line %d: invalid format (expected 'service:container_path=service_path')", i+1))
+				errors = append(errors, fmt.Sprintf("Service line %d: invalid format (expected 'servicename:service=local')", i+1))
 				continue
 			}
 
-			containerPath := strings.TrimSpace(pathParts[0])
-			servicePath := strings.TrimSpace(pathParts[1])
+			servicePath := strings.TrimSpace(pathParts[0])
+			localPath := strings.TrimSpace(pathParts[1])
 
-			if service == "" || containerPath == "" || servicePath == "" {
-				errors = append(errors, fmt.Sprintf("Service line %d: empty service, container, or service path", i+1))
+			if serviceName == "" || servicePath == "" || localPath == "" {
+				errors = append(errors, fmt.Sprintf("Service line %d: empty service name, service path, or local path", i+1))
 				continue
 			}
 
-			// Test container path (left side - what we can see)
-			if _, err := os.Stat(containerPath); err != nil {
-				errors = append(errors, fmt.Sprintf("%s:%s=%s: container path error: %v", service, containerPath, servicePath, err))
+			// Test local path (right side - what media-finder can access)
+			if _, err := os.Stat(localPath); err != nil {
+				errors = append(errors, fmt.Sprintf("%s:%s=%s: local path error: %v", serviceName, servicePath, localPath, err))
 				continue
 			}
 
 			// Intelligent validation: query service for actual file and test translation
-			if cfg, hasConfig := serviceConfigs[service]; hasConfig {
-				if err := s.testServicePathMapping(service, containerPath, servicePath, cfg); err != nil {
-					errors = append(errors, fmt.Sprintf("%s:%s=%s: mapping validation failed: %v", service, containerPath, servicePath, err))
+			if cfg, hasConfig := serviceConfigs[serviceName]; hasConfig {
+				if err := s.testServicePathMapping(serviceName, localPath, servicePath, cfg); err != nil {
+					errors = append(errors, fmt.Sprintf("%s:%s=%s: mapping validation failed: %v", serviceName, servicePath, localPath, err))
 				} else {
-					successes = append(successes, fmt.Sprintf("%s:%s=%s: OK (container path accessible, mapping verified)", service, containerPath, servicePath))
+					successes = append(successes, fmt.Sprintf("%s:%s=%s: OK (local path accessible, mapping verified)", serviceName, servicePath, localPath))
 				}
 			} else {
 				// No service config available, only basic validation
-				successes = append(successes, fmt.Sprintf("%s:%s=%s: OK (container path accessible, no service config for intelligent test)", service, containerPath, servicePath))
+				successes = append(successes, fmt.Sprintf("%s:%s=%s: OK (local path accessible, no service config for intelligent test)", serviceName, servicePath, localPath))
 			}
 		}
 	}
@@ -1591,7 +1591,7 @@ func (s *Server) collectServiceConfigsFromForm(r *http.Request) map[string]inter
 
 // testServicePathMapping validates a service path mapping by querying the service
 // and testing if the path translation works correctly
-func (s *Server) testServicePathMapping(serviceName, containerPath, servicePath string, cfg interface{}) error {
+func (s *Server) testServicePathMapping(serviceName, localPath, servicePath string, cfg interface{}) error {
 	// Get a sample file path from the service
 	var sampleFilePath string
 	var err error
@@ -1626,13 +1626,13 @@ func (s *Server) testServicePathMapping(serviceName, containerPath, servicePath 
 		return nil
 	}
 
-	// Test if we can translate the service path to container path
+	// Test if we can translate the service path to local path
 	if !strings.HasPrefix(sampleFilePath, servicePath) {
 		return fmt.Errorf("service file path '%s' doesn't start with expected service path '%s'", sampleFilePath, servicePath)
 	}
 
-	// Replace service path with container path
-	translatedPath := strings.Replace(sampleFilePath, servicePath, containerPath, 1)
+	// Replace service path with local path
+	translatedPath := strings.Replace(sampleFilePath, servicePath, localPath, 1)
 
 	// Check if the translated path exists
 	if _, err := os.Stat(translatedPath); err != nil {
