@@ -195,7 +195,7 @@ func (c *Calculator) calculateOrphanedExtensions(stats *Stats) error {
 	query := `
 		SELECT extension, COUNT(*) as count, COALESCE(SUM(size), 0) as total_size
 		FROM files
-		WHERE is_orphaned = 1 AND extension != ''
+		WHERE is_orphaned = 1 AND LENGTH(extension) > 0
 		GROUP BY extension
 		ORDER BY total_size DESC
 		LIMIT 10
