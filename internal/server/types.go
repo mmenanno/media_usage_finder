@@ -134,10 +134,13 @@ type StatsData struct {
 type HardlinksData struct {
 	Groups     interface{}
 	Total      int
-	Showing    int   // Number of groups shown on current page
+	Showing    int    // Number of groups shown on current page
 	Page       int64
 	TotalPages int
 	Title      string
+	Search     string // Search query for filtering by path
+	OrderBy    string // Sort field (link_count, space_saved, first_path)
+	Direction  string // Sort direction (asc, desc)
 }
 
 // ScansData represents data for the scans history template

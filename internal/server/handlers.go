@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -328,22 +327,34 @@ type ScanDisplay struct {
 	ActualFileCount int // Actual count of files with this scan_id
 }
 
-// HandleHardlinks serves the hardlinks page with pagination
+// HandleHardlinks serves the hardlinks page with pagination, search, and sorting
 func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	page = ValidatePage(page)
+
+	search := r.URL.Query().Get("search")
+	orderBy := r.URL.Query().Get("order")
+	if orderBy == "" {
+		orderBy = "space_saved" // default sort
+	}
+	direction := r.URL.Query().Get("direction")
+	if direction == "" {
+		direction = "desc" // default direction
+	}
 
 	limit := constants.DefaultHardlinkGroupsPerPage
 	offset := (page - 1) * limit
 
-	groupsMap, err := s.db.GetHardlinkGroups()
+	// Get filtered and sorted groups from database
+	groupsMap, total, err := s.db.GetHardlinkGroupsFiltered(search, orderBy, direction, limit, offset)
 	if err != nil {
 		log.Printf("ERROR: Failed to get hardlink groups: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to retrieve hardlink groups. Database error occurred", "database_error")
 		return
 	}
 
-	// Convert map to sorted slice for consistent display
+	// Convert map to slice for display
 	groups := make([]HardlinkGroup, 0, len(groupsMap))
 	for key, files := range groupsMap {
 		if len(files) > 0 {
@@ -371,31 +382,16 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Sort by space saved (descending)
-	sort.Slice(groups, func(i, j int) bool {
-		return groups[i].Size > groups[j].Size
-	})
-
-	// Paginate
-	total := len(groups)
-	start := offset
-	end := offset + limit
-	if start > total {
-		start = total
-	}
-	if end > total {
-		end = total
-	}
-
-	paginatedGroups := groups[start:end]
-
 	data := HardlinksData{
-		Groups:     paginatedGroups,
+		Groups:     groups,
 		Total:      total,
-		Showing:    len(paginatedGroups),
+		Showing:    len(groups),
 		Page:       int64(page),
 		TotalPages: CalculateTotalPages(total, limit),
 		Title:      "Hardlink Groups",
+		Search:     search,
+		OrderBy:    orderBy,
+		Direction:  direction,
 	}
 
 	s.renderTemplate(w, "hardlinks.html", data)

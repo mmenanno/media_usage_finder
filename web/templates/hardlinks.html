@@ -9,6 +9,98 @@
         </div>
     </div>
 
+    <!-- Search and Sort Controls -->
+    <div class="bg-gray-800 rounded-lg p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Search -->
+            <div>
+                <label for="search-input" class="block text-sm font-medium text-gray-400 mb-2">Search by Path</label>
+                <div class="relative">
+                    <input
+                        type="text"
+                        name="search"
+                        id="search-input"
+                        value="{{.Search}}"
+                        placeholder="Search hardlinked files..."
+                        hx-get="/hardlinks"
+                        hx-trigger="keyup changed delay:500ms, search"
+                        hx-target="#hardlinks-content"
+                        hx-include="[name='order'], [name='direction']"
+                        class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                    <input type="hidden" name="order" value="{{.OrderBy}}">
+                    <input type="hidden" name="direction" value="{{.Direction}}">
+                </div>
+                {{if .Search}}
+                <p class="text-xs text-gray-500 mt-1">
+                    Showing results for "{{.Search}}"
+                    <a href="/hardlinks?order={{.OrderBy}}&direction={{.Direction}}" class="text-blue-400 hover:text-blue-300 ml-2">Clear</a>
+                </p>
+                {{end}}
+            </div>
+
+            <!-- Sort Controls -->
+            <div>
+                <span class="block text-sm font-medium text-gray-400 mb-2">Sort By</span>
+                <div class="flex space-x-2">
+                    <div class="flex-1 relative z-20" data-custom-dropdown>
+                        <input type="hidden" name="sort-order" value="{{.OrderBy}}" data-dropdown-input>
+                        <button
+                            type="button"
+                            data-dropdown-button
+                            aria-expanded="false"
+                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                            <span data-dropdown-text>
+                                {{if eq .OrderBy "link_count"}}Link Count
+                                {{else if eq .OrderBy "space_saved"}}Space Saved
+                                {{else if eq .OrderBy "first_path"}}Path
+                                {{else}}Space Saved{{end}}
+                            </span>
+                            <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                            <a href="/hardlinks?order=link_count&direction={{.Direction}}{{if .Search}}&search={{.Search}}{{end}}"
+                               data-dropdown-option
+                               data-value="link_count"
+                               class="block px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .OrderBy "link_count"}}bg-blue-600{{end}}">
+                                Link Count
+                            </a>
+                            <a href="/hardlinks?order=space_saved&direction={{.Direction}}{{if .Search}}&search={{.Search}}{{end}}"
+                               data-dropdown-option
+                               data-value="space_saved"
+                               class="block px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .OrderBy "space_saved"}}bg-blue-600{{end}}">
+                                Space Saved
+                            </a>
+                            <a href="/hardlinks?order=first_path&direction={{.Direction}}{{if .Search}}&search={{.Search}}{{end}}"
+                               data-dropdown-option
+                               data-value="first_path"
+                               class="block px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .OrderBy "first_path"}}bg-blue-600{{end}}">
+                                Path
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Direction Toggle -->
+                    <a href="/hardlinks?order={{.OrderBy}}&direction={{if eq .Direction "asc"}}desc{{else}}asc{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                       class="px-4 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded transition flex items-center justify-center"
+                       title="Toggle sort direction">
+                        {{if eq .Direction "asc"}}
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                        </svg>
+                        {{else}}
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                        {{end}}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="hardlinks-content">
     {{if .Groups}}
     <div class="space-y-4">
         {{range .Groups}}
@@ -54,14 +146,14 @@
         </div>
         <div class="flex space-x-2">
             {{if gt .Page 1}}
-            <a href="/hardlinks?page={{sub .Page 1}}"
+            <a href="/hardlinks?page={{sub .Page 1}}&order={{.OrderBy}}&direction={{.Direction}}{{if .Search}}&search={{.Search}}{{end}}"
                class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
                 Previous
             </a>
             {{end}}
 
             {{if lt .Page .TotalPages}}
-            <a href="/hardlinks?page={{add .Page 1}}"
+            <a href="/hardlinks?page={{add .Page 1}}&order={{.OrderBy}}&direction={{.Direction}}{{if .Search}}&search={{.Search}}{{end}}"
                class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
                 Next
             </a>
@@ -81,6 +173,7 @@
         </a>
     </div>
     {{end}}
+    </div>
 </div>
 {{end}}
 
