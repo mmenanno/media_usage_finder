@@ -56,8 +56,19 @@
             // Stop the polling by removing the hx-trigger attribute
             const progressContainer = document.getElementById('progress-container');
             if (progressContainer) {
-                // Remove the polling trigger to stop updates
-                progressContainer.setAttribute('hx-trigger', '');
+                // Remove the polling trigger attribute entirely to stop updates
+                progressContainer.removeAttribute('hx-trigger');
+
+                // Also clear any pending HTMX timers on this element
+                if (window.htmx) {
+                    htmx.trigger(progressContainer, 'htmx:abort');
+                }
+            }
+
+            // Hide the resume button if it exists (scan completed successfully)
+            const resumeButton = document.querySelector('[hx-post="/api/scan/resume"]');
+            if (resumeButton && resumeButton.parentElement) {
+                resumeButton.parentElement.style.display = 'none';
             }
         });
     </script>

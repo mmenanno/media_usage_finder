@@ -282,7 +282,7 @@ func (db *DB) GetFilesByPaths(ctx context.Context, paths []string) (map[string]*
 		}
 
 		query := fmt.Sprintf(`
-			SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, created_at
+			SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, extension, created_at
 			FROM files
 			WHERE path IN (%s)
 		`, buildInClause(len(batch)))
@@ -427,6 +427,14 @@ func (db *DB) UpdateScanCheckpoint(scanID int64, lastPath string) error {
 	return err
 }
 
+// UpdateScanFilesProcessed updates only the files_scanned count for a scan
+// Used to persist progress when scans are interrupted, cancelled, or crash
+func (db *DB) UpdateScanFilesProcessed(scanID int64, filesProcessed int64) error {
+	query := `UPDATE scans SET files_scanned = ? WHERE id = ?`
+	_, err := db.conn.Exec(query, filesProcessed, scanID)
+	return err
+}
+
 // GetLastInterruptedScan returns the most recent interrupted scan that can be resumed
 func (db *DB) GetLastInterruptedScan() (*Scan, error) {
 	query := `
@@ -549,6 +557,29 @@ func (db *DB) GetCurrentScan() (*Scan, error) {
 	}
 
 	return scan, nil
+}
+
+// GetLastCompletedScanFileCount returns the file count from the most recent completed scan
+// Returns 0 if no completed scans exist (first scan ever)
+// Used to estimate total files for subsequent scans
+func (db *DB) GetLastCompletedScanFileCount() (int64, error) {
+	var count int64
+	err := db.conn.QueryRow(`
+		SELECT files_scanned
+		FROM scans
+		WHERE status = 'completed' AND files_scanned > 0
+		ORDER BY started_at DESC
+		LIMIT 1
+	`).Scan(&count)
+
+	if err == sql.ErrNoRows {
+		return 0, nil // First scan ever - no previous data
+	}
+	if err != nil {
+		return 0, fmt.Errorf("failed to get last completed scan file count: %w", err)
+	}
+
+	return count, nil
 }
 
 // ListScans retrieves recent scans with pagination

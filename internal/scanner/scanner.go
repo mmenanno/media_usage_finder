@@ -228,6 +228,29 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 	// Store scan context for service updates to respect cancellation
 	s.scanCtx = ctx
 
+	// Ensure files_scanned is persisted even if scan is interrupted/cancelled/panics
+	// This is critical for scan history to show accurate counts
+	defer func() {
+		if s.progress != nil {
+			processedFiles := s.progress.ProcessedFiles
+			if processedFiles > 0 {
+				// Update the scan record with the current file count
+				// This persists the count for interrupted, cancelled, or crashed scans
+				if err := s.db.UpdateScanFilesProcessed(scanID, processedFiles); err != nil {
+					// Log error but don't fail - this is cleanup code
+					s.progress.Log(fmt.Sprintf("Warning: Failed to persist file count on cleanup: %v", err))
+				}
+			}
+		}
+	}()
+
+	// Try to get previous scan's file count as estimate for progress tracking
+	// This allows showing percentage and ETA even without pre-counting files
+	if lastCount, err := s.db.GetLastCompletedScanFileCount(); err == nil && lastCount > 0 {
+		s.progress.SetEstimatedTotal(lastCount)
+		s.progress.Log(fmt.Sprintf("Using previous scan count (%d files) as estimate for progress tracking", lastCount))
+	}
+
 	// Scan filesystem immediately (no file counting phase)
 	// Files are counted dynamically as they're processed
 	s.updatePhase(scanID, "Scanning filesystem")
@@ -242,34 +265,78 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 	}
 
 	// Phase 3: Update service usage
-	s.updatePhase(scanID, "Checking Plex")
-	s.progress.Log("Querying Plex for tracked files...")
-	if err := s.updatePlexUsage(); err != nil {
-		s.progress.Log(fmt.Sprintf("Warning: Failed to update Plex usage: %v", err))
+	// Count configured services for progress tracking
+	totalServices := 0
+	if s.config.Services.Plex.URL != "" {
+		totalServices++
+	}
+	if s.config.Services.Sonarr.URL != "" {
+		totalServices++
+	}
+	if s.config.Services.Radarr.URL != "" {
+		totalServices++
+	}
+	if s.config.Services.QBittorrent.URL != "" || s.config.Services.QBittorrent.QuiProxyURL != "" {
+		totalServices++
+	}
+	if s.config.Services.Stash.URL != "" {
+		totalServices++
+	}
+	currentService := 0
+
+	// Update Plex if configured
+	if s.config.Services.Plex.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking Plex")
+		s.progress.Log("Querying Plex for tracked files...")
+		if err := s.updatePlexUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update Plex usage: %v", err))
+		}
 	}
 
-	s.updatePhase(scanID, "Checking Sonarr")
-	s.progress.Log("Querying Sonarr for tracked files...")
-	if err := s.updateSonarrUsage(); err != nil {
-		s.progress.Log(fmt.Sprintf("Warning: Failed to update Sonarr usage: %v", err))
+	// Update Sonarr if configured
+	if s.config.Services.Sonarr.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking Sonarr")
+		s.progress.Log("Querying Sonarr for tracked files...")
+		if err := s.updateSonarrUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update Sonarr usage: %v", err))
+		}
 	}
 
-	s.updatePhase(scanID, "Checking Radarr")
-	s.progress.Log("Querying Radarr for tracked files...")
-	if err := s.updateRadarrUsage(); err != nil {
-		s.progress.Log(fmt.Sprintf("Warning: Failed to update Radarr usage: %v", err))
+	// Update Radarr if configured
+	if s.config.Services.Radarr.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking Radarr")
+		s.progress.Log("Querying Radarr for tracked files...")
+		if err := s.updateRadarrUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update Radarr usage: %v", err))
+		}
 	}
 
-	s.updatePhase(scanID, "Checking qBittorrent")
-	s.progress.Log("Querying qBittorrent for tracked files...")
-	if err := s.updateQBittorrentUsage(); err != nil {
-		s.progress.Log(fmt.Sprintf("Warning: Failed to update qBittorrent usage: %v", err))
+	// Update qBittorrent if configured
+	if s.config.Services.QBittorrent.URL != "" || s.config.Services.QBittorrent.QuiProxyURL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking qBittorrent")
+		s.progress.Log("Querying qBittorrent for tracked files...")
+		if err := s.updateQBittorrentUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update qBittorrent usage: %v", err))
+		}
 	}
 
-	s.updatePhase(scanID, "Checking Stash")
-	s.progress.Log("Querying Stash for tracked files...")
-	if err := s.updateStashUsage(); err != nil {
-		s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+	// Update Stash if configured
+	if s.config.Services.Stash.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking Stash")
+		s.progress.Log("Querying Stash for tracked files...")
+		if err := s.updateStashUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+		}
 	}
 
 	// Phase 4: Update orphaned status
@@ -293,6 +360,29 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 func (s *Scanner) runScanWithResume(ctx context.Context, scanID int64, incremental bool, resumeFromPath *string) error {
 	// Store scan context for service updates to respect cancellation
 	s.scanCtx = ctx
+
+	// Ensure files_scanned is persisted even if scan is interrupted/cancelled/panics
+	// This is critical for scan history to show accurate counts
+	defer func() {
+		if s.progress != nil {
+			processedFiles := s.progress.ProcessedFiles
+			if processedFiles > 0 {
+				// Update the scan record with the current file count
+				// This persists the count for interrupted, cancelled, or crashed scans
+				if err := s.db.UpdateScanFilesProcessed(scanID, processedFiles); err != nil {
+					// Log error but don't fail - this is cleanup code
+					s.progress.Log(fmt.Sprintf("Warning: Failed to persist file count on cleanup: %v", err))
+				}
+			}
+		}
+	}()
+
+	// Try to get previous scan's file count as estimate for progress tracking
+	// This allows showing percentage and ETA even without pre-counting files
+	if lastCount, err := s.db.GetLastCompletedScanFileCount(); err == nil && lastCount > 0 {
+		s.progress.SetEstimatedTotal(lastCount)
+		s.progress.Log(fmt.Sprintf("Using previous scan count (%d files) as estimate for progress tracking", lastCount))
+	}
 
 	// Scan filesystem immediately (no file counting phase)
 	// Files are counted dynamically as they're processed
@@ -337,34 +427,78 @@ func (s *Scanner) runScanWithResume(ctx context.Context, scanID int64, increment
 	close(checkpointTicker)
 
 	// Phase 3: Update service usage
-	s.updatePhase(scanID, "Checking Plex")
-	s.progress.Log("Querying Plex for tracked files...")
-	if err := s.updatePlexUsage(); err != nil {
-		s.progress.Log(fmt.Sprintf("Warning: Failed to update Plex usage: %v", err))
+	// Count configured services for progress tracking
+	totalServices := 0
+	if s.config.Services.Plex.URL != "" {
+		totalServices++
+	}
+	if s.config.Services.Sonarr.URL != "" {
+		totalServices++
+	}
+	if s.config.Services.Radarr.URL != "" {
+		totalServices++
+	}
+	if s.config.Services.QBittorrent.URL != "" || s.config.Services.QBittorrent.QuiProxyURL != "" {
+		totalServices++
+	}
+	if s.config.Services.Stash.URL != "" {
+		totalServices++
+	}
+	currentService := 0
+
+	// Update Plex if configured
+	if s.config.Services.Plex.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking Plex")
+		s.progress.Log("Querying Plex for tracked files...")
+		if err := s.updatePlexUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update Plex usage: %v", err))
+		}
 	}
 
-	s.updatePhase(scanID, "Checking Sonarr")
-	s.progress.Log("Querying Sonarr for tracked files...")
-	if err := s.updateSonarrUsage(); err != nil {
-		s.progress.Log(fmt.Sprintf("Warning: Failed to update Sonarr usage: %v", err))
+	// Update Sonarr if configured
+	if s.config.Services.Sonarr.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking Sonarr")
+		s.progress.Log("Querying Sonarr for tracked files...")
+		if err := s.updateSonarrUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update Sonarr usage: %v", err))
+		}
 	}
 
-	s.updatePhase(scanID, "Checking Radarr")
-	s.progress.Log("Querying Radarr for tracked files...")
-	if err := s.updateRadarrUsage(); err != nil {
-		s.progress.Log(fmt.Sprintf("Warning: Failed to update Radarr usage: %v", err))
+	// Update Radarr if configured
+	if s.config.Services.Radarr.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking Radarr")
+		s.progress.Log("Querying Radarr for tracked files...")
+		if err := s.updateRadarrUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update Radarr usage: %v", err))
+		}
 	}
 
-	s.updatePhase(scanID, "Checking qBittorrent")
-	s.progress.Log("Querying qBittorrent for tracked files...")
-	if err := s.updateQBittorrentUsage(); err != nil {
-		s.progress.Log(fmt.Sprintf("Warning: Failed to update qBittorrent usage: %v", err))
+	// Update qBittorrent if configured
+	if s.config.Services.QBittorrent.URL != "" || s.config.Services.QBittorrent.QuiProxyURL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking qBittorrent")
+		s.progress.Log("Querying qBittorrent for tracked files...")
+		if err := s.updateQBittorrentUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update qBittorrent usage: %v", err))
+		}
 	}
 
-	s.updatePhase(scanID, "Checking Stash")
-	s.progress.Log("Querying Stash for tracked files...")
-	if err := s.updateStashUsage(); err != nil {
-		s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+	// Update Stash if configured
+	if s.config.Services.Stash.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking Stash")
+		s.progress.Log("Querying Stash for tracked files...")
+		if err := s.updateStashUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+		}
 	}
 
 	// Phase 4: Update orphaned status

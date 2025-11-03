@@ -21,6 +21,13 @@ type Progress struct {
 	IsRunning      bool
 	CurrentPhase   string
 
+	// Progress estimation
+	IsEstimated bool // True if TotalFiles is estimated from previous scan
+
+	// Service update progress
+	CurrentService int // Which service is being updated (1-based)
+	TotalServices  int // Total number of configured services
+
 	// Log streaming
 	logChan      chan string
 	logListeners []chan string
@@ -193,6 +200,24 @@ func (p *Progress) SetPhase(phase string) {
 	p.CurrentPhase = phase
 }
 
+// SetEstimatedTotal sets the total files as an estimate from a previous scan
+func (p *Progress) SetEstimatedTotal(total int64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.TotalFiles = total
+	p.IsEstimated = true
+}
+
+// SetServiceProgress sets the current service progress (1-based indexing)
+func (p *Progress) SetServiceProgress(current, total int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.CurrentService = current
+	p.TotalServices = total
+}
+
 // Stop marks the scan as completed
 func (p *Progress) Stop() {
 	p.mu.Lock()
@@ -242,6 +267,9 @@ func (p *Progress) GetSnapshot() ProgressSnapshot {
 		IsRunning:       p.IsRunning,
 		CurrentPhase:    p.CurrentPhase,
 		StartTime:       p.StartTime,
+		IsEstimated:     p.IsEstimated,
+		CurrentService:  p.CurrentService,
+		TotalServices:   p.TotalServices,
 	}
 }
 
@@ -258,4 +286,7 @@ type ProgressSnapshot struct {
 	IsRunning       bool
 	CurrentPhase    string
 	StartTime       time.Time
+	IsEstimated     bool // True if TotalFiles is estimated from previous scan
+	CurrentService  int  // Which service is being updated (1-based)
+	TotalServices   int  // Total number of configured services
 }

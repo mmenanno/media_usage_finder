@@ -447,13 +447,22 @@ func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Enhance scans with actual file counts
+	// Prefer the FilesScanned field from the scan record (populated by our persistence logic)
+	// Only query the database as a fallback for old scans that don't have it
 	scanDisplays := make([]*ScanDisplay, 0, len(scans))
 	for _, scan := range scans {
-		actualCount, err := s.db.GetScanFileCount(scan.ID)
-		if err != nil {
-			log.Printf("WARNING: Failed to get file count for scan %d: %v", scan.ID, err)
-			actualCount = 0
+		actualCount := int(scan.FilesScanned)
+
+		// Fallback: Query database if FilesScanned is 0 (old scans before our persistence fix)
+		if actualCount == 0 {
+			count, err := s.db.GetScanFileCount(scan.ID)
+			if err != nil {
+				log.Printf("WARNING: Failed to get file count for scan %d: %v", scan.ID, err)
+			} else {
+				actualCount = count
+			}
 		}
+
 		scanDisplays = append(scanDisplays, &ScanDisplay{
 			Scan:            scan,
 			ActualFileCount: actualCount,
@@ -880,10 +889,6 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 					<div class="text-green-400 font-medium">✓ Complete</div>
 				</div>
 			</div>
-
-			<div class="pt-2 border-t border-gray-700 text-center text-sm text-gray-400">
-				Scan completed successfully. Refresh page to start a new scan.
-			</div>
 		</div>
 		`,
 			snapshot.ProcessedFiles,
@@ -922,7 +927,19 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 
 	var html string
 	if isServicePhase {
-		// Service update phase: show indeterminate progress with pulsing animation
+		// Service update phase: show progress with service count
+		// Calculate service progress percentage
+		var serviceProgressPercent float64
+		var serviceProgressDisplay string
+		if snapshot.TotalServices > 0 && snapshot.CurrentService > 0 {
+			serviceProgressPercent = (float64(snapshot.CurrentService) / float64(snapshot.TotalServices)) * 100
+			serviceProgressDisplay = fmt.Sprintf("Service %d of %d", snapshot.CurrentService, snapshot.TotalServices)
+		} else {
+			// Fallback if service tracking not available
+			serviceProgressPercent = 100 // Show full bar with pulse
+			serviceProgressDisplay = "Querying API..."
+		}
+
 		html = fmt.Sprintf(`
 		<div class="space-y-3">
 			<div class="flex items-center justify-between">
@@ -930,11 +947,11 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 					%s
 					<span class="font-medium">%s</span>
 				</div>
-				<span class="text-lg font-bold text-purple-400">Querying API...</span>
+				<span class="text-lg font-bold text-purple-400">%s</span>
 			</div>
 
 			<div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-				<div class="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full shadow-lg animate-pulse"></div>
+				<div class="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full shadow-lg transition-all duration-300" style="width: %.1f%%"></div>
 			</div>
 
 			<div class="grid grid-cols-2 gap-4 text-sm">
@@ -943,8 +960,8 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 					<div class="text-gray-200 font-medium">%d files scanned</div>
 				</div>
 				<div>
-					<div class="text-gray-500 text-xs">Current Phase</div>
-					<div class="text-gray-200 font-medium">Service Update</div>
+					<div class="text-gray-500 text-xs">Service Progress</div>
+					<div class="text-gray-200 font-medium">%s</div>
 				</div>
 				<div>
 					<div class="text-gray-500 text-xs">Elapsed Time</div>
@@ -976,11 +993,61 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 	`,
 			icon,
 			snapshot.CurrentPhase,
+			serviceProgressDisplay,
+			serviceProgressPercent,
 			snapshot.ProcessedFiles,
+			serviceProgressDisplay,
 			stats.FormatDuration(elapsed),
 		)
 	} else {
 		// Normal filesystem scanning phase: show percentage and file progress
+		// Handle three cases:
+		// 1. First scan (no estimate): Show animated gradient
+		// 2. Estimated progress: Show ~X%
+		// 3. Normal progress: Show X%
+
+		var percentDisplay string
+		var progressBarHTML string
+
+		if snapshot.TotalFiles == 0 {
+			// First scan ever - no estimate available
+			percentDisplay = `<span class="text-sm text-gray-400">First scan</span>`
+			progressBarHTML = `<div class="bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 h-3 rounded-full animate-pulse bg-[length:200%_100%]" style="animation: gradient 3s ease infinite;"></div>
+			<style>
+				@keyframes gradient {
+					0% { background-position: 0% 50%; }
+					50% { background-position: 100% 50%; }
+					100% { background-position: 0% 50%; }
+				}
+			</style>`
+		} else if snapshot.IsEstimated {
+			// Using estimate from previous scan
+			percentDisplay = fmt.Sprintf(`<span class="text-lg font-bold text-blue-400">~%.1f%%</span>`, snapshot.PercentComplete)
+			progressBarHTML = fmt.Sprintf(`<div class="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 shadow-lg" style="width: %.1f%%"></div>`, snapshot.PercentComplete)
+		} else {
+			// Normal progress with actual total
+			percentDisplay = fmt.Sprintf(`<span class="text-lg font-bold text-blue-400">%.1f%%</span>`, snapshot.PercentComplete)
+			progressBarHTML = fmt.Sprintf(`<div class="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 shadow-lg" style="width: %.1f%%"></div>`, snapshot.PercentComplete)
+		}
+
+		// Format total files display
+		var totalFilesDisplay string
+		if snapshot.TotalFiles == 0 {
+			totalFilesDisplay = fmt.Sprintf("%d", snapshot.ProcessedFiles)
+		} else if snapshot.IsEstimated {
+			totalFilesDisplay = fmt.Sprintf("%d / ~%d", snapshot.ProcessedFiles, snapshot.TotalFiles)
+		} else {
+			totalFilesDisplay = fmt.Sprintf("%d / %d", snapshot.ProcessedFiles, snapshot.TotalFiles)
+		}
+
+		// Format ETA display
+		var etaDisplay string
+		if snapshot.TotalFiles == 0 {
+			etaDisplay = "calculating..."
+		} else {
+			etaDisplay = stats.FormatDuration(snapshot.ETA)
+		}
+
 		html = fmt.Sprintf(`
 		<div class="space-y-3">
 			<div class="flex items-center justify-between">
@@ -988,17 +1055,17 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 					%s
 					<span class="font-medium">%s</span>
 				</div>
-				<span class="text-lg font-bold text-blue-400">%.1f%%</span>
+				%s
 			</div>
 
 			<div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-				<div class="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300 shadow-lg" style="width: %.1f%%"></div>
+				%s
 			</div>
 
 			<div class="grid grid-cols-2 gap-4 text-sm">
 				<div>
 					<div class="text-gray-500 text-xs">Files Processed</div>
-					<div class="text-gray-200 font-medium">%d / %d</div>
+					<div class="text-gray-200 font-medium">%s</div>
 				</div>
 				<div>
 					<div class="text-gray-500 text-xs">Speed</div>
@@ -1034,13 +1101,12 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 	`,
 			icon,
 			snapshot.CurrentPhase,
-			snapshot.PercentComplete,
-			snapshot.PercentComplete,
-			snapshot.ProcessedFiles,
-			snapshot.TotalFiles,
+			percentDisplay,
+			progressBarHTML,
+			totalFilesDisplay,
 			filesPerSec,
 			stats.FormatDuration(elapsed),
-			stats.FormatDuration(snapshot.ETA),
+			etaDisplay,
 		)
 	}
 
