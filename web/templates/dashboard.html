@@ -70,6 +70,12 @@
             if (resumeButton && resumeButton.parentElement) {
                 resumeButton.parentElement.style.display = 'none';
             }
+
+            // Refresh stats and service breakdown after a short delay
+            // This allows the completion UI to be visible briefly before refresh
+            setTimeout(function() {
+                window.location.reload();
+            }, 2000); // 2 second delay to show completion state
         });
     </script>
 

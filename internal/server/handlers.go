@@ -922,8 +922,9 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 		icon = phaseIcons["Initializing"]
 	}
 
-	// Check if we're in a service update phase (starts with "Checking" or "Updating")
-	isServicePhase := strings.HasPrefix(snapshot.CurrentPhase, "Checking ") || strings.HasPrefix(snapshot.CurrentPhase, "Updating ")
+	// Check if we're in a service update phase (starts with "Checking")
+	// Exclude "Updating orphaned status" which is a post-service phase
+	isServicePhase := strings.HasPrefix(snapshot.CurrentPhase, "Checking ")
 
 	var html string
 	if isServicePhase {
@@ -951,8 +952,14 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 			</div>
 
 			<div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-				<div class="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full shadow-lg transition-all duration-300" style="width: %.1f%%"></div>
+				<div class="bg-gradient-to-r from-purple-500 via-purple-400 to-purple-500 h-3 rounded-full shadow-lg transition-all duration-300" style="width: %.1f%%; animation: shimmer 2s ease-in-out infinite; background-size: 200%% 100%%"></div>
 			</div>
+			<style>
+				@keyframes shimmer {
+					0%% { background-position: -200%% 0; }
+					100%% { background-position: 200%% 0; }
+				}
+			</style>
 
 			<div class="grid grid-cols-2 gap-4 text-sm">
 				<div>

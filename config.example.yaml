@@ -17,10 +17,11 @@ scan_workers: 10
 scan_buffer_size: 100
 
 # API Timeout: Timeout for external service API calls
-# - Default: 30s
-# - Increase to 60s if services are slow or over network
-# - Decrease to 15s for local, fast services
-api_timeout: 30s
+# - Default: 5m (recommended for large libraries)
+# - Note: Actual timeout is 2x this value (10m) to handle pagination/retries
+# - Increase to 10m if you have very large libraries (100K+ items per service)
+# - Decrease to 2m for smaller, faster services
+api_timeout: 5m
 
 # Server Configuration
 server_port: 8080

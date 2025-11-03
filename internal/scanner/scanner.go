@@ -135,6 +135,10 @@ func (s *Scanner) Scan(ctx context.Context, incremental bool) error {
 		s.onScanComplete()
 	}
 
+	// Clear progress object so GetProgress() returns nil
+	// This prevents the UI from showing stale progress after scan completes
+	s.progress = nil
+
 	return scanErr
 }
 
@@ -219,6 +223,10 @@ func (s *Scanner) ResumeScan(ctx context.Context) error {
 	if s.onScanComplete != nil && status == "completed" {
 		s.onScanComplete()
 	}
+
+	// Clear progress object so GetProgress() returns nil
+	// This prevents the UI from showing stale progress after scan completes
+	s.progress = nil
 
 	return scanErr
 }
