@@ -1674,30 +1674,88 @@ func (db *DB) ClearAuditLog(olderThanDays int) (int64, error) {
 
 // ExtractExtension extracts the file extension from a path
 // Returns lowercase extension including the dot (e.g., ".mkv")
+// Handles compound extensions like ".mkv.!qb", ".original_epub", ".tar.gz"
 // Returns empty string if no extension found
 func ExtractExtension(path string) string {
-	// Find the last occurrence of '.' after the last '/'
+	// Find the last two dots after the last slash
 	lastSlash := -1
 	lastDot := -1
+	secondLastDot := -1
 
 	for i := len(path) - 1; i >= 0; i-- {
 		if path[i] == '/' && lastSlash == -1 {
 			lastSlash = i
 			break // Stop after finding the last slash
 		}
-		if path[i] == '.' && lastDot == -1 {
-			lastDot = i
+		if path[i] == '.' {
+			if lastDot == -1 {
+				lastDot = i
+			} else if secondLastDot == -1 {
+				secondLastDot = i
+				// We found both dots, no need to continue
+				break
+			}
 		}
 	}
 
-	// If we found a dot and it's after the last slash (or no slash found)
-	if lastDot > lastSlash {
-		ext := path[lastDot:]
-		// Convert to lowercase for consistency
-		return toLower(ext)
+	// If we didn't find a dot after the last slash, no extension
+	if lastDot <= lastSlash {
+		return ""
 	}
 
-	return ""
+	// Extract the last extension part (lowercase)
+	lastExt := toLower(path[lastDot:])
+
+	// If there's no second dot, just return the last extension
+	if secondLastDot <= lastSlash {
+		return lastExt
+	}
+
+	// Extract the part between the two dots (without dots, lowercase)
+	middlePart := toLower(path[secondLastDot+1 : lastDot])
+
+	// Check if this is a compound extension we should keep
+	if isCompoundExtension(middlePart, lastExt) {
+		// Return the full compound extension
+		return toLower(path[secondLastDot:])
+	}
+
+	// Not a compound extension, just return the last part
+	return lastExt
+}
+
+// isCompoundExtension determines if two extension parts form a compound extension
+func isCompoundExtension(middle, lastExt string) bool {
+	// qBittorrent incomplete download marker
+	if lastExt == ".!qb" {
+		return true
+	}
+
+	// Calibre backup files (.original_epub, .original_mobi, etc.)
+	if middle == "original" {
+		return true
+	}
+
+	// Common archive compound extensions
+	if middle == "tar" {
+		// .tar.gz, .tar.bz2, .tar.xz, .tar.zst, .tar.lz, .tar.lz4, .tar.z
+		archiveExts := []string{".gz", ".bz2", ".xz", ".zst", ".lz", ".lz4", ".z"}
+		for _, ext := range archiveExts {
+			if lastExt == ext {
+				return true
+			}
+		}
+	}
+
+	// Common compound extensions in media/backup contexts
+	compoundMiddles := []string{"backup", "tmp", "part", "old"}
+	for _, cm := range compoundMiddles {
+		if middle == cm {
+			return true
+		}
+	}
+
+	return false
 }
 
 // toLower converts a string to lowercase (simple ASCII version)
