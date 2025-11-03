@@ -15,7 +15,9 @@ class BatchSelection {
 
         // Listen for table updates (HTMX swaps)
         document.body.addEventListener('htmx:afterSwap', (event) => {
-            if (event.detail.target.id === 'files-table') {
+            // Handle full table swaps or tbody swaps (e.g., from infinite scroll)
+            if (event.detail.target.id === 'files-table' ||
+                (event.target && event.target.matches && event.target.matches('#files-table tbody'))) {
                 this.init();
             }
         });

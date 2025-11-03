@@ -115,6 +115,7 @@ type FilesData struct {
 	Search     string
 	OrderBy    string
 	Direction  string
+	Extensions []string
 }
 
 // ConfigData represents data for the configuration template

@@ -55,13 +55,13 @@ func scanFileRow(scanner interface {
 
 // Usage represents a service using a file
 type Usage struct {
-	ID            int64
-	FileID        int64
-	Service       string
-	ReferencePath string
-	Metadata      map[string]interface{}
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID            int64                  `json:"id"`
+	FileID        int64                  `json:"file_id"`
+	Service       string                 `json:"service"`
+	ReferencePath string                 `json:"reference_path"`
+	Metadata      map[string]interface{} `json:"metadata"`
+	CreatedAt     time.Time              `json:"created_at"`
+	UpdatedAt     time.Time              `json:"updated_at"`
 }
 
 // Scan represents a scan operation
@@ -775,8 +775,60 @@ func ValidateDirection(direction string) string {
 	return "ASC" // default
 }
 
+// GetFileExtensions returns a list of distinct file extensions in the database
+// Optionally filtered by orphaned status and service
+func (db *DB) GetFileExtensions(orphanedOnly bool, service string) ([]string, error) {
+	var conditions []string
+	args := []interface{}{}
+
+	// Build WHERE clause
+	if orphanedOnly {
+		conditions = append(conditions, "f.is_orphaned = 1")
+	}
+
+	if service != "" {
+		conditions = append(conditions, "EXISTS (SELECT 1 FROM usage u WHERE u.file_id = f.id AND u.service = ?)")
+		args = append(args, service)
+	}
+
+	// Add condition to ensure file has an extension
+	conditions = append(conditions, "INSTR(REVERSE(f.path), '.') > 0")
+
+	whereClause := "WHERE " + conditions[0]
+	for i := 1; i < len(conditions); i++ {
+		whereClause += " AND " + conditions[i]
+	}
+
+	query := `
+		SELECT DISTINCT
+			LOWER(SUBSTR(f.path, LENGTH(f.path) - INSTR(REVERSE(f.path), '.') + 2)) AS extension
+		FROM files f
+		` + whereClause + `
+		ORDER BY extension
+	`
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	extensions := []string{}
+	for rows.Next() {
+		var ext string
+		if err := rows.Scan(&ext); err != nil {
+			return nil, err
+		}
+		if ext != "" {
+			extensions = append(extensions, ext)
+		}
+	}
+
+	return extensions, rows.Err()
+}
+
 // ListFiles retrieves files with filtering and pagination
-func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, limit, offset int, orderBy, direction string) ([]*File, int, error) {
+func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, extensions []string, limit, offset int, orderBy, direction string) ([]*File, int, error) {
 	var conditions []string
 	args := []interface{}{}
 
@@ -793,6 +845,19 @@ func (db *DB) ListFiles(orphanedOnly bool, service string, hardlinksOnly bool, l
 		conditions = append(conditions, `(f.device_id, f.inode) IN (
 			SELECT device_id, inode FROM files GROUP BY device_id, inode HAVING COUNT(*) > 1
 		)`)
+	}
+
+	// Filter by file extensions
+	if len(extensions) > 0 {
+		placeholders := make([]string, len(extensions))
+		for i, ext := range extensions {
+			placeholders[i] = "?"
+			args = append(args, ext)
+		}
+		conditions = append(conditions, fmt.Sprintf(
+			"LOWER(SUBSTR(f.path, LENGTH(f.path) - INSTR(REVERSE(f.path), '.') + 2)) IN (%s)",
+			strings.Join(placeholders, ", "),
+		))
 	}
 
 	whereClause := ""

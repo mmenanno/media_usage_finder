@@ -197,6 +197,17 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	orderBy := r.URL.Query().Get("order")
 	direction := r.URL.Query().Get("direction")
 
+	// Parse extensions filter (can be comma-separated or multiple params)
+	var extensions []string
+	if extParam := r.URL.Query().Get("extensions"); extParam != "" {
+		for _, ext := range strings.Split(extParam, ",") {
+			ext = strings.TrimSpace(strings.ToLower(ext))
+			if ext != "" {
+				extensions = append(extensions, ext)
+			}
+		}
+	}
+
 	var files []*database.File
 	var total int
 	var err error
@@ -204,7 +215,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	if search != "" {
 		files, total, err = s.db.SearchFiles(search, limit, offset)
 	} else {
-		files, total, err = s.db.ListFiles(orphanedOnly, service, hardlinksOnly, limit, offset, orderBy, direction)
+		files, total, err = s.db.ListFiles(orphanedOnly, service, hardlinksOnly, extensions, limit, offset, orderBy, direction)
 	}
 
 	if err != nil {
@@ -246,9 +257,34 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		Search:     search,
 		OrderBy:    orderBy,
 		Direction:  direction,
+		Extensions: extensions,
 	}
 
 	s.renderTemplate(w, "files.html", data)
+}
+
+// HandleGetFileExtensions returns a JSON list of distinct file extensions
+func (s *Server) HandleGetFileExtensions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse filter parameters
+	orphanedOnly := r.URL.Query().Get("orphaned") == "true"
+	service := r.URL.Query().Get("service")
+
+	extensions, err := s.db.GetFileExtensions(orphanedOnly, service)
+	if err != nil {
+		log.Printf("ERROR: Failed to get file extensions: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to get file extensions", "database_error")
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"extensions": extensions,
+	})
 }
 
 // HandleConfig serves the configuration page
@@ -1785,7 +1821,7 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 
 		first := true
 		for {
-			files, _, err := s.db.ListFiles(orphanedOnly, "", false, batchSize, offset, "path", "asc")
+			files, _, err := s.db.ListFiles(orphanedOnly, "", false, nil, batchSize, offset, "path", "asc")
 			if err != nil {
 				if offset == 0 {
 					http.Error(w, "Failed to list files", http.StatusInternalServerError)
@@ -1838,7 +1874,7 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for {
-			files, _, err := s.db.ListFiles(orphanedOnly, "", false, batchSize, offset, "path", "asc")
+			files, _, err := s.db.ListFiles(orphanedOnly, "", false, nil, batchSize, offset, "path", "asc")
 			if err != nil {
 				if offset == 0 {
 					http.Error(w, "Failed to list files", http.StatusInternalServerError)
@@ -1908,7 +1944,7 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 
 	// Bulk orphaned files deletion
 	if orphaned {
-		files, _, err := s.db.ListFiles(true, "", false, constants.MaxExportFiles, 0, "path", "asc")
+		files, _, err := s.db.ListFiles(true, "", false, nil, constants.MaxExportFiles, 0, "path", "asc")
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to list orphaned files", "list_failed")
 			return

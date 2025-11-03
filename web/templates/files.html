@@ -68,6 +68,36 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Extension Filter -->
+                <div>
+                    <span class="block text-sm font-medium text-gray-400 mb-2">File Extensions</span>
+                    <div class="relative z-20" data-extension-multiselect>
+                        <input type="hidden" name="extensions" value="{{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}" data-extensions-input>
+                        <button
+                            type="button"
+                            data-extensions-button
+                            aria-expanded="false"
+                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                            <span data-extensions-text>{{if .Extensions}}{{len .Extensions}} extension(s){{else}}All Extensions{{end}}</span>
+                            <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div data-extensions-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                            <div class="px-4 py-2 border-b border-gray-600">
+                                <div class="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        data-select-all-extensions
+                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded cursor-pointer">
+                                    <label class="text-sm font-medium text-gray-300 cursor-pointer">Select All</label>
+                                </div>
+                            </div>
+                            <div data-extensions-list class="text-gray-400 text-sm px-4 py-2">Loading...</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Orphaned Filter -->
@@ -293,7 +323,7 @@
             </div>
             <div class="flex space-x-2">
                 {{if gt .Page 1}}
-                <a href="/files?page={{sub .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                <a href="/files?page={{sub .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
                     Previous
                 </a>
@@ -301,9 +331,9 @@
 
                 {{if lt .Page .TotalPages}}
                 <a id="next-page-btn"
-                   href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
+                   href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition"
-                   hx-get="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
+                   hx-get="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Service}}&service={{.Service}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    hx-trigger="revealed"
                    hx-target="#files-table tbody"
                    hx-swap="beforeend"
@@ -311,7 +341,7 @@
                    hx-indicator="#infinite-scroll-loading"
                    data-current-page="{{.Page}}"
                    data-total-pages="{{.TotalPages}}"
-                   hx-disabled>
+                   hx-disabled="true">
                     Next
                 </a>
                 <div id="infinite-scroll-loading" class="htmx-indicator px-3 py-1 text-sm text-gray-400">
@@ -357,7 +387,7 @@
                 const totalPages = parseInt(btn.getAttribute('data-total-pages') || '1');
                 const nextPage = currentPage + 1;
 
-                if (nextPage < totalPages) {
+                if (nextPage <= totalPages) {
                     // Update page number in data attribute
                     btn.setAttribute('data-current-page', nextPage);
 
@@ -367,13 +397,147 @@
 
                     btn.setAttribute('hx-get', currentUrl.pathname + currentUrl.search);
                     btn.setAttribute('href', currentUrl.pathname + currentUrl.search);
-                } else if (nextPage >= totalPages) {
+                } else {
                     // No more pages, disable infinite scroll
-                    btn.setAttribute('hx-disabled', '');
+                    btn.setAttribute('hx-disabled', 'true');
                     btn.classList.add('hidden');
                 }
             }
         });
+    }
+
+    // Extension multiselect functionality
+    const extensionMultiselect = document.querySelector('[data-extension-multiselect]');
+    if (extensionMultiselect) {
+        const button = extensionMultiselect.querySelector('[data-extensions-button]');
+        const menu = extensionMultiselect.querySelector('[data-extensions-menu]');
+        const input = extensionMultiselect.querySelector('[data-extensions-input]');
+        const textSpan = extensionMultiselect.querySelector('[data-extensions-text]');
+        const extensionsList = extensionMultiselect.querySelector('[data-extensions-list]');
+        const selectAllCheckbox = extensionMultiselect.querySelector('[data-select-all-extensions]');
+
+        let availableExtensions = [];
+        let selectedExtensions = new Set();
+
+        // Parse initial selected extensions from hidden input
+        if (input.value) {
+            input.value.split(',').forEach(ext => {
+                if (ext.trim()) selectedExtensions.add(ext.trim());
+            });
+        }
+
+        // Toggle dropdown
+        button.addEventListener('click', function() {
+            const isOpen = menu.classList.contains('hidden');
+            menu.classList.toggle('hidden');
+            button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
+            // Load extensions on first open
+            if (isOpen && availableExtensions.length === 0) {
+                loadExtensions();
+            }
+        });
+
+        // Close on click outside
+        document.addEventListener('click', function(e) {
+            if (!extensionMultiselect.contains(e.target)) {
+                menu.classList.add('hidden');
+                button.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        // Load extensions from API
+        function loadExtensions() {
+            extensionsList.innerHTML = '<div class="text-gray-400 text-sm">Loading...</div>';
+
+            fetch('/api/files/extensions')
+                .then(response => response.json())
+                .then(data => {
+                    availableExtensions = data.extensions || [];
+                    renderExtensions();
+                })
+                .catch(error => {
+                    console.error('Failed to load extensions:', error);
+                    extensionsList.innerHTML = '<div class="text-red-400 text-sm">Failed to load</div>';
+                });
+        }
+
+        // Render extension checkboxes
+        function renderExtensions() {
+            if (availableExtensions.length === 0) {
+                extensionsList.innerHTML = '<div class="text-gray-400 text-sm">No extensions found</div>';
+                return;
+            }
+
+            extensionsList.innerHTML = availableExtensions.map(ext => `
+                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        value="${ext}"
+                        ${selectedExtensions.has(ext) ? 'checked' : ''}
+                        class="extension-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                    <span class="text-gray-100">.${ext}</span>
+                </label>
+            `).join('');
+
+            // Add event listeners to checkboxes
+            extensionsList.querySelectorAll('.extension-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', handleExtensionChange);
+            });
+
+            updateSelectAllState();
+        }
+
+        // Handle individual checkbox change
+        function handleExtensionChange(e) {
+            const ext = e.target.value;
+            if (e.target.checked) {
+                selectedExtensions.add(ext);
+            } else {
+                selectedExtensions.delete(ext);
+            }
+            updateHiddenInput();
+            updateSelectAllState();
+        }
+
+        // Handle select all checkbox
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function(e) {
+                const checkboxes = extensionsList.querySelectorAll('.extension-checkbox');
+                checkboxes.forEach(cb => {
+                    cb.checked = e.target.checked;
+                    if (e.target.checked) {
+                        selectedExtensions.add(cb.value);
+                    } else {
+                        selectedExtensions.delete(cb.value);
+                    }
+                });
+                updateHiddenInput();
+            });
+        }
+
+        // Update select all checkbox state
+        function updateSelectAllState() {
+            if (!selectAllCheckbox) return;
+            const checkboxes = extensionsList.querySelectorAll('.extension-checkbox');
+            const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            selectAllCheckbox.checked = checkedCount === checkboxes.length && checkboxes.length > 0;
+            selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+        }
+
+        // Update hidden input and button text
+        function updateHiddenInput() {
+            const values = Array.from(selectedExtensions).join(',');
+            input.value = values;
+
+            if (selectedExtensions.size === 0) {
+                textSpan.textContent = 'All Extensions';
+            } else if (selectedExtensions.size === 1) {
+                textSpan.textContent = '1 extension';
+            } else {
+                textSpan.textContent = `${selectedExtensions.size} extensions`;
+            }
+        }
     }
     </script>
 

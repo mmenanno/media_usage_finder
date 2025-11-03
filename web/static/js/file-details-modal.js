@@ -105,7 +105,7 @@ class FileDetailsModal {
                         </div>
                         <button
                             onclick="fileDetailsModal.hide()"
-                            class="text-gray-400 hover:text-white transition p-1"
+                            class="text-gray-400 hover:text-white transition p-1 cursor-pointer"
                             aria-label="Close">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -214,9 +214,10 @@ class FileDetailsModal {
     getServiceColor(service) {
         const colors = {
             plex: 'blue',
-            sonarr: 'purple',
-            radarr: 'yellow',
-            qbittorrent: 'green'
+            sonarr: 'green',
+            radarr: 'amber',
+            qbittorrent: 'red',
+            stash: 'purple'
         };
         return colors[service] || 'gray';
     }
