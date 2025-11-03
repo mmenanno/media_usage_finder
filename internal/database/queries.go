@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -805,21 +807,15 @@ func (db *DB) GetFileExtensions(orphanedOnly bool, service string) ([]string, er
 		args = append(args, service)
 	}
 
-	// Add condition to ensure file has an extension
-	conditions = append(conditions, "INSTR(REVERSE(f.path), '.') > 0")
+	// Add condition to ensure file has an extension (contains a dot)
+	conditions = append(conditions, "f.path LIKE '%.%'")
 
-	whereClause := "WHERE " + conditions[0]
-	for i := 1; i < len(conditions); i++ {
-		whereClause += " AND " + conditions[i]
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	query := `
-		SELECT DISTINCT
-			LOWER(SUBSTR(f.path, LENGTH(f.path) - INSTR(REVERSE(f.path), '.') + 2)) AS extension
-		FROM files f
-		` + whereClause + `
-		ORDER BY extension
-	`
+	query := `SELECT DISTINCT f.path FROM files f ` + whereClause
 
 	rows, err := db.conn.Query(query, args...)
 	if err != nil {
@@ -827,18 +823,33 @@ func (db *DB) GetFileExtensions(orphanedOnly bool, service string) ([]string, er
 	}
 	defer rows.Close()
 
-	extensions := []string{}
+	// Use a map to collect unique extensions
+	extMap := make(map[string]bool)
 	for rows.Next() {
-		var ext string
-		if err := rows.Scan(&ext); err != nil {
+		var path string
+		if err := rows.Scan(&path); err != nil {
 			return nil, err
 		}
-		if ext != "" {
-			extensions = append(extensions, ext)
+		// Extract extension using filepath.Ext() and remove the leading dot
+		ext := filepath.Ext(path)
+		if len(ext) > 1 { // Ensure we have more than just the dot
+			ext = strings.ToLower(ext[1:]) // Remove leading dot and lowercase
+			extMap[ext] = true
 		}
 	}
 
-	return extensions, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Convert map to sorted slice
+	extensions := make([]string, 0, len(extMap))
+	for ext := range extMap {
+		extensions = append(extensions, ext)
+	}
+	sort.Strings(extensions)
+
+	return extensions, nil
 }
 
 // ListFiles retrieves files with filtering and pagination
@@ -901,17 +912,15 @@ func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode 
 		)`)
 	}
 
-	// Filter by file extensions
+	// Filter by file extensions using GLOB patterns (SQLite-compatible)
 	if len(extensions) > 0 {
-		placeholders := make([]string, len(extensions))
+		extConditions := make([]string, len(extensions))
 		for i, ext := range extensions {
-			placeholders[i] = "?"
-			args = append(args, ext)
+			extConditions[i] = "f.path GLOB ?"
+			// Add GLOB pattern: *.<ext> (case-insensitive by checking both cases)
+			args = append(args, "*.["+strings.ToLower(string(ext[0]))+strings.ToUpper(string(ext[0]))+"]"+strings.ToLower(ext[1:]))
 		}
-		conditions = append(conditions, fmt.Sprintf(
-			"LOWER(SUBSTR(f.path, LENGTH(f.path) - INSTR(REVERSE(f.path), '.') + 2)) IN (%s)",
-			strings.Join(placeholders, ", "),
-		))
+		conditions = append(conditions, "("+strings.Join(extConditions, " OR ")+")")
 	}
 
 	whereClause := ""
