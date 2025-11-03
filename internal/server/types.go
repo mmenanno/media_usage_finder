@@ -128,7 +128,7 @@ type ConfigData struct {
 
 // StatsData represents data for the statistics template
 type StatsData struct {
-	Stats interface{}
+	Stats *stats.Stats
 	Title string
 }
 
