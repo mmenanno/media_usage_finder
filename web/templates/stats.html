@@ -103,8 +103,15 @@
             <!-- Orphaned Files by Extension -->
             {{if .Stats.OrphanedExtensions}}
             <div class="bg-gray-700 rounded-lg p-4">
-                <h4 class="text-sm font-medium text-gray-400 mb-4 text-center">Top Extensions (Orphaned)</h4>
-                <canvas id="extensionsChart" class="max-h-64"></canvas>
+                <h4 class="text-sm font-medium text-gray-400 mb-4 text-center">Top 5 Extensions (Orphaned)</h4>
+                <div style="height: 280px;">
+                    <canvas id="extensionsChart"></canvas>
+                </div>
+                {{if gt .Stats.OrphanedExtensionsTotal 5}}
+                <div class="mt-3 text-center text-xs text-gray-500">
+                    + {{sub .Stats.OrphanedExtensionsTotal 5}} more extension{{if gt (sub .Stats.OrphanedExtensionsTotal 5) 1}}s{{end}}
+                </div>
+                {{end}}
             </div>
             {{end}}
 
@@ -120,18 +127,26 @@
         <!-- Detailed Extension Breakdown -->
         {{if gt (len .Stats.OrphanedExtensions) 0}}
         <div class="mt-6">
-            <h4 class="text-sm font-medium text-gray-400 mb-4">Extension Details</h4>
+            <h4 class="text-sm font-medium text-gray-400 mb-4">Top 5 Extension Details</h4>
             <div class="space-y-2">
-                {{range .Stats.OrphanedExtensions}}
+                {{range $index, $ext := .Stats.OrphanedExtensions}}
                 <div class="flex justify-between items-center p-3 bg-gray-700 rounded text-sm">
-                    <span class="font-mono text-yellow-400">{{.Extension}}</span>
+                    <div class="flex items-center space-x-3">
+                        <span class="text-xs text-gray-500 font-bold w-4">#{{add $index 1}}</span>
+                        <span class="font-mono text-yellow-400 font-semibold">{{$ext.Extension}}</span>
+                    </div>
                     <div class="flex items-center space-x-4 text-gray-400">
-                        <span>{{.FileCount}} files</span>
-                        <span class="font-medium text-white">{{formatSize .TotalSize}}</span>
+                        <span>{{formatNumber $ext.FileCount}} files</span>
+                        <span class="font-medium text-white">{{formatSize $ext.TotalSize}}</span>
                     </div>
                 </div>
                 {{end}}
             </div>
+            {{if gt .Stats.OrphanedExtensionsTotal 5}}
+            <div class="mt-3 text-center text-xs text-gray-500 italic">
+                Plus {{sub .Stats.OrphanedExtensionsTotal 5}} more extension types not shown
+            </div>
+            {{end}}
         </div>
         {{end}}
 
@@ -489,36 +504,70 @@ if (extensionsCtx) {
         {{end}}
     ];
 
+    // Distinct, high-contrast color palette for easy differentiation
+    const extensionColors = [
+        '#F59E0B', // amber/orange - largest
+        '#10B981', // emerald green
+        '#3B82F6', // bright blue
+        '#A855F7', // purple
+        '#EC4899', // pink - smallest
+    ];
+
+    // Calculate max value for better scaling
+    const maxSize = Math.max(...extensionData.map(e => e.size));
+
     new Chart(extensionsCtx, {
         type: 'bar',
         data: {
             labels: extensionData.map(e => e.ext),
             datasets: [{
-                label: 'Storage (GB)',
+                label: 'Storage',
                 data: extensionData.map(e => e.size),
-                backgroundColor: '#F59E0B', // yellow/amber for orphaned
-                borderWidth: 0
+                backgroundColor: extensionColors.slice(0, extensionData.length),
+                borderWidth: 0,
+                barThickness: 40, // Thicker bars
+                borderRadius: 6,
+                // Add subtle shadow effect
+                borderSkipped: false
             }]
         },
         options: {
-            indexAxis: 'y', // Horizontal bar chart
+            indexAxis: 'y',
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: {
+                    left: 10,
+                    right: 100, // Space for end labels
+                    top: 15,
+                    bottom: 15
+                }
+            },
             scales: {
                 x: {
                     beginAtZero: true,
+                    max: maxSize * 1.15, // Add 15% padding for labels
                     grid: {
-                        color: '#374151'
+                        display: false, // Clean look without grid
+                        drawBorder: false
                     },
                     ticks: {
-                        callback: function(value) {
-                            return formatGBValue(value);
-                        }
+                        display: false // Hide x-axis ticks for cleaner look
                     }
                 },
                 y: {
                     grid: {
-                        display: false
+                        display: false,
+                        drawBorder: false
+                    },
+                    ticks: {
+                        padding: 12,
+                        font: {
+                            size: 15,
+                            weight: '600',
+                            family: 'ui-monospace, monospace'
+                        },
+                        color: '#F9FAFB'
                     }
                 }
             },
@@ -527,7 +576,25 @@ if (extensionsCtx) {
                     display: false
                 },
                 tooltip: {
+                    enabled: true,
+                    backgroundColor: '#1F2937',
+                    titleColor: '#F9FAFB',
+                    bodyColor: '#D1D5DB',
+                    borderColor: '#4B5563',
+                    borderWidth: 1,
+                    padding: 14,
+                    displayColors: false,
+                    titleFont: {
+                        size: 14,
+                        weight: 'bold'
+                    },
+                    bodyFont: {
+                        size: 13
+                    },
                     callbacks: {
+                        title: function(context) {
+                            return context[0].label;
+                        },
                         label: function(context) {
                             const idx = context.dataIndex;
                             const data = extensionData[idx];
@@ -539,7 +606,62 @@ if (extensionsCtx) {
                     }
                 }
             }
-        }
+        },
+        plugins: [{
+            id: 'customLabels',
+            afterDatasetsDraw: function(chart) {
+                const ctx = chart.ctx;
+                const chartArea = chart.chartArea;
+
+                chart.data.datasets.forEach((dataset, i) => {
+                    const meta = chart.getDatasetMeta(i);
+                    meta.data.forEach((bar, index) => {
+                        const data = extensionData[index];
+                        const sizeLabel = formatGBValue(data.size);
+                        const fileLabel = formatNumber(data.count) + ' files';
+
+                        // Calculate position - inside bar if too long, outside if space available
+                        const barWidth = bar.width;
+                        const labelX = bar.x + barWidth + 8;
+
+                        // Ensure we're within chart area
+                        const effectiveX = Math.min(labelX, chartArea.right - 5);
+                        const y = bar.y;
+
+                        // Draw size label (bold, white)
+                        ctx.save();
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+
+                        // Add shadow for better readability
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                        ctx.shadowBlur = 4;
+                        ctx.shadowOffsetX = 1;
+                        ctx.shadowOffsetY = 1;
+
+                        ctx.fillText(sizeLabel, effectiveX, y - 7);
+                        ctx.restore();
+
+                        // Draw file count (smaller, lighter gray)
+                        ctx.save();
+                        ctx.fillStyle = '#D1D5DB';
+                        ctx.font = '500 11px system-ui, -apple-system, sans-serif';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
+
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                        ctx.shadowBlur = 3;
+                        ctx.shadowOffsetX = 1;
+                        ctx.shadowOffsetY = 1;
+
+                        ctx.fillText(fileLabel, effectiveX, y + 7);
+                        ctx.restore();
+                    });
+                });
+            }
+        }]
     });
 }
 

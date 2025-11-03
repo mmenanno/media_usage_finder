@@ -11,19 +11,20 @@ import (
 // Note: Size fields use int64 and have a theoretical limit of ~9 exabytes.
 // For filesystems with total sizes exceeding this, overflow may occur.
 type Stats struct {
-	TotalFiles          int64
-	TotalSize           int64 // In bytes, max ~9 EB before overflow
-	OrphanedFiles       int64
-	OrphanedSize        int64 // In bytes, max ~9 EB before overflow
-	HardlinkGroups      int64
-	ServiceBreakdown    map[string]ServiceStats
-	HardlinkSavings     int64 // In bytes, max ~9 EB before overflow
-	ActiveServiceCount  int64 // Number of services with files
-	OrphanedExtensions  []ExtensionStats
-	OrphanedByAge       []AgeGroupStats
-	MultiServiceUsage   []ServiceUsageCount
-	LargestOrphanedPath string // Path of largest orphaned file
-	LargestOrphanedSize int64  // Size of largest orphaned file
+	TotalFiles              int64
+	TotalSize               int64 // In bytes, max ~9 EB before overflow
+	OrphanedFiles           int64
+	OrphanedSize            int64 // In bytes, max ~9 EB before overflow
+	HardlinkGroups          int64
+	ServiceBreakdown        map[string]ServiceStats
+	HardlinkSavings         int64 // In bytes, max ~9 EB before overflow
+	ActiveServiceCount      int64 // Number of services with files
+	OrphanedExtensions      []ExtensionStats
+	OrphanedExtensionsTotal int64 // Total count of unique orphaned extensions
+	OrphanedByAge           []AgeGroupStats
+	MultiServiceUsage       []ServiceUsageCount
+	LargestOrphanedPath     string // Path of largest orphaned file
+	LargestOrphanedSize     int64  // Size of largest orphaned file
 }
 
 // ServiceStats contains statistics for a specific service
@@ -190,15 +191,24 @@ func (c *Calculator) calculateServiceBreakdown(stats *Stats) error {
 }
 
 func (c *Calculator) calculateOrphanedExtensions(stats *Stats) error {
-	// Simple query using the extension column with GROUP BY
-	// Much more efficient than processing in Go!
+	// First, count total number of unique orphaned extensions
+	countQuery := `
+		SELECT COUNT(DISTINCT extension)
+		FROM files
+		WHERE is_orphaned = 1 AND LENGTH(extension) > 0
+	`
+	if err := c.db.Conn().QueryRow(countQuery).Scan(&stats.OrphanedExtensionsTotal); err != nil {
+		return err
+	}
+
+	// Get top 5 extensions by size
 	query := `
 		SELECT extension, COUNT(*) as count, COALESCE(SUM(size), 0) as total_size
 		FROM files
 		WHERE is_orphaned = 1 AND LENGTH(extension) > 0
 		GROUP BY extension
 		ORDER BY total_size DESC
-		LIMIT 10
+		LIMIT 5
 	`
 
 	rows, err := c.db.Conn().Query(query)

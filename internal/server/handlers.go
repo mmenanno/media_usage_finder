@@ -2581,5 +2581,22 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 				return 0
 			}
 		},
+		"formatNumber": func(n int64) string {
+			// Format integer with thousand separators
+			str := fmt.Sprintf("%d", n)
+			if len(str) <= 3 {
+				return str
+			}
+
+			// Add commas from right to left
+			var result string
+			for i, digit := range str {
+				if i > 0 && (len(str)-i)%3 == 0 {
+					result += ","
+				}
+				result += string(digit)
+			}
+			return result
+		},
 	}
 }
