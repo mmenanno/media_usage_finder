@@ -846,6 +846,58 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 		filesPerSec = float64(snapshot.ProcessedFiles) / elapsed.Seconds()
 	}
 
+	// Check if scan is completed - show final summary without polling
+	if snapshot.CurrentPhase == "Completed" {
+		completedHTML := fmt.Sprintf(`
+		<div class="space-y-3">
+			<div class="flex items-center justify-between">
+				<div class="flex items-center text-sm text-gray-300">
+					<svg class="w-5 h-5 inline-block mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+					<span class="font-medium">Completed</span>
+				</div>
+				<span class="text-lg font-bold text-green-400">100.0%%</span>
+			</div>
+
+			<div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+				<div class="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full shadow-lg" style="width: 100%%"></div>
+			</div>
+
+			<div class="grid grid-cols-2 gap-4 text-sm">
+				<div>
+					<div class="text-gray-500 text-xs">Files Processed</div>
+					<div class="text-gray-200 font-medium">%d</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Average Speed</div>
+					<div class="text-gray-200 font-medium">%.1f files/sec</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Total Time</div>
+					<div class="text-gray-200 font-medium">%s</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Status</div>
+					<div class="text-green-400 font-medium">✓ Complete</div>
+				</div>
+			</div>
+
+			<div class="pt-2 border-t border-gray-700 text-center text-sm text-gray-400">
+				Scan completed successfully. Refresh page to start a new scan.
+			</div>
+		</div>
+		`,
+			snapshot.ProcessedFiles,
+			filesPerSec,
+			stats.FormatDuration(elapsed),
+		)
+
+		// Set HX-Trigger header to stop polling
+		w.Header().Set("HX-Trigger", "scanCompleted")
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(completedHTML))
+		return
+	}
+
 	// Phase icons
 	phaseIcons := map[string]string{
 		"Initializing":             `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>`,

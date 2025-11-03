@@ -49,6 +49,19 @@
         </div>
     </div>
 
+    <!-- JavaScript to handle scan completion -->
+    <script>
+        // Listen for the scanCompleted event from HTMX response headers
+        document.body.addEventListener('scanCompleted', function() {
+            // Stop the polling by removing the hx-trigger attribute
+            const progressContainer = document.getElementById('progress-container');
+            if (progressContainer) {
+                // Remove the polling trigger to stop updates
+                progressContainer.setAttribute('hx-trigger', '');
+            }
+        });
+    </script>
+
     <!-- Statistics Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <!-- Total Files -->
