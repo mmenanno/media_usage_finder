@@ -87,7 +87,8 @@ const (
 // Path translation cache constants
 const (
 	// PathCacheSize is the maximum number of cached path translations
-	PathCacheSize = 10000
+	// Increased from 10k to 50k for better performance with large datasets (90TB+)
+	PathCacheSize = 50000
 
 	// PathCacheCleanupThreshold is the percentage at which to trigger cleanup
 	PathCacheCleanupThreshold = 0.9

@@ -239,11 +239,11 @@ func (c *Config) ClearPathCache() {
 }
 
 // GetPathCacheStats returns cache statistics for monitoring
-func (c *Config) GetPathCacheStats() (hits, total uint64, hitRate float64) {
+func (c *Config) GetPathCacheStats() (hits, total, evictions uint64, size int, hitRate float64) {
 	if c.pathCache != nil {
 		return c.pathCache.Stats()
 	}
-	return 0, 0, 0
+	return 0, 0, 0, 0, 0
 }
 
 // translatePath performs the actual path translation

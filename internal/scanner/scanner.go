@@ -287,6 +287,9 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 		return fmt.Errorf("failed to update orphaned status: %w", err)
 	}
 
+	// Log path cache performance statistics
+	s.logCacheStats()
+
 	s.updatePhase(scanID, "Completed")
 	s.progress.Log("Scan completed successfully!")
 
@@ -390,6 +393,9 @@ func (s *Scanner) runScanWithResume(ctx context.Context, scanID int64, increment
 	if err := s.db.UpdateOrphanedStatus(); err != nil {
 		return fmt.Errorf("failed to update orphaned status: %w", err)
 	}
+
+	// Log path cache performance statistics
+	s.logCacheStats()
 
 	s.updatePhase(scanID, "Completed")
 	s.progress.Log("Scan completed successfully!")
@@ -712,6 +718,17 @@ func (s *Scanner) updatePhase(scanID int64, phase string) {
 	}
 	if err := s.db.UpdateScanPhase(scanID, phase); err != nil {
 		log.Printf("WARNING: Failed to update scan phase in database: %v", err)
+	}
+}
+
+// logCacheStats logs path cache performance statistics
+func (s *Scanner) logCacheStats() {
+	hits, total, evictions, size, hitRate := s.config.GetPathCacheStats()
+	log.Printf("Path cache stats - Size: %d/%d, Hits: %d/%d (%.2f%%), Evictions: %d",
+		size, constants.PathCacheSize, hits, total, hitRate*100, evictions)
+	if s.progress != nil {
+		s.progress.Log(fmt.Sprintf("Path cache: %d entries, %.1f%% hit rate, %d evictions",
+			size, hitRate*100, evictions))
 	}
 }
 
