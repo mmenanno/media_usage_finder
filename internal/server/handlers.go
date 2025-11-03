@@ -680,6 +680,7 @@ func (s *Server) HandleUpdateSingleService(w http.ResponseWriter, r *http.Reques
 		"sonarr":      true,
 		"radarr":      true,
 		"qbittorrent": true,
+		"stash":       true,
 	}
 	if !validServices[serviceName] {
 		respondError(w, http.StatusBadRequest, "Invalid service name", "invalid_service")
@@ -792,6 +793,7 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 		"Checking Sonarr":          `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>`,
 		"Checking Radarr":          `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>`,
 		"Checking qBittorrent":     `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>`,
+		"Checking Stash":           `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path></svg>`,
 		"Updating orphaned status": `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>`,
 		"Completed":                `<svg class="w-5 h-5 inline-block mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
 	}
@@ -801,7 +803,71 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 		icon = phaseIcons["Initializing"]
 	}
 
-	html := fmt.Sprintf(`
+	// Check if we're in a service update phase (starts with "Checking" or "Updating")
+	isServicePhase := strings.HasPrefix(snapshot.CurrentPhase, "Checking ") || strings.HasPrefix(snapshot.CurrentPhase, "Updating ")
+
+	var html string
+	if isServicePhase {
+		// Service update phase: show indeterminate progress with pulsing animation
+		html = fmt.Sprintf(`
+		<div class="space-y-3">
+			<div class="flex items-center justify-between">
+				<div class="flex items-center text-sm text-gray-300">
+					%s
+					<span class="font-medium">%s</span>
+				</div>
+				<span class="text-lg font-bold text-purple-400">Querying API...</span>
+			</div>
+
+			<div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+				<div class="bg-gradient-to-r from-purple-500 to-purple-600 h-3 rounded-full shadow-lg animate-pulse"></div>
+			</div>
+
+			<div class="grid grid-cols-2 gap-4 text-sm">
+				<div>
+					<div class="text-gray-500 text-xs">Filesystem Scan</div>
+					<div class="text-gray-200 font-medium">%d files scanned</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Current Phase</div>
+					<div class="text-gray-200 font-medium">Service Update</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Elapsed Time</div>
+					<div class="text-gray-200 font-medium">%s</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Status</div>
+					<div class="text-gray-200 font-medium">In Progress</div>
+				</div>
+			</div>
+
+			<div class="flex justify-end space-x-2 pt-2 border-t border-gray-700">
+				<button
+					hx-post="/api/scan/cancel"
+					hx-swap="none"
+					hx-confirm="Cancel the current scan gracefully? The current service update will complete before stopping."
+					class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm transition cursor-pointer">
+					Cancel Scan
+				</button>
+				<button
+					hx-post="/api/scan/force-stop"
+					hx-swap="none"
+					hx-confirm="Force stop the scan immediately? This may leave the database in an inconsistent state."
+					class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition cursor-pointer">
+					Force Stop
+				</button>
+			</div>
+		</div>
+	`,
+			icon,
+			snapshot.CurrentPhase,
+			snapshot.ProcessedFiles,
+			stats.FormatDuration(elapsed),
+		)
+	} else {
+		// Normal filesystem scanning phase: show percentage and file progress
+		html = fmt.Sprintf(`
 		<div class="space-y-3">
 			<div class="flex items-center justify-between">
 				<div class="flex items-center text-sm text-gray-300">
@@ -852,16 +918,17 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 			</div>
 		</div>
 	`,
-		icon,
-		snapshot.CurrentPhase,
-		snapshot.PercentComplete,
-		snapshot.PercentComplete,
-		snapshot.ProcessedFiles,
-		snapshot.TotalFiles,
-		filesPerSec,
-		stats.FormatDuration(elapsed),
-		stats.FormatDuration(snapshot.ETA),
-	)
+			icon,
+			snapshot.CurrentPhase,
+			snapshot.PercentComplete,
+			snapshot.PercentComplete,
+			snapshot.ProcessedFiles,
+			snapshot.TotalFiles,
+			filesPerSec,
+			stats.FormatDuration(elapsed),
+			stats.FormatDuration(snapshot.ETA),
+		)
+	}
 
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(html))

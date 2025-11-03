@@ -134,13 +134,14 @@
                 console.log('SSE connection error, will retry automatically');
             });
 
-            // Monitor scan status changes to show/hide placeholder
+            // Monitor scan status changes to show/hide placeholder and disable/enable service buttons
             const progressContainer = document.getElementById('progress-container');
             if (progressContainer) {
                 progressContainer.addEventListener('htmx:afterSwap', function() {
                     const scanningText = progressContainer.textContent;
                     const isScanning = scanningText.includes('Scanning') || scanningText.includes('Checking');
 
+                    // Update placeholder
                     if (isScanning && placeholder && placeholder.parentNode) {
                         // Scan started, ensure placeholder shows connecting message
                         placeholder.textContent = 'Connecting to scan logs...';
@@ -150,6 +151,20 @@
                         placeholder.textContent = 'Waiting for scan activity...';
                         placeholder.className = 'text-gray-500';
                     }
+
+                    // Update service button states
+                    const serviceButtons = document.querySelectorAll('[hx-post*="/api/scan/update-service"], [hx-post="/api/scan/update-services"], [hx-post="/api/scan/recalculate-orphaned"]');
+                    serviceButtons.forEach(button => {
+                        if (isScanning) {
+                            button.disabled = true;
+                            button.classList.add('opacity-50', 'cursor-not-allowed');
+                            button.classList.remove('cursor-pointer');
+                        } else {
+                            button.disabled = false;
+                            button.classList.remove('opacity-50', 'cursor-not-allowed');
+                            button.classList.add('cursor-pointer');
+                        }
+                    });
                 });
             }
         }
@@ -166,14 +181,16 @@
             <button
                 hx-post="/api/scan/update-services"
                 hx-swap="none"
-                class="p-4 bg-purple-600 hover:bg-purple-700 rounded transition text-center cursor-pointer">
+                {{if .HasActiveScan}}disabled{{end}}
+                class="p-4 bg-purple-600 hover:bg-purple-700 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
                 <div class="text-lg font-medium">Update All Services</div>
                 <div class="text-sm text-purple-200 mt-1">Check all services and recalculate orphaned status</div>
             </button>
             <button
                 hx-post="/api/scan/recalculate-orphaned"
                 hx-swap="none"
-                class="p-4 bg-orange-600 hover:bg-orange-700 rounded transition text-center cursor-pointer">
+                {{if .HasActiveScan}}disabled{{end}}
+                class="p-4 bg-orange-600 hover:bg-orange-700 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
                 <div class="text-lg font-medium">Recalculate Orphaned</div>
                 <div class="text-sm text-orange-200 mt-1">Update orphaned status without checking services</div>
             </button>
@@ -184,35 +201,40 @@
             <button
                 hx-post="/api/scan/update-service?service=plex"
                 hx-swap="none"
-                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer">
+                {{if .HasActiveScan}}disabled{{end}}
+                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
                 <div class="text-lg font-medium">Update Plex</div>
                 <div class="text-sm text-gray-400 mt-1">Check Plex only</div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=sonarr"
                 hx-swap="none"
-                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer">
+                {{if .HasActiveScan}}disabled{{end}}
+                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
                 <div class="text-lg font-medium">Update Sonarr</div>
                 <div class="text-sm text-gray-400 mt-1">Check Sonarr only</div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=radarr"
                 hx-swap="none"
-                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer">
+                {{if .HasActiveScan}}disabled{{end}}
+                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
                 <div class="text-lg font-medium">Update Radarr</div>
                 <div class="text-sm text-gray-400 mt-1">Check Radarr only</div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=qbittorrent"
                 hx-swap="none"
-                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer">
+                {{if .HasActiveScan}}disabled{{end}}
+                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
                 <div class="text-lg font-medium">Update qBittorrent</div>
                 <div class="text-sm text-gray-400 mt-1">Check qBittorrent only</div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=stash"
                 hx-swap="none"
-                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer">
+                {{if .HasActiveScan}}disabled{{end}}
+                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
                 <div class="text-lg font-medium">Update Stash</div>
                 <div class="text-sm text-gray-400 mt-1">Check Stash only</div>
             </button>

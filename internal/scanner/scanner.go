@@ -20,7 +20,8 @@ type Scanner struct {
 	config         *config.Config
 	progress       *Progress
 	cancel         context.CancelFunc
-	onScanComplete func() // Callback when scan completes
+	scanCtx        context.Context     // Current scan context for cancellation
+	onScanComplete func()              // Callback when scan completes
 }
 
 // NewScanner creates a new scanner
@@ -224,6 +225,9 @@ func (s *Scanner) ResumeScan(ctx context.Context) error {
 
 // runScan performs the actual scanning work
 func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) error {
+	// Store scan context for service updates to respect cancellation
+	s.scanCtx = ctx
+
 	// Phase 1: Count files
 	s.updatePhase(scanID, "Counting files")
 	s.progress.Log("Counting files...")
@@ -298,6 +302,9 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 
 // runScanWithResume performs scanning work, optionally resuming from a checkpoint
 func (s *Scanner) runScanWithResume(ctx context.Context, scanID int64, incremental bool, resumeFromPath *string) error {
+	// Store scan context for service updates to respect cancellation
+	s.scanCtx = ctx
+
 	// Phase 1: Count files
 	s.updatePhase(scanID, "Counting files")
 	if resumeFromPath != nil {
@@ -685,7 +692,13 @@ func (s *Scanner) updateStashUsage() error {
 // updateServiceUsageWithTimeout is a generic helper to update service usage with timeout handling
 // This eliminates duplication across all service update methods
 func (s *Scanner) updateServiceUsageWithTimeout(serviceName string, getFiles func() ([]serviceFile, error)) error {
-	ctx, cancel := context.WithTimeout(context.Background(), s.config.APITimeout*constants.MaxAPITimeoutMultiplier)
+	// Use scan context if available (for cancellation during full scans), otherwise use Background (for manual updates)
+	baseCtx := s.scanCtx
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
+
+	ctx, cancel := context.WithTimeout(baseCtx, s.config.APITimeout*constants.MaxAPITimeoutMultiplier)
 	defer cancel()
 
 	resultChan := make(chan error, 1)
@@ -700,6 +713,10 @@ func (s *Scanner) updateServiceUsageWithTimeout(serviceName string, getFiles fun
 
 	select {
 	case <-ctx.Done():
+		// Check if cancellation was due to scan cancellation or timeout
+		if baseCtx.Err() == context.Canceled {
+			return fmt.Errorf("%s update cancelled", serviceName)
+		}
 		return fmt.Errorf("%s request timed out after %v", serviceName, s.config.APITimeout*constants.MaxAPITimeoutMultiplier)
 	case err := <-resultChan:
 		return err
