@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS scans (
 	status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed', 'interrupted')),
 	files_scanned INTEGER NOT NULL DEFAULT 0,
 	errors TEXT,
-	scan_type TEXT NOT NULL DEFAULT 'full' CHECK(scan_type IN ('full', 'incremental')),
+	scan_type TEXT NOT NULL DEFAULT 'full' CHECK(scan_type IN ('full', 'incremental', 'disk_location')),
 	current_phase TEXT,
 	last_processed_path TEXT,
 	resume_from_scan_id INTEGER,
@@ -281,4 +281,38 @@ CREATE INDEX IF NOT EXISTS idx_files_needs_hash ON files(hash_calculated, size) 
 
 -- Create composite index for cross-disk duplicate detection (hash + device_id)
 CREATE INDEX IF NOT EXISTS idx_files_hash_device ON files(file_hash, device_id) WHERE file_hash IS NOT NULL;
+`
+
+// Migration to add 'disk_location' to scans table CHECK constraint
+const migrateAddDiskLocationToScanType = `
+-- Create new scans table with updated CHECK constraint
+CREATE TABLE IF NOT EXISTS scans_new (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	started_at INTEGER NOT NULL,
+	completed_at INTEGER,
+	status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed', 'interrupted')),
+	files_scanned INTEGER NOT NULL DEFAULT 0,
+	errors TEXT,
+	scan_type TEXT NOT NULL DEFAULT 'full' CHECK(scan_type IN ('full', 'incremental', 'disk_location')),
+	current_phase TEXT,
+	last_processed_path TEXT,
+	resume_from_scan_id INTEGER,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (resume_from_scan_id) REFERENCES scans(id)
+);
+
+-- Copy data from old table
+INSERT INTO scans_new SELECT * FROM scans;
+
+-- Drop old table and indexes
+DROP INDEX IF EXISTS idx_scans_status;
+DROP INDEX IF EXISTS idx_scans_started_at;
+DROP TABLE scans;
+
+-- Rename new table
+ALTER TABLE scans_new RENAME TO scans;
+
+-- Recreate indexes
+CREATE INDEX idx_scans_status ON scans(status);
+CREATE INDEX idx_scans_started_at ON scans(started_at);
 `

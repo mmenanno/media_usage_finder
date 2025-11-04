@@ -1042,12 +1042,22 @@ func (db *DB) GetFileExtensions(orphanedOnly bool, service string) ([]string, er
 }
 
 // ListFiles retrieves files with filtering and pagination
-func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode string, hardlinksOnly bool, extensions []string, limit, offset int, orderBy, direction string) ([]*File, int, error) {
+func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode string, hardlinksOnly bool, extensions []string, deviceIDs []int64, limit, offset int, orderBy, direction string) ([]*File, int, error) {
 	var conditions []string
 	args := []interface{}{}
 
 	if orphanedOnly {
 		conditions = append(conditions, "f.is_orphaned = 1")
+	}
+
+	// Filter by device IDs (for disk-based filtering)
+	if len(deviceIDs) > 0 {
+		placeholders := make([]string, len(deviceIDs))
+		for i, deviceID := range deviceIDs {
+			placeholders[i] = "?"
+			args = append(args, deviceID)
+		}
+		conditions = append(conditions, fmt.Sprintf("f.device_id IN (%s)", strings.Join(placeholders, ", ")))
 	}
 
 	// Multi-service filtering with three modes

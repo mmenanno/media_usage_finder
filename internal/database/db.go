@@ -229,6 +229,44 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 7: Update scans table CHECK constraint to include 'disk_location'
+	// Test if migration is needed by trying to insert a test record with scan_type='disk_location'
+	needsScanTypeMigration := false
+
+	// Start a transaction for the test
+	tx2, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction for scan_type migration check: %w", err)
+	}
+	defer tx2.Rollback()
+
+	// Try to insert a test record with scan_type='disk_location'
+	_, err = tx2.Exec(`
+		INSERT INTO scans (started_at, status, scan_type)
+		VALUES (?, 'completed', 'disk_location')
+	`, time.Now().Unix())
+
+	if err != nil {
+		// Check if the error is a CHECK constraint failure
+		if strings.Contains(err.Error(), "CHECK constraint failed") {
+			needsScanTypeMigration = true
+		}
+	} else {
+		// If insert succeeded, delete the test record
+		_, _ = tx2.Exec(`DELETE FROM scans WHERE scan_type = 'disk_location'`)
+	}
+
+	// Rollback the test transaction
+	tx2.Rollback()
+
+	// Run migration if needed
+	if needsScanTypeMigration {
+		_, err = db.conn.Exec(migrateAddDiskLocationToScanType)
+		if err != nil {
+			return fmt.Errorf("failed to update scans table CHECK constraint: %w", err)
+		}
+	}
+
 	return nil
 }
 

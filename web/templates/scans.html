@@ -28,7 +28,15 @@
                     <tr class="hover:bg-gray-750 transition">
                         <td class="px-6 py-4 text-sm text-gray-400">#{{.ID}}</td>
                         <td class="px-6 py-4 text-sm">
-                            <span class="px-2 py-1 bg-gray-600 rounded text-xs capitalize">{{.ScanType}}</span>
+                            {{if eq .ScanType "full"}}
+                                <span class="px-2 py-1 bg-blue-600 rounded text-xs">Full Scan</span>
+                            {{else if eq .ScanType "incremental"}}
+                                <span class="px-2 py-1 bg-green-600 rounded text-xs">Incremental</span>
+                            {{else if eq .ScanType "disk_location"}}
+                                <span class="px-2 py-1 bg-purple-600 rounded text-xs">Disk Location</span>
+                            {{else}}
+                                <span class="px-2 py-1 bg-gray-600 rounded text-xs capitalize">{{.ScanType}}</span>
+                            {{end}}
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-300">
                             {{.StartedAt.Format "2006-01-02 15:04:05"}}

@@ -261,6 +261,26 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Parse device names filter and convert to device IDs
+	var deviceIDs []int64
+	var deviceNames []string
+	if devicesParam := r.URL.Query().Get("devices"); devicesParam != "" && s.diskDetector != nil {
+		for _, devName := range strings.Split(devicesParam, ",") {
+			devName = strings.TrimSpace(devName)
+			if devName == "" {
+				continue
+			}
+			deviceNames = append(deviceNames, devName)
+			// Find the disk by name and get its device ID
+			for _, disk := range s.diskDetector.GetAllDisks() {
+				if disk.Name == devName {
+					deviceIDs = append(deviceIDs, disk.DeviceID)
+					break
+				}
+			}
+		}
+	}
+
 	var files []*database.File
 	var total int
 	var err error
@@ -268,7 +288,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	if search != "" {
 		files, total, err = s.db.SearchFiles(search, limit, offset)
 	} else {
-		files, total, err = s.db.ListFiles(orphanedOnly, services, serviceFilterMode, hardlinksOnly, extensions, limit, offset, orderBy, direction)
+		files, total, err = s.db.ListFiles(orphanedOnly, services, serviceFilterMode, hardlinksOnly, extensions, deviceIDs, limit, offset, orderBy, direction)
 	}
 
 	if err != nil {
@@ -303,6 +323,12 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		legacyService = services[0]
 	}
 
+	// Get available disks for filter dropdown
+	var availableDisks []*disk.DiskInfo
+	if s.diskDetector != nil {
+		availableDisks = s.diskDetector.GetAllDisks()
+	}
+
 	data := FilesData{
 		Files:             filesWithUsage,
 		Total:             total,
@@ -319,6 +345,8 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		OrderBy:           orderBy,
 		Direction:         direction,
 		Extensions:        extensions,
+		Devices:           deviceNames,
+		AvailableDisks:    availableDisks,
 		DiskResolver:      s.diskResolver,
 		HasDiskLocations:  len(s.config.Disks) > 0,
 	}
@@ -1640,36 +1668,233 @@ func (s *Server) HandleScanDiskLocations(w http.ResponseWriter, r *http.Request)
 	respondSuccess(w, "Disk location scan started", nil)
 }
 
-// HandleDiskScanProgress streams disk scan progress via SSE
-func (s *Server) HandleDiskScanProgress(w http.ResponseWriter, r *http.Request) {
-	// Set SSE headers
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	// Get disk scanner progress (if available)
-	// For now, this is a placeholder - we'll need to add progress tracking to disk scanner
-	// Similar to how the main scanner has progress tracking
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+// HandleDiskScanProgressHTML returns HTML for disk scan progress (HTMX endpoint)
+func (s *Server) HandleDiskScanProgressHTML(w http.ResponseWriter, r *http.Request) {
+	progress := s.scanner.GetDiskScanProgress()
+	if progress == nil {
+		w.Write([]byte(`<div class="text-gray-400">No disk scan running</div>`))
 		return
 	}
 
-	// Send initial message
-	fmt.Fprintf(w, "data: {\"status\":\"checking\",\"message\":\"Checking disk scan status...\"}\n\n")
+	snapshot := progress.GetSnapshot()
+
+	// Calculate files per second
+	elapsed := time.Since(snapshot.StartTime)
+	var filesPerSec float64
+	if elapsed.Seconds() > 0 && snapshot.ProcessedFiles > 0 {
+		filesPerSec = float64(snapshot.ProcessedFiles) / elapsed.Seconds()
+	}
+
+	// Check if scan is completed - show final summary without polling
+	if snapshot.CurrentPhase == "Completed" || snapshot.CurrentPhase == "Failed" {
+		status := "Completed"
+		statusColor := "green"
+		statusIcon := `<svg class="w-5 h-5 inline-block mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
+
+		if snapshot.CurrentPhase == "Failed" {
+			status = "Failed"
+			statusColor = "red"
+			statusIcon = `<svg class="w-5 h-5 inline-block mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
+		}
+
+		completedHTML := fmt.Sprintf(`
+		<div class="space-y-3">
+			<div class="flex items-center justify-between">
+				<div class="flex items-center text-sm text-gray-300">
+					%s
+					<span class="font-medium">%s</span>
+				</div>
+				<span class="text-lg font-bold text-%s-400">✓</span>
+			</div>
+
+			<div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+				<div class="bg-gradient-to-r from-%s-500 to-%s-600 h-3 rounded-full shadow-lg" style="width: 100%%"></div>
+			</div>
+
+			<div class="grid grid-cols-2 gap-4 text-sm">
+				<div>
+					<div class="text-gray-500 text-xs">Files Processed</div>
+					<div class="text-gray-200 font-medium">%d</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Average Speed</div>
+					<div class="text-gray-200 font-medium">%.1f files/sec</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Total Time</div>
+					<div class="text-gray-200 font-medium">%s</div>
+				</div>
+				<div>
+					<div class="text-gray-500 text-xs">Status</div>
+					<div class="text-%s-400 font-medium">%s</div>
+				</div>
+			</div>
+		</div>
+		`,
+			statusIcon,
+			status,
+			statusColor,
+			statusColor,
+			statusColor,
+			snapshot.ProcessedFiles,
+			filesPerSec,
+			stats.FormatDuration(elapsed),
+			statusColor,
+			status,
+		)
+
+		// Set HX-Trigger header to stop polling
+		w.Header().Set("HX-Trigger", "diskScanCompleted")
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(completedHTML))
+		return
+	}
+
+	// Phase-specific icon
+	phaseIcon := `<svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>`
+
+	// Running scan progress HTML
+	percentDisplay := "Scanning..."
+	if snapshot.TotalFiles > 0 {
+		percentDisplay = fmt.Sprintf("%.1f%%", snapshot.PercentComplete)
+	}
+
+	html := fmt.Sprintf(`
+	<div class="space-y-3" hx-get="/api/scan/disk-progress-html" hx-trigger="every 2s" hx-swap="outerHTML">
+		<div class="flex items-center justify-between">
+			<div class="flex items-center text-sm text-gray-300">
+				%s
+				<span class="font-medium">%s</span>
+			</div>
+			<span class="text-lg font-bold text-blue-400">%s</span>
+		</div>
+
+		<div class="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+			<div class="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full shadow-lg transition-all duration-300" style="width: %.1f%%"></div>
+		</div>
+
+		<div class="grid grid-cols-2 gap-4 text-sm">
+			<div>
+				<div class="text-gray-500 text-xs">Files Scanned</div>
+				<div class="text-gray-200 font-medium">%d</div>
+			</div>
+			<div>
+				<div class="text-gray-500 text-xs">Speed</div>
+				<div class="text-gray-200 font-medium">%.1f files/sec</div>
+			</div>
+			<div>
+				<div class="text-gray-500 text-xs">Elapsed</div>
+				<div class="text-gray-200 font-medium">%s</div>
+			</div>
+			<div>
+				<div class="text-gray-500 text-xs">Phase</div>
+				<div class="text-blue-400 font-medium">%s</div>
+			</div>
+		</div>
+	</div>
+	`,
+		phaseIcon,
+		snapshot.CurrentPhase,
+		percentDisplay,
+		snapshot.PercentComplete,
+		snapshot.ProcessedFiles,
+		filesPerSec,
+		stats.FormatDuration(elapsed),
+		snapshot.CurrentPhase,
+	)
+
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(html))
+}
+
+// HandleDiskScanProgress streams disk scan logs via SSE
+func (s *Server) HandleDiskScanProgress(w http.ResponseWriter, r *http.Request) {
+	// Check if scanner exists
+	if s.scanner == nil {
+		log.Printf("ERROR: Scanner not initialized for disk scan SSE logs endpoint")
+		http.Error(w, "Scanner not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if streaming is supported BEFORE writing any headers
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		log.Printf("ERROR: Streaming not supported for disk scan SSE logs endpoint")
+		http.Error(w, "Streaming not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Now it's safe to write headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // Disable buffering for nginx
+
+	// Send initial connection message
+	fmt.Fprintf(w, "data: <div class=\"text-gray-400\">Connected to disk scan log stream</div>\n\n")
 	flusher.Flush()
 
-	// For now, just send a simple status message
-	// TODO: Implement proper progress tracking for disk scanner
-	fmt.Fprintf(w, "data: {\"status\":\"info\",\"message\":\"Disk scan progress tracking will be available in a future update\"}\n\n")
-	flusher.Flush()
+	progress := s.scanner.GetDiskScanProgress()
+	if progress == nil {
+		// No scan running - keep connection open but send status updates
+		fmt.Fprintf(w, "data: <div class=\"text-gray-500\">No disk scan currently running</div>\n\n")
+		flusher.Flush()
 
-	time.Sleep(1 * time.Second)
-	fmt.Fprintf(w, "data: {\"status\":\"done\"}\n\n")
-	flusher.Flush()
+		// Keep connection alive with periodic pings
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			case <-ticker.C:
+				fmt.Fprintf(w, ": keep-alive\n\n")
+				flusher.Flush()
+
+				// Check if a disk scan has started
+				if s.scanner.GetDiskScanProgress() != nil {
+					fmt.Fprintf(w, "data: <div class=\"text-green-400\">Disk scan started, reconnect to see logs</div>\n\n")
+					flusher.Flush()
+					return
+				}
+			}
+		}
+	}
+
+	// Subscribe to log messages
+	logChan := progress.Subscribe()
+	if logChan == nil {
+		fmt.Fprintf(w, "data: <div class=\"text-red-400\">Failed to subscribe to disk scan logs</div>\n\n")
+		flusher.Flush()
+		return
+	}
+	defer progress.Unsubscribe(logChan)
+
+	// Create ticker for keep-alive heartbeat (every 30 seconds to keep connection alive)
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	// Stream log messages
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-ticker.C:
+			// Send keep-alive comment (ignored by SSE clients)
+			fmt.Fprintf(w, ": keep-alive\n\n")
+			flusher.Flush()
+		case msg, ok := <-logChan:
+			if !ok {
+				// Channel closed, scan finished
+				fmt.Fprintf(w, "data: <div class=\"text-green-400\">Disk scan completed</div>\n\n")
+				flusher.Flush()
+				return
+			}
+			fmt.Fprintf(w, "data: <div class=\"text-gray-300\">%s</div>\n\n", msg)
+			flusher.Flush()
+		}
+	}
 }
 
 // HandleGetFileDiskLocations returns all disk locations for a specific file
@@ -2369,7 +2594,7 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 
 		first := true
 		for {
-			files, _, err := s.db.ListFiles(orphanedOnly, nil, "any", false, nil, batchSize, offset, "path", "asc")
+			files, _, err := s.db.ListFiles(orphanedOnly, nil, "any", false, nil, nil, batchSize, offset, "path", "asc")
 			if err != nil {
 				if offset == 0 {
 					http.Error(w, "Failed to list files", http.StatusInternalServerError)
@@ -2422,7 +2647,7 @@ func (s *Server) HandleExport(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for {
-			files, _, err := s.db.ListFiles(orphanedOnly, nil, "any", false, nil, batchSize, offset, "path", "asc")
+			files, _, err := s.db.ListFiles(orphanedOnly, nil, "any", false, nil, nil, batchSize, offset, "path", "asc")
 			if err != nil {
 				if offset == 0 {
 					http.Error(w, "Failed to list files", http.StatusInternalServerError)
@@ -2492,7 +2717,7 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 
 	// Bulk orphaned files deletion
 	if orphaned {
-		files, _, err := s.db.ListFiles(true, nil, "any", false, nil, constants.MaxExportFiles, 0, "path", "asc")
+		files, _, err := s.db.ListFiles(true, nil, "any", false, nil, nil, constants.MaxExportFiles, 0, "path", "asc")
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to list orphaned files", "list_failed")
 			return

@@ -123,6 +123,8 @@ type FilesData struct {
 	OrderBy           string
 	Direction         string
 	Extensions        []string
+	Devices           []string             // Selected device names for filtering
+	AvailableDisks    []*disk.DiskInfo     // Available disks for filter dropdown
 	DiskResolver      *disk.DeviceResolver // For resolving device IDs to friendly names
 	HasDiskLocations  bool                 // True if disk location tracking is enabled
 }

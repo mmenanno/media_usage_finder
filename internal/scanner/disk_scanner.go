@@ -75,9 +75,15 @@ func (ds *DiskScanner) ScanDiskLocations() error {
 	}
 
 	// Scan each disk
-	for _, diskCfg := range ds.cfg.Disks {
+	totalDisks := len(ds.cfg.Disks)
+	for i, diskCfg := range ds.cfg.Disks {
+		// Update phase for current disk
+		phase := fmt.Sprintf("Scanning Disk %d of %d: %s", i+1, totalDisks, diskCfg.Name)
+		ds.progress.SetPhase(phase)
+		ds.progress.Log(phase)
+
 		if err := ds.scanDisk(diskCfg, fileChan); err != nil {
-			fmt.Printf("Warning: Failed to scan disk %s: %v\n", diskCfg.Name, err)
+			ds.progress.Log(fmt.Sprintf("Warning: Failed to scan disk %s: %v", diskCfg.Name, err))
 			// Continue with other disks
 		}
 	}
@@ -86,8 +92,8 @@ func (ds *DiskScanner) ScanDiskLocations() error {
 	close(fileChan)
 	wg.Wait()
 
-	fmt.Printf("Disk scanning complete: %d files scanned, %d disk locations added\n",
-		ds.filesScanned, ds.locationsAdded)
+	ds.progress.Log(fmt.Sprintf("Disk scanning complete: %d files scanned, %d disk locations added",
+		ds.filesScanned, ds.locationsAdded))
 
 	return nil
 }
@@ -105,8 +111,6 @@ type diskFileInfo struct {
 
 // scanDisk scans a single disk and sends files to the worker channel
 func (ds *DiskScanner) scanDisk(diskCfg config.DiskConfig, fileChan chan<- diskFileInfo) error {
-	fmt.Printf("Scanning disk: %s (%s)\n", diskCfg.Name, diskCfg.MountPath)
-
 	// Get disk device ID
 	var stat syscall.Stat_t
 	if err := syscall.Stat(diskCfg.MountPath, &stat); err != nil {
@@ -124,8 +128,7 @@ func (ds *DiskScanner) scanDisk(diskCfg config.DiskConfig, fileChan chan<- diskF
 		}
 
 		if err != nil {
-			// Log error but continue
-			fmt.Printf("Warning: Error accessing %s: %v\n", path, err)
+			// Log error but continue (avoid spamming logs with every error)
 			return nil
 		}
 
@@ -137,14 +140,14 @@ func (ds *DiskScanner) scanDisk(diskCfg config.DiskConfig, fileChan chan<- diskF
 		// Get file info
 		info, err := d.Info()
 		if err != nil {
-			fmt.Printf("Warning: Failed to get info for %s: %v\n", path, err)
+			// Skip files we can't stat
 			return nil
 		}
 
 		// Get file stats for inode
 		var fileStat syscall.Stat_t
 		if err := syscall.Stat(path, &fileStat); err != nil {
-			fmt.Printf("Warning: Failed to stat %s: %v\n", path, err)
+			// Skip files we can't stat
 			return nil
 		}
 
@@ -206,7 +209,7 @@ func (ds *DiskScanner) worker(wg *sync.WaitGroup, fileChan <-chan diskFileInfo) 
 		// Flush batch when it reaches size
 		if len(batch) >= 100 {
 			if err := ds.db.BatchUpsertFileDiskLocations(ds.ctx, batch); err != nil {
-				fmt.Printf("Warning: Failed to insert batch: %v\n", err)
+				ds.progress.Log(fmt.Sprintf("Warning: Failed to insert batch: %v", err))
 			} else {
 				ds.mu.Lock()
 				ds.locationsAdded += int64(len(batch))
@@ -219,7 +222,7 @@ func (ds *DiskScanner) worker(wg *sync.WaitGroup, fileChan <-chan diskFileInfo) 
 	// Flush remaining batch
 	if len(batch) > 0 {
 		if err := ds.db.BatchUpsertFileDiskLocations(ds.ctx, batch); err != nil {
-			fmt.Printf("Warning: Failed to insert final batch: %v\n", err)
+			ds.progress.Log(fmt.Sprintf("Warning: Failed to insert final batch: %v", err))
 		} else {
 			ds.mu.Lock()
 			ds.locationsAdded += int64(len(batch))
@@ -230,7 +233,7 @@ func (ds *DiskScanner) worker(wg *sync.WaitGroup, fileChan <-chan diskFileInfo) 
 
 // loadFileCache loads all file paths and IDs into memory for fast lookups
 func (ds *DiskScanner) loadFileCache() error {
-	fmt.Println("Loading file cache...")
+	ds.progress.Log("Loading file cache...")
 
 	// Query all file paths and IDs
 	query := `SELECT id, path FROM files`
@@ -255,7 +258,7 @@ func (ds *DiskScanner) loadFileCache() error {
 	}
 
 	ds.fileCacheSize = count
-	fmt.Printf("Loaded %d files into cache\n", count)
+	ds.progress.Log(fmt.Sprintf("Loaded %d files into cache", count))
 
 	return rows.Err()
 }

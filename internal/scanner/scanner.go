@@ -17,12 +17,13 @@ import (
 
 // Scanner coordinates the entire scanning process
 type Scanner struct {
-	db             *database.DB
-	config         *config.Config
-	progress       *Progress
-	cancel         context.CancelFunc
-	scanCtx        context.Context     // Current scan context for cancellation
-	onScanComplete func()              // Callback when scan completes
+	db                *database.DB
+	config            *config.Config
+	progress          *Progress
+	diskScanProgress  *Progress           // Progress tracker for disk location scanning
+	cancel            context.CancelFunc
+	scanCtx           context.Context     // Current scan context for cancellation
+	onScanComplete    func()              // Callback when scan completes
 }
 
 // NewScanner creates a new scanner
@@ -873,6 +874,11 @@ func (s *Scanner) GetProgress() *Progress {
 	return s.progress
 }
 
+// GetDiskScanProgress returns the current disk scan progress tracker
+func (s *Scanner) GetDiskScanProgress() *Progress {
+	return s.diskScanProgress
+}
+
 // updatePhase updates both the progress phase and the database
 func (s *Scanner) updatePhase(scanID int64, phase string) {
 	if s.progress != nil {
@@ -1016,23 +1022,74 @@ func (s *Scanner) ScanDiskLocations(detector *disk.Detector) error {
 		return fmt.Errorf("no disks configured - disk scanning not available")
 	}
 
-	// Create temporary progress tracker for disk scanning
-	tempProgress := NewProgress()
-	tempProgress.SetPhase("Scanning Disk Locations")
+	// Check if there's already a running scan
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		return fmt.Errorf("failed to check for running scan: %w", err)
+	}
+
+	if currentScan != nil {
+		return fmt.Errorf("cannot start disk scan while another scan is running (ID: %d)", currentScan.ID)
+	}
+
+	// Create scan record
+	scan, err := s.db.CreateScan("disk_location")
+	if err != nil {
+		return fmt.Errorf("failed to create disk scan record: %w", err)
+	}
+
+	// Initialize progress tracker
+	s.diskScanProgress = NewProgress()
+	s.diskScanProgress.SetPhase("Initializing")
+	s.diskScanProgress.Log("Starting disk location scan...")
 
 	// Create disk scanner
-	diskScanner := NewDiskScanner(context.Background(), s.config, s.db, detector, tempProgress)
+	diskScanner := NewDiskScanner(context.Background(), s.config, s.db, detector, s.diskScanProgress)
+
+	// Update phase to loading cache
+	s.diskScanProgress.SetPhase("Loading File Cache")
+	if err := s.db.UpdateScanPhase(scan.ID, "Loading File Cache"); err != nil {
+		log.Printf("Warning: failed to update scan phase: %v", err)
+	}
 
 	// Run disk scan
-	err := diskScanner.ScanDiskLocations()
+	err = diskScanner.ScanDiskLocations()
+
+	// Determine final status
+	status := "completed"
+	if err != nil {
+		status = "failed"
+		s.diskScanProgress.SetPhase("Failed")
+		s.diskScanProgress.Log(fmt.Sprintf("Disk scan failed: %v", err))
+	} else {
+		s.diskScanProgress.SetPhase("Completed")
+		s.diskScanProgress.Log("Disk location scanning completed successfully")
+	}
+
+	// Update scan record with final status
+	var errorMsg *string
+	if err != nil {
+		msg := err.Error()
+		errorMsg = &msg
+	}
+	if updateErr := s.db.UpdateScan(scan.ID, status, diskScanner.filesScanned, errorMsg); updateErr != nil {
+		log.Printf("Warning: failed to update scan record: %v", updateErr)
+	}
 
 	// Stop progress
-	tempProgress.Stop()
+	s.diskScanProgress.Stop()
+
+	// Call onScanComplete callback to invalidate stats cache
+	if s.onScanComplete != nil {
+		s.onScanComplete()
+	}
+
+	// Clear progress reference
+	s.diskScanProgress = nil
 
 	if err != nil {
 		return fmt.Errorf("disk scanning failed: %w", err)
 	}
 
-	fmt.Println("Disk location scanning completed successfully")
 	return nil
 }
