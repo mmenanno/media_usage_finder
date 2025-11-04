@@ -1492,6 +1492,25 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	s.config.DuplicateDetection.HashMode = r.FormValue("hash_mode")
+	if s.config.DuplicateDetection.HashMode == "" {
+		s.config.DuplicateDetection.HashMode = "quick_manual"
+	}
+
+	minFileSize := r.FormValue("min_file_size")
+	if minFileSize != "" {
+		if size, err := strconv.ParseInt(minFileSize, 10, 64); err == nil && size >= 0 {
+			s.config.DuplicateDetection.MinFileSize = size * 1024 * 1024 // Convert MB to bytes
+		}
+	}
+
+	maxHashRate := r.FormValue("max_hash_rate")
+	if maxHashRate != "" {
+		if rate, err := strconv.Atoi(maxHashRate); err == nil && rate >= 0 {
+			s.config.DuplicateDetection.MaxHashRateMB = rate
+		}
+	}
+
 	// Parse consolidation settings
 	s.config.DuplicateConsolidation.Enabled = r.FormValue("consolidation_enabled") == "true"
 	s.config.DuplicateConsolidation.DryRun = r.FormValue("dry_run") == "true"
