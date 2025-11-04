@@ -574,9 +574,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const diskRow = document.createElement('div');
         diskRow.className = 'disk-row flex gap-2 items-center bg-gray-700 p-3 rounded';
         diskRow.innerHTML = `
-            <input type="text" name="disk_name_${diskCounter}" placeholder="Disk Name"
+            <input type="text" name="disk_name_${diskCounter}"
+                   value="Disk ${diskCounter + 1}"
+                   placeholder="Disk Name"
                    class="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-blue-500">
-            <input type="text" name="disk_mount_${diskCounter}" placeholder="/disk${diskCounter + 1}"
+            <input type="text" name="disk_mount_${diskCounter}"
+                   value="/disk${diskCounter + 1}"
+                   placeholder="/disk${diskCounter + 1}"
                    class="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-blue-500 font-mono text-sm">
             <button type="button" onclick="this.parentElement.remove()"
                     class="px-3 py-2 bg-red-600 hover:bg-red-700 rounded text-sm transition">Remove</button>
@@ -593,18 +597,49 @@ document.addEventListener('DOMContentLoaded', function() {
         testDiskDetectionBtn.disabled = true;
 
         try {
-            const response = await fetch('/api/disks/detect');
+            // Gather disk configurations from form
+            const formData = new FormData();
+            document.querySelectorAll('.disk-row').forEach((row, index) => {
+                const nameInput = row.querySelector(`input[name^="disk_name_"]`);
+                const mountInput = row.querySelector(`input[name^="disk_mount_"]`);
+                if (nameInput && mountInput && nameInput.value && mountInput.value) {
+                    formData.append(`disk_name_${index}`, nameInput.value);
+                    formData.append(`disk_mount_${index}`, mountInput.value);
+                }
+            });
+
+            const response = await fetch('/api/disks/detect', {
+                method: 'POST',
+                body: formData
+            });
 
             if (!response.ok) {
                 const error = await response.json();
-                throw new Error(error.message || 'Failed to detect disks');
+                throw new Error(error.error || 'Failed to detect disks');
             }
 
             const result = await response.json();
-            alert(`Successfully detected ${result.count} disk(s):\n\n` +
-                  result.disks.map(d => `${d.name}: ${d.mount_path} (${d.used_percent.toFixed(1)}% full)`).join('\n'));
+
+            // Show success toast
+            const diskList = result.disks.map(d =>
+                `${d.name}: ${d.mount_path} (${d.used_percent.toFixed(1)}% full)`
+            ).join('\\n');
+
+            if (window.showToast) {
+                window.showToast(
+                    `Successfully detected ${result.count} disk(s):\\n${diskList}`,
+                    'success'
+                );
+            } else {
+                alert(`Successfully detected ${result.count} disk(s):\\n\\n${diskList}`);
+            }
         } catch (error) {
-            alert('Disk detection failed: ' + error.message);
+            // Show error toast
+            if (window.showToast) {
+                window.showToast('Disk detection failed: ' + error.message, 'error');
+            } else {
+                alert('Disk detection failed: ' + error.message);
+            }
         } finally {
             // Hide loading state
             diskDetectionSpinner.classList.add('hidden');

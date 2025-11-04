@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -1402,6 +1403,82 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Parse duplicate detection settings
+	s.config.DuplicateDetection.Enabled = r.FormValue("duplicate_detection_enabled") == "true"
+	s.config.DuplicateDetection.HashAlgorithm = r.FormValue("hash_algorithm")
+	if s.config.DuplicateDetection.HashAlgorithm == "" {
+		s.config.DuplicateDetection.HashAlgorithm = "sha256"
+	}
+
+	hashWorkers := r.FormValue("hash_workers")
+	if hashWorkers != "" {
+		if workers, err := strconv.Atoi(hashWorkers); err == nil && workers > 0 {
+			s.config.DuplicateDetection.HashWorkers = workers
+		}
+	}
+
+	// Parse consolidation settings
+	s.config.DuplicateConsolidation.Enabled = r.FormValue("consolidation_enabled") == "true"
+	s.config.DuplicateConsolidation.DryRun = r.FormValue("dry_run") == "true"
+	s.config.DuplicateConsolidation.RequireManualApproval = r.FormValue("require_manual_approval") == "true"
+	s.config.DuplicateConsolidation.Strategy = r.FormValue("consolidation_strategy")
+	if s.config.DuplicateConsolidation.Strategy == "" {
+		s.config.DuplicateConsolidation.Strategy = "least_full_disk"
+	}
+
+	// Parse disk configuration
+	var disks []config.DiskConfig
+	diskIndex := 0
+	for {
+		diskName := r.FormValue(fmt.Sprintf("disk_name_%d", diskIndex))
+		diskMount := r.FormValue(fmt.Sprintf("disk_mount_%d", diskIndex))
+
+		if diskName == "" && diskMount == "" {
+			break
+		}
+
+		// Validate
+		if diskName == "" {
+			validationErrors = append(validationErrors, fmt.Sprintf("Disk %d: Name is required", diskIndex+1))
+		}
+		if diskMount == "" {
+			validationErrors = append(validationErrors, fmt.Sprintf("Disk %d: Mount path is required", diskIndex+1))
+		} else {
+			if !filepath.IsAbs(diskMount) {
+				validationErrors = append(validationErrors, fmt.Sprintf("Disk %d: Mount path must be absolute", diskIndex+1))
+			}
+			if strings.Contains(diskMount, "..") {
+				validationErrors = append(validationErrors, fmt.Sprintf("Disk %d: Mount path cannot contain '..'", diskIndex+1))
+			}
+		}
+
+		if diskName != "" && diskMount != "" {
+			disks = append(disks, config.DiskConfig{
+				Name:      strings.TrimSpace(diskName),
+				MountPath: strings.TrimSpace(diskMount),
+			})
+		}
+		diskIndex++
+	}
+
+	// Check for duplicate mount paths
+	mountPaths := make(map[string]bool)
+	for i, disk := range disks {
+		if mountPaths[disk.MountPath] {
+			validationErrors = append(validationErrors, fmt.Sprintf("Disk %d: Duplicate mount path '%s'", i+1, disk.MountPath))
+		}
+		mountPaths[disk.MountPath] = true
+	}
+
+	// Return early if there are validation errors
+	if len(validationErrors) > 0 {
+		s.renderValidationErrors(w, "Configuration Validation Failed", validationErrors)
+		return
+	}
+
+	// Assign parsed disks
+	s.config.Disks = disks
+
 	// Clear path cache after updating mappings
 	s.config.ClearPathCache()
 
@@ -1424,6 +1501,81 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	// Clear and hide the validation-errors div
 	w.Write([]byte(`<script>document.getElementById('validation-errors').classList.add('hidden');</script>`))
+}
+
+// HandleDetectDisks tests disk detection with provided configuration
+func (s *Server) HandleDetectDisks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"Method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse disk configs from form
+	var diskConfigs []config.DiskConfig
+	diskIndex := 0
+	for {
+		diskName := r.FormValue(fmt.Sprintf("disk_name_%d", diskIndex))
+		diskMount := r.FormValue(fmt.Sprintf("disk_mount_%d", diskIndex))
+
+		if diskName == "" && diskMount == "" {
+			break
+		}
+
+		if diskName != "" && diskMount != "" {
+			diskConfigs = append(diskConfigs, config.DiskConfig{
+				Name:      strings.TrimSpace(diskName),
+				MountPath: strings.TrimSpace(diskMount),
+			})
+		}
+		diskIndex++
+	}
+
+	if len(diskConfigs) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, `{"error":"No disk configurations provided"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Create detector and test
+	detector := disk.NewDetector(diskConfigs)
+	if err := detector.DetectDisks(); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		http.Error(w, fmt.Sprintf(`{"error":"Disk detection failed: %s"}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	// Build response
+	disks := detector.GetAllDisks()
+	type diskResponse struct {
+		Name        string  `json:"name"`
+		MountPath   string  `json:"mount_path"`
+		TotalBytes  int64   `json:"total_bytes"`
+		UsedBytes   int64   `json:"used_bytes"`
+		FreeBytes   int64   `json:"free_bytes"`
+		UsedPercent float64 `json:"used_percent"`
+	}
+
+	response := struct {
+		Count int            `json:"count"`
+		Disks []diskResponse `json:"disks"`
+	}{
+		Count: detector.GetDiskCount(),
+		Disks: make([]diskResponse, 0, len(disks)),
+	}
+
+	for _, d := range disks {
+		response.Disks = append(response.Disks, diskResponse{
+			Name:        d.Name,
+			MountPath:   d.MountPath,
+			TotalBytes:  d.TotalBytes,
+			UsedBytes:   d.UsedBytes,
+			FreeBytes:   d.FreeBytes,
+			UsedPercent: d.UsedPercent,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 // getServiceDisplayName returns the properly capitalized display name for a service
