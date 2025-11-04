@@ -15,6 +15,7 @@ type Config struct {
 	DatabasePath      string        `yaml:"database_path"`
 	ScanWorkers       int           `yaml:"scan_workers"`
 	ScanBufferSize    int           `yaml:"scan_buffer_size"`
+	DiskScanWorkers   int           `yaml:"disk_scan_workers"` // Workers for disk location scanning
 	APITimeout        time.Duration `yaml:"api_timeout"`
 	CORSAllowedOrigin string        `yaml:"cors_allowed_origin"`
 	StatsCacheTTL     time.Duration `yaml:"stats_cache_ttl"`
@@ -410,4 +411,27 @@ func validatePathMapping(mapping PathMapping, context string) error {
 	}
 
 	return nil
+}
+
+// TranslateDiskPathToFuse translates a disk-specific path to a FUSE path
+// Example: /disk1/movies/Movie.mkv → /data/movies/Movie.mkv
+// This is used during disk scanning to find the canonical file path for lookup
+func (c *Config) TranslateDiskPathToFuse(diskPath string, diskMountPath string) string {
+	// Strip the disk mount prefix to get the relative path
+	relativePath := strings.TrimPrefix(diskPath, diskMountPath)
+
+	// Remove leading slash if present (will be added back when joining)
+	relativePath = strings.TrimPrefix(relativePath, "/")
+
+	// Use the first scan path as the FUSE prefix
+	// In typical Unraid setups, this is /data
+	fusePrefix := "/data"
+	if len(c.ScanPaths) > 0 {
+		fusePrefix = c.ScanPaths[0]
+	}
+
+	// Combine FUSE prefix with relative path
+	fusePath := filepath.Join(fusePrefix, relativePath)
+
+	return fusePath
 }

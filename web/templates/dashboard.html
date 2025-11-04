@@ -139,10 +139,21 @@
             </div>
             {{end}}
         </div>
-        <div class="text-sm text-gray-400 mt-4">
-            <span class="mr-4"><span class="inline-block w-3 h-3 bg-green-500 rounded mr-1"></span> &lt;80% full</span>
-            <span class="mr-4"><span class="inline-block w-3 h-3 bg-yellow-500 rounded mr-1"></span> 80-90% full</span>
-            <span><span class="inline-block w-3 h-3 bg-red-500 rounded mr-1"></span> &gt;90% full</span>
+        <div class="flex justify-between items-center mt-4">
+            <div class="text-sm text-gray-400">
+                <span class="mr-4"><span class="inline-block w-3 h-3 bg-green-500 rounded mr-1"></span> &lt;80% full</span>
+                <span class="mr-4"><span class="inline-block w-3 h-3 bg-yellow-500 rounded mr-1"></span> 80-90% full</span>
+                <span><span class="inline-block w-3 h-3 bg-red-500 rounded mr-1"></span> &gt;90% full</span>
+            </div>
+            <button
+                hx-post="/api/scan/disk-locations"
+                hx-swap="none"
+                class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition cursor-pointer text-sm">
+                Scan Disk Locations
+            </button>
+        </div>
+        <div class="text-xs text-gray-500 mt-2 text-right">
+            Scans individual disks to track file locations for cross-disk duplicate detection
         </div>
     </div>
     {{else}}

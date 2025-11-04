@@ -16,6 +16,12 @@ scan_workers: 10
 # - Decrease to 50 for systems with limited memory
 scan_buffer_size: 100
 
+# Disk Scan Workers: Number of concurrent workers for disk location scanning
+# - Default: 5 (good for most systems)
+# - Increase to 10-15 for very fast storage
+# - Only used if disks are configured for cross-disk duplicate detection
+disk_scan_workers: 5
+
 # API Timeout: Timeout for external service API calls
 # - Default: 5m (recommended for large libraries)
 # - Note: Actual timeout is 2x this value (10m) to handle pagination/retries

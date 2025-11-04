@@ -11,6 +11,7 @@ import (
 	"github.com/mmenanno/media-usage-finder/internal/config"
 	"github.com/mmenanno/media-usage-finder/internal/constants"
 	"github.com/mmenanno/media-usage-finder/internal/database"
+	"github.com/mmenanno/media-usage-finder/internal/disk"
 	"github.com/mmenanno/media-usage-finder/internal/scanner"
 	"github.com/mmenanno/media-usage-finder/internal/server"
 	"github.com/mmenanno/media-usage-finder/internal/stats"
@@ -100,6 +101,14 @@ orphaned files and optimizes storage through hardlink detection.`,
 	}
 	scanCmd.Flags().BoolP("incremental", "i", false, "Run incremental scan (only changed files)")
 
+	// Disk-scan command
+	diskScanCmd := &cobra.Command{
+		Use:   "disk-scan",
+		Short: "Scan individual disks to populate disk location tracking",
+		RunE:  runDiskScan,
+	}
+	diskScanCmd.Flags().StringP("disk", "d", "", "Scan only a specific disk by name (optional)")
+
 	// Stats command
 	statsCmd := &cobra.Command{
 		Use:   "stats",
@@ -156,7 +165,7 @@ orphaned files and optimizes storage through hardlink detection.`,
 
 	configCmd.AddCommand(configValidateCmd, configShowCmd)
 
-	rootCmd.AddCommand(serveCmd, scanCmd, statsCmd, exportCmd, markRescanCmd, deleteCmd, configCmd)
+	rootCmd.AddCommand(serveCmd, scanCmd, diskScanCmd, statsCmd, exportCmd, markRescanCmd, deleteCmd, configCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -188,6 +197,48 @@ func runScan(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Println("Scan completed successfully")
+	return nil
+}
+
+func runDiskScan(cmd *cobra.Command, args []string) error {
+	diskName, _ := cmd.Flags().GetString("disk")
+
+	// Check if disks are configured
+	if len(cfg.Disks) == 0 {
+		return fmt.Errorf("no disks configured in config.yaml - disk scanning not available")
+	}
+
+	// If specific disk requested, validate it exists
+	if diskName != "" {
+		found := false
+		for _, diskCfg := range cfg.Disks {
+			if diskCfg.Name == diskName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("disk '%s' not found in configuration", diskName)
+		}
+		return fmt.Errorf("scanning specific disks not yet implemented - run without --disk flag to scan all")
+	}
+
+	log.Println("Starting disk location scan...")
+
+	// Create disk detector
+	detector := disk.NewDetector(cfg.Disks)
+	if err := detector.DetectDisks(); err != nil {
+		return fmt.Errorf("failed to detect disks: %w", err)
+	}
+	log.Printf("Detected %d disk(s)", detector.GetDiskCount())
+
+	// Create scanner and run disk scan
+	s := scanner.NewScanner(db, cfg)
+	if err := s.ScanDiskLocations(detector); err != nil {
+		return fmt.Errorf("disk scan failed: %w", err)
+	}
+
+	log.Println("Disk location scan completed successfully")
 	return nil
 }
 

@@ -49,17 +49,20 @@ type ScanProgressResponse struct {
 
 // FileDetailsResponse represents detailed file information
 type FileDetailsResponse struct {
-	ID           int64             `json:"id"`
-	Path         string            `json:"path"`
-	Size         int64             `json:"size"`
-	Inode        int64             `json:"inode"`
-	DeviceID     int64             `json:"device_id"`
-	ModifiedTime int64             `json:"modified_time"`
-	LastVerified int64             `json:"last_verified"`
-	IsOrphaned   bool              `json:"is_orphaned"`
-	CreatedAt    int64             `json:"created_at"`
-	Usage        []*database.Usage `json:"usage"`
-	Hardlinks    []string          `json:"hardlinks,omitempty"`
+	ID            int64                        `json:"id"`
+	Path          string                       `json:"path"`
+	Size          int64                        `json:"size"`
+	Inode         int64                        `json:"inode"`
+	DeviceID      int64                        `json:"device_id"`
+	DeviceName    string                       `json:"device_name,omitempty"`    // Friendly device name (e.g., "Disk 1 (44)")
+	DeviceColor   string                       `json:"device_color,omitempty"`   // Badge color for device
+	ModifiedTime  int64                        `json:"modified_time"`
+	LastVerified  int64                        `json:"last_verified"`
+	IsOrphaned    bool                         `json:"is_orphaned"`
+	CreatedAt     int64                        `json:"created_at"`
+	Usage         []*database.Usage            `json:"usage"`
+	Hardlinks     []string                     `json:"hardlinks,omitempty"`
+	DiskLocations []*database.FileDiskLocation `json:"disk_locations,omitempty"` // Disk-specific locations
 }
 
 // BulkDeleteResponse represents the result of a bulk deletion
@@ -120,6 +123,8 @@ type FilesData struct {
 	OrderBy           string
 	Direction         string
 	Extensions        []string
+	DiskResolver      *disk.DeviceResolver // For resolving device IDs to friendly names
+	HasDiskLocations  bool                 // True if disk location tracking is enabled
 }
 
 // ConfigData represents data for the configuration template
@@ -130,9 +135,11 @@ type ConfigData struct {
 
 // StatsData represents data for the statistics template
 type StatsData struct {
-	Stats *stats.Stats
-	Title string
-	Disks []*disk.DiskInfo
+	Stats                  *stats.Stats
+	Title                  string
+	Disks                  []*disk.DiskInfo
+	CrossDiskDuplicates    int64 // Count of files on multiple disks
+	HasDiskLocations       bool  // True if disk location tracking is enabled
 }
 
 // HardlinksData represents data for the hardlinks template

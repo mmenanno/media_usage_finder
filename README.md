@@ -200,6 +200,25 @@ disks:
   # ... etc
 ```
 
+#### Disk Location Scanning
+
+After configuring disks, run a disk scan to populate file locations:
+
+**Via Web UI:** Click "Scan Disk Locations" on the Dashboard
+
+**Via CLI:**
+```bash
+docker exec MediaUsageFinder /app/media-finder disk-scan
+```
+
+This scan:
+- Walks each disk mount path individually
+- Records file locations with disk-specific device IDs
+- Maps files to their physical disk locations
+- Enables cross-disk duplicate detection
+
+**Note:** Disk scanning is independent of the main file scan. Run the main scan first to populate the database, then run disk-scan to add location tracking.
+
 #### Duplicate Detection & Consolidation
 
 Once disks are configured, the application can:

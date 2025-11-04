@@ -82,6 +82,22 @@ type Scan struct {
 	CreatedAt         time.Time
 }
 
+// FileDiskLocation represents a file's location on a specific disk
+// This enables tracking files across multiple physical disks (Unraid support)
+// while keeping FUSE paths as the canonical identifier for service matching
+type FileDiskLocation struct {
+	ID           int64
+	FileID       int64
+	DiskName     string
+	DiskDeviceID int64
+	DiskPath     string
+	Size         int64
+	Inode        int64
+	ModifiedTime time.Time
+	LastVerified time.Time
+	CreatedAt    time.Time
+}
+
 // UpsertFile inserts or updates a file record
 func (db *DB) UpsertFile(file *File) error {
 	query := `
@@ -1942,4 +1958,185 @@ func toLower(s string) string {
 		}
 	}
 	return string(result)
+}
+
+// ===== File Disk Location Functions =====
+
+// UpsertFileDiskLocation inserts or updates a file disk location record
+func (db *DB) UpsertFileDiskLocation(loc *FileDiskLocation) error {
+	query := `
+		INSERT INTO file_disk_locations (file_id, disk_name, disk_device_id, disk_path, size, inode, modified_time, last_verified)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(file_id, disk_device_id) DO UPDATE SET
+			disk_name = excluded.disk_name,
+			disk_path = excluded.disk_path,
+			size = excluded.size,
+			inode = excluded.inode,
+			modified_time = excluded.modified_time,
+			last_verified = excluded.last_verified
+	`
+
+	_, err := db.conn.Exec(query,
+		loc.FileID,
+		loc.DiskName,
+		loc.DiskDeviceID,
+		loc.DiskPath,
+		loc.Size,
+		loc.Inode,
+		loc.ModifiedTime.Unix(),
+		loc.LastVerified.Unix(),
+	)
+
+	return err
+}
+
+// BatchUpsertFileDiskLocations batch inserts or updates file disk location records
+func (db *DB) BatchUpsertFileDiskLocations(ctx context.Context, locs []*FileDiskLocation) error {
+	if len(locs) == 0 {
+		return nil
+	}
+
+	tx, err := db.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO file_disk_locations (file_id, disk_name, disk_device_id, disk_path, size, inode, modified_time, last_verified)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(file_id, disk_device_id) DO UPDATE SET
+			disk_name = excluded.disk_name,
+			disk_path = excluded.disk_path,
+			size = excluded.size,
+			inode = excluded.inode,
+			modified_time = excluded.modified_time,
+			last_verified = excluded.last_verified
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, loc := range locs {
+		_, err = stmt.ExecContext(ctx,
+			loc.FileID,
+			loc.DiskName,
+			loc.DiskDeviceID,
+			loc.DiskPath,
+			loc.Size,
+			loc.Inode,
+			loc.ModifiedTime.Unix(),
+			loc.LastVerified.Unix(),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to insert disk location: %w", err)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// GetDiskLocationsForFile returns all disk locations for a file
+func (db *DB) GetDiskLocationsForFile(fileID int64) ([]*FileDiskLocation, error) {
+	query := `
+		SELECT id, file_id, disk_name, disk_device_id, disk_path, size, inode, modified_time, last_verified, created_at
+		FROM file_disk_locations
+		WHERE file_id = ?
+		ORDER BY disk_name
+	`
+
+	rows, err := db.conn.Query(query, fileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var locations []*FileDiskLocation
+	for rows.Next() {
+		loc := &FileDiskLocation{}
+		var modTime, lastVerified, createdAt int64
+
+		err = rows.Scan(
+			&loc.ID,
+			&loc.FileID,
+			&loc.DiskName,
+			&loc.DiskDeviceID,
+			&loc.DiskPath,
+			&loc.Size,
+			&loc.Inode,
+			&modTime,
+			&lastVerified,
+			&createdAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		loc.ModifiedTime = time.Unix(modTime, 0)
+		loc.LastVerified = time.Unix(lastVerified, 0)
+		loc.CreatedAt = time.Unix(createdAt, 0)
+
+		locations = append(locations, loc)
+	}
+
+	return locations, rows.Err()
+}
+
+// GetFilesWithMultipleDiskLocations returns files that exist on multiple disks (cross-disk duplicates)
+func (db *DB) GetFilesWithMultipleDiskLocations() ([]*File, error) {
+	query := `
+		SELECT DISTINCT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time, f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
+		FROM files f
+		JOIN file_disk_locations fdl ON f.id = fdl.file_id
+		GROUP BY f.id
+		HAVING COUNT(DISTINCT fdl.disk_device_id) > 1
+		ORDER BY f.size DESC
+	`
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var files []*File
+	for rows.Next() {
+		file, err := scanFileRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, file)
+	}
+
+	return files, rows.Err()
+}
+
+// GetCrossDiskDuplicateCount returns the count of files on multiple disks
+func (db *DB) GetCrossDiskDuplicateCount() (int64, error) {
+	query := `
+		SELECT COUNT(DISTINCT f.id)
+		FROM files f
+		JOIN file_disk_locations fdl ON f.id = fdl.file_id
+		GROUP BY f.id
+		HAVING COUNT(DISTINCT fdl.disk_device_id) > 1
+	`
+
+	var count int64
+	err := db.conn.QueryRow(query).Scan(&count)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return count, err
+}
+
+// DeleteDiskLocationsByDisk deletes all disk locations for a specific disk device
+func (db *DB) DeleteDiskLocationsByDisk(diskDeviceID int64) error {
+	query := `DELETE FROM file_disk_locations WHERE disk_device_id = ?`
+	_, err := db.conn.Exec(query, diskDeviceID)
+	return err
 }

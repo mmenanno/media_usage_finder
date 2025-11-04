@@ -42,6 +42,8 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/scan/update-services", s.HandleUpdateAllServices)
 	mux.HandleFunc("/api/scan/update-service", s.HandleUpdateSingleService)
 	mux.HandleFunc("/api/scan/recalculate-orphaned", s.HandleRecalculateOrphaned)
+	mux.HandleFunc("/api/scan/disk-locations", s.HandleScanDiskLocations)
+	mux.HandleFunc("/api/scan/disk-progress", s.HandleDiskScanProgress)
 	mux.HandleFunc("/api/config/save", s.HandleSaveConfig)
 	mux.HandleFunc("/api/config/test", s.HandleTestService)
 	mux.HandleFunc("/api/config/test-scan-paths", s.HandleTestScanPaths)
@@ -68,13 +70,18 @@ func (s *Server) Run() error {
 
 	// File details endpoint (with dynamic ID in query param)
 	mux.HandleFunc("/api/files/", func(w http.ResponseWriter, r *http.Request) {
-		// Extract ID from path like /api/files/123/details
+		// Extract ID from path like /api/files/123/details or /api/files/123/disk-locations
 		path := r.URL.Path
 		if len(path) > len("/api/files/") && path[len(path)-8:] == "/details" {
 			// Extract ID from path
 			idPart := path[len("/api/files/") : len(path)-8]
 			r.URL.RawQuery = "id=" + idPart
 			s.HandleFileDetails(w, r)
+		} else if len(path) > len("/api/files/") && path[len(path)-15:] == "/disk-locations" {
+			// Extract ID from path like /api/files/123/disk-locations
+			idPart := path[len("/api/files/") : len(path)-15]
+			r.URL.RawQuery = "id=" + idPart
+			s.HandleGetFileDiskLocations(w, r)
 		} else {
 			http.NotFound(w, r)
 		}

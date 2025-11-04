@@ -104,6 +104,29 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+
+-- File disk locations table for tracking files on specific disks (Unraid support)
+-- This table maps canonical FUSE paths (files.path) to disk-specific paths
+-- Enables cross-disk duplicate detection while maintaining service path matching
+CREATE TABLE IF NOT EXISTS file_disk_locations (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	file_id INTEGER NOT NULL,
+	disk_name TEXT NOT NULL,
+	disk_device_id INTEGER NOT NULL,
+	disk_path TEXT NOT NULL,
+	size INTEGER NOT NULL,
+	inode INTEGER NOT NULL,
+	modified_time INTEGER NOT NULL,
+	last_verified INTEGER NOT NULL,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
+	UNIQUE(file_id, disk_device_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_disk_locations_file_id ON file_disk_locations(file_id);
+CREATE INDEX IF NOT EXISTS idx_disk_locations_disk_device ON file_disk_locations(disk_device_id);
+CREATE INDEX IF NOT EXISTS idx_disk_locations_disk_path ON file_disk_locations(disk_path);
+CREATE INDEX IF NOT EXISTS idx_disk_locations_inode ON file_disk_locations(disk_device_id, inode);
 `
 
 // GetSchema returns the database schema

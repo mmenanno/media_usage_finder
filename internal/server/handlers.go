@@ -35,6 +35,7 @@ type Server struct {
 	version       string             // Application version
 	clientFactory *api.ClientFactory // Factory for creating service clients
 	diskDetector  *disk.Detector     // Disk detector for cross-disk duplicate detection
+	diskResolver  *disk.DeviceResolver // Device resolver for friendly disk names in UI
 }
 
 // NewServer creates a new server instance
@@ -65,6 +66,9 @@ func NewServer(db *database.DB, cfg *config.Config, version string) *Server {
 			log.Printf("Duplicate detection features will be limited without disk information")
 		} else {
 			log.Printf("Successfully detected %d disk(s)", srv.diskDetector.GetDiskCount())
+
+			// Initialize disk resolver with detected disks for UI display
+			srv.diskResolver = disk.NewDeviceResolver(srv.diskDetector.GetAllDisks())
 		}
 	} else {
 		log.Printf("No disks configured - cross-disk duplicate detection disabled")
@@ -315,6 +319,8 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		OrderBy:           orderBy,
 		Direction:         direction,
 		Extensions:        extensions,
+		DiskResolver:      s.diskResolver,
+		HasDiskLocations:  len(s.config.Disks) > 0,
 	}
 
 	s.renderTemplate(w, "files.html", data)
@@ -365,17 +371,27 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 
 	// Get disk information if disk detector is configured
 	var disks []*disk.DiskInfo
+	var crossDiskDuplicates int64
+	hasDiskLocations := len(s.config.Disks) > 0
+
 	if s.diskDetector != nil {
 		if err := s.diskDetector.RefreshDiskSpace(); err != nil {
 			log.Printf("Warning: Failed to refresh disk space: %v", err)
 		}
 		disks = s.diskDetector.GetAllDisks()
+
+		// Get cross-disk duplicate count if disk locations are tracked
+		if hasDiskLocations {
+			crossDiskDuplicates, _ = s.db.GetCrossDiskDuplicateCount()
+		}
 	}
 
 	data := StatsData{
-		Stats: statistics,
-		Title: "Statistics",
-		Disks: disks,
+		Stats:               statistics,
+		Title:               "Statistics",
+		Disks:               disks,
+		CrossDiskDuplicates: crossDiskDuplicates,
+		HasDiskLocations:    hasDiskLocations,
 	}
 
 	s.renderTemplate(w, "stats.html", data)
@@ -1578,6 +1594,155 @@ func (s *Server) HandleDetectDisks(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// HandleScanDiskLocations starts a disk location scan to populate file_disk_locations table
+func (s *Server) HandleScanDiskLocations(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Check if disks are configured
+	if len(s.config.Disks) == 0 {
+		respondError(w, http.StatusBadRequest, "No disks configured - disk scanning not available", "no_disks_configured")
+		return
+	}
+
+	// Check if disk detector is available
+	if s.diskDetector == nil {
+		respondError(w, http.StatusInternalServerError, "Disk detector not initialized", "detector_unavailable")
+		return
+	}
+
+	// Check if a scan is already running
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check scan status", "scan_check_failed")
+		return
+	}
+
+	if currentScan != nil {
+		respondError(w, http.StatusConflict, "Cannot run disk scan while a main scan is running", "scan_running")
+		return
+	}
+
+	// Run disk scan in background
+	go func() {
+		log.Println("Starting disk location scan...")
+		if err := s.scanner.ScanDiskLocations(s.diskDetector); err != nil {
+			log.Printf("ERROR: Disk location scan failed: %v", err)
+		} else {
+			log.Println("INFO: Disk location scan completed successfully")
+		}
+	}()
+
+	w.Header().Set("X-Toast-Message", "Starting disk location scan...")
+	w.Header().Set("X-Toast-Type", "info")
+
+	respondSuccess(w, "Disk location scan started", nil)
+}
+
+// HandleDiskScanProgress streams disk scan progress via SSE
+func (s *Server) HandleDiskScanProgress(w http.ResponseWriter, r *http.Request) {
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Get disk scanner progress (if available)
+	// For now, this is a placeholder - we'll need to add progress tracking to disk scanner
+	// Similar to how the main scanner has progress tracking
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	// Send initial message
+	fmt.Fprintf(w, "data: {\"status\":\"checking\",\"message\":\"Checking disk scan status...\"}\n\n")
+	flusher.Flush()
+
+	// For now, just send a simple status message
+	// TODO: Implement proper progress tracking for disk scanner
+	fmt.Fprintf(w, "data: {\"status\":\"info\",\"message\":\"Disk scan progress tracking will be available in a future update\"}\n\n")
+	flusher.Flush()
+
+	time.Sleep(1 * time.Second)
+	fmt.Fprintf(w, "data: {\"status\":\"done\"}\n\n")
+	flusher.Flush()
+}
+
+// HandleGetFileDiskLocations returns all disk locations for a specific file
+func (s *Server) HandleGetFileDiskLocations(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	// Get file ID from query parameter
+	fileIDStr := r.URL.Query().Get("id")
+	if fileIDStr == "" {
+		respondError(w, http.StatusBadRequest, "File ID is required", "missing_file_id")
+		return
+	}
+
+	fileID, err := strconv.ParseInt(fileIDStr, 10, 64)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid file ID", "invalid_file_id")
+		return
+	}
+
+	// Get disk locations from database
+	locations, err := s.db.GetDiskLocationsForFile(fileID)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to get disk locations", "db_error")
+		return
+	}
+
+	// Build response with resolved disk names
+	type locationResponse struct {
+		ID           int64  `json:"id"`
+		FileID       int64  `json:"file_id"`
+		DiskName     string `json:"disk_name"`
+		DeviceID     int64  `json:"device_id"`
+		DeviceName   string `json:"device_name"` // Friendly name from resolver
+		DeviceColor  string `json:"device_color"` // Badge color
+		DiskPath     string `json:"disk_path"`
+		Size         int64  `json:"size"`
+		Inode        int64  `json:"inode"`
+		ModifiedTime int64  `json:"modified_time"`
+		LastVerified int64  `json:"last_verified"`
+	}
+
+	response := make([]locationResponse, 0, len(locations))
+	for _, loc := range locations {
+		lr := locationResponse{
+			ID:           loc.ID,
+			FileID:       loc.FileID,
+			DiskName:     loc.DiskName,
+			DeviceID:     loc.DiskDeviceID,
+			DiskPath:     loc.DiskPath,
+			Size:         loc.Size,
+			Inode:        loc.Inode,
+			ModifiedTime: loc.ModifiedTime.Unix(),
+			LastVerified: loc.LastVerified.Unix(),
+		}
+
+		// Resolve device name and color if resolver is available
+		if s.diskResolver != nil {
+			lr.DeviceName = s.diskResolver.ResolveDisplayName(loc.DiskDeviceID)
+			lr.DeviceColor = s.diskResolver.ResolveColor(loc.DiskDeviceID)
+		} else {
+			lr.DeviceName = fmt.Sprintf("Device %d", loc.DiskDeviceID)
+			lr.DeviceColor = "gray"
+		}
+
+		response = append(response, lr)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 // getServiceDisplayName returns the properly capitalized display name for a service
 func getServiceDisplayName(serviceName string) string {
 	switch serviceName {
@@ -2403,18 +2568,31 @@ func (s *Server) HandleFileDetails(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get disk locations if available
+	var diskLocations []*database.FileDiskLocation
+	if len(s.config.Disks) > 0 {
+		diskLocations, _ = s.db.GetDiskLocationsForFile(fileID)
+	}
+
 	response := FileDetailsResponse{
-		ID:           file.ID,
-		Path:         file.Path,
-		Size:         file.Size,
-		Inode:        file.Inode,
-		DeviceID:     file.DeviceID,
-		ModifiedTime: file.ModifiedTime.Unix(),
-		LastVerified: file.LastVerified.Unix(),
-		IsOrphaned:   file.IsOrphaned,
-		CreatedAt:    file.CreatedAt.Unix(),
-		Usage:        usage,
-		Hardlinks:    hardlinks,
+		ID:            file.ID,
+		Path:          file.Path,
+		Size:          file.Size,
+		Inode:         file.Inode,
+		DeviceID:      file.DeviceID,
+		ModifiedTime:  file.ModifiedTime.Unix(),
+		LastVerified:  file.LastVerified.Unix(),
+		IsOrphaned:    file.IsOrphaned,
+		CreatedAt:     file.CreatedAt.Unix(),
+		Usage:         usage,
+		Hardlinks:     hardlinks,
+		DiskLocations: diskLocations,
+	}
+
+	// Resolve device name and color if resolver is available
+	if s.diskResolver != nil {
+		response.DeviceName = s.diskResolver.ResolveDisplayName(file.DeviceID)
+		response.DeviceColor = s.diskResolver.ResolveColor(file.DeviceID)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

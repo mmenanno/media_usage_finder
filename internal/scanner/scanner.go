@@ -12,6 +12,7 @@ import (
 	"github.com/mmenanno/media-usage-finder/internal/config"
 	"github.com/mmenanno/media-usage-finder/internal/constants"
 	"github.com/mmenanno/media-usage-finder/internal/database"
+	"github.com/mmenanno/media-usage-finder/internal/disk"
 )
 
 // Scanner coordinates the entire scanning process
@@ -1004,5 +1005,34 @@ func (s *Scanner) RecalculateOrphanedStatus() error {
 	}
 
 	s.progress.Log("Orphaned status recalculated successfully!")
+	return nil
+}
+
+// ScanDiskLocations scans configured disks and populates disk-specific file locations
+// This enables cross-disk duplicate detection while maintaining FUSE paths as canonical
+func (s *Scanner) ScanDiskLocations(detector *disk.Detector) error {
+	// Check if disks are configured
+	if len(s.config.Disks) == 0 {
+		return fmt.Errorf("no disks configured - disk scanning not available")
+	}
+
+	// Create temporary progress tracker for disk scanning
+	tempProgress := NewProgress()
+	tempProgress.SetPhase("Scanning Disk Locations")
+
+	// Create disk scanner
+	diskScanner := NewDiskScanner(context.Background(), s.config, s.db, detector, tempProgress)
+
+	// Run disk scan
+	err := diskScanner.ScanDiskLocations()
+
+	// Stop progress
+	tempProgress.Stop()
+
+	if err != nil {
+		return fmt.Errorf("disk scanning failed: %w", err)
+	}
+
+	fmt.Println("Disk location scanning completed successfully")
 	return nil
 }

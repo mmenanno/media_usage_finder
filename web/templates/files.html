@@ -288,6 +288,13 @@
                             <div class="truncate sm:whitespace-normal" title="{{.File.Path}}">
                                 {{.File.Path}}
                             </div>
+                            {{if $.DiskResolver}}
+                            <div class="mt-1">
+                                <span class="px-2 py-1 {{if eq ($.DiskResolver.ResolveColor .File.DeviceID) "blue"}}bg-blue-600{{else if eq ($.DiskResolver.ResolveColor .File.DeviceID) "purple"}}bg-purple-600{{else}}bg-gray-600{{end}} rounded text-xs">
+                                    {{$.DiskResolver.ResolveDisplayName .File.DeviceID}}
+                                </span>
+                            </div>
+                            {{end}}
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-400 whitespace-nowrap">
                             {{formatSize .File.Size}}
