@@ -68,9 +68,10 @@ func (r *UnraidStatsReader) ParseDisksINI() error {
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		// Check for section header [diskN]
-		if strings.HasPrefix(line, "[disk") && strings.HasSuffix(line, "]") {
-			diskName := strings.Trim(line, "[]")
+		// Check for section header ["diskN"] or [diskN]
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			// Remove brackets and quotes
+			diskName := strings.Trim(line, `[]"`)
 			// Only process data disks (disk1, disk2, etc.), not parity or cache
 			if strings.HasPrefix(diskName, "disk") && len(diskName) > 4 {
 				currentDisk = &UnraidDiskStats{Name: diskName}
