@@ -388,6 +388,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const plexTokenInput = document.getElementById('plex_token');
     const testConnectionBtn = container.closest('.bg-gray-800').querySelector('button[hx-post]');
 
+    // Get currently selected libraries from config (Go template evaluated once)
+    const savedLibraries = [{{range $i, $lib := .Config.Services.Plex.Libraries}}{{if $i}}, {{end}}"{{$lib}}"{{end}}];
+    console.log('Saved libraries from config:', savedLibraries);
+
     // Store fetched libraries
     let currentLibraries = [];
 
@@ -441,21 +445,22 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Get currently selected libraries from config
-        const selectedLibraries = {{ .Config.Services.Plex.Libraries | len }} > 0
-            ? [{{range $i, $lib := .Config.Services.Plex.Libraries}}{{if $i}}, {{end}}"{{$lib}}"{{end}}]
-            : [];
+        console.log('Rendering', libraries.length, 'libraries. Saved selections:', savedLibraries);
 
-        librariesList.innerHTML = libraries.map(lib => `
-            <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-700 px-2 py-1 rounded">
-                <input type="checkbox"
-                       name="plex_libraries"
-                       value="${lib.key}"
-                       class="plex-library-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded"
-                       ${selectedLibraries.includes(lib.key) ? 'checked' : ''}>
-                <span class="text-sm">${lib.title}</span>
-            </label>
-        `).join('');
+        librariesList.innerHTML = libraries.map(lib => {
+            const isChecked = savedLibraries.includes(lib.key);
+            console.log(`Library ${lib.title} (${lib.key}): ${isChecked ? 'CHECKED' : 'unchecked'}`);
+            return `
+                <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-700 px-2 py-1 rounded">
+                    <input type="checkbox"
+                           name="plex_libraries"
+                           value="${lib.key}"
+                           class="plex-library-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded"
+                           ${isChecked ? 'checked' : ''}>
+                    <span class="text-sm">${lib.title}</span>
+                </label>
+            `;
+        }).join('');
 
         updateSelectAllState();
     }
