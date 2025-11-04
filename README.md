@@ -5,14 +5,17 @@ A high-performance Go application that scans your media server files and tracks 
 ## Features
 
 - 🚀 **Fast Concurrent Scanning** - Multi-threaded file scanning with configurable worker pools
-- 📊 **Service Integration** - Tracks file usage across Plex, Sonarr, Radarr, and qBittorrent
+- 📊 **Service Integration** - Tracks file usage across Plex, Sonarr, Radarr, qBittorrent, and Stash
 - 🔗 **Hardlink Detection** - Identifies hardlinked files to track space savings
 - 🎯 **Orphaned File Detection** - Find files not tracked by any service
+- 💿 **Cross-Disk Duplicate Detection** - Find duplicate files across multiple disks (Unraid support)
+- 🔄 **Duplicate Consolidation** - Automatically consolidate duplicates to optimize storage
 - 💾 **Incremental Scans** - Only rescan modified files for faster updates
 - 🌐 **Modern Web UI** - Dark-themed interface with HTMX for real-time updates
-- 📈 **Detailed Statistics** - Storage efficiency, service breakdown, and more
+- 📈 **Detailed Statistics** - Storage efficiency, service breakdown, disk usage
 - 🔄 **Resumable Scans** - Graceful interruption and resumption
 - 🐳 **Docker Ready** - Easy deployment with Docker/Docker Compose
+- 🖥️ **Unraid Integration** - Native support for accurate disk statistics
 
 ## Quick Start
 
@@ -159,6 +162,66 @@ The tool automatically translates these paths to match files correctly.
 
 - Can use direct connection or qui proxy
 - For qui proxy, use the full proxy URL: `http://qui:7476/proxy/YOUR_KEY`
+
+#### Stash
+
+- Requires API key from Settings → Security → Authentication
+- Uses GraphQL API for querying media files
+
+### Unraid-Specific Setup
+
+Media Usage Finder has native Unraid integration for accurate disk statistics and cross-disk duplicate detection.
+
+#### Required Volume Mounts
+
+For Unraid deployments, add these volume mounts:
+
+```bash
+# Individual disk mounts for duplicate detection
+-v '/mnt/disk1/':'/disk1':'rw'
+-v '/mnt/disk2/':'/disk2':'rw'
+-v '/mnt/disk3/':'/disk3':'rw'
+# ... add all disks
+
+# Unraid stats for accurate disk usage
+-v '/var/local/emhttp':'/unraid/stats':'ro'
+```
+
+#### Disk Configuration
+
+Configure disks in the web UI (Configuration page):
+
+```yaml
+disks:
+  - name: Disk 1
+    mount_path: /disk1
+  - name: Disk 2
+    mount_path: /disk2
+  # ... etc
+```
+
+#### Duplicate Detection & Consolidation
+
+Once disks are configured, the application can:
+
+1. **Detect cross-disk duplicates** - Find identical files on different physical disks
+2. **Calculate actual storage usage** - Shows accurate disk capacities and usage percentages
+3. **Consolidate duplicates** - Move duplicates to optimize storage:
+   - **Least Full Disk** - Move files to disks with most free space
+   - **Most Full Disk** - Consolidate to fuller disks to free up empty ones
+   - **Custom Strategy** - Define your own consolidation rules
+
+**How it works:**
+
+- Without `/var/local/emhttp` mount: Falls back to statfs (may show incorrect disk sizes for ZFS datasets)
+- With `/var/local/emhttp` mount: Reads Unraid's native disk statistics for accurate capacity and usage
+- Device ID detection always works correctly for duplicate detection
+
+**Benefits:**
+
+- **Optimize array usage** - Consolidate duplicates to free up entire disks for parity checks
+- **Prevent overfilling** - Consolidation strategy respects disk capacities
+- **Safe operations** - Dry-run mode and manual approval options available
 
 ## Web UI Features
 
