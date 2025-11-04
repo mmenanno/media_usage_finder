@@ -130,8 +130,12 @@ class FileDetailsModal {
                                 <p class="text-white font-mono">${fileData.inode}</p>
                             </div>
                             <div>
-                                <label class="text-xs text-gray-500 uppercase">Device ID</label>
-                                <p class="text-white font-mono">${fileData.device_id}</p>
+                                <label class="text-xs text-gray-500 uppercase">Device</label>
+                                <p class="text-white">
+                                    ${fileData.device_name
+                                        ? `<span class="px-2 py-1 ${fileData.device_color === 'blue' ? 'bg-blue-600' : fileData.device_color === 'purple' ? 'bg-purple-600' : 'bg-gray-600'} rounded text-xs">${fileData.device_name}</span>`
+                                        : `<span class="font-mono">${fileData.device_id}</span>`}
+                                </p>
                             </div>
                             <div>
                                 <label class="text-xs text-gray-500 uppercase">Status</label>
