@@ -417,21 +417,14 @@ func validatePathMapping(mapping PathMapping, context string) error {
 // Example: /disk1/movies/Movie.mkv → /data/movies/Movie.mkv
 // This is used during disk scanning to find the canonical file path for lookup
 func (c *Config) TranslateDiskPathToFuse(diskPath string, diskMountPath string) string {
-	// Strip the disk mount prefix to get the relative path
-	relativePath := strings.TrimPrefix(diskPath, diskMountPath)
+	// Strip the disk mount prefix to get the FUSE path
+	// Example: /disk1/data/downloads/file.mp4 -> /data/downloads/file.mp4
+	fusePath := strings.TrimPrefix(diskPath, diskMountPath)
 
-	// Remove leading slash if present (will be added back when joining)
-	relativePath = strings.TrimPrefix(relativePath, "/")
-
-	// Use the first scan path as the FUSE prefix
-	// In typical Unraid setups, this is /data
-	fusePrefix := "/data"
-	if len(c.ScanPaths) > 0 {
-		fusePrefix = c.ScanPaths[0]
+	// Ensure path starts with /
+	if !strings.HasPrefix(fusePath, "/") {
+		fusePath = "/" + fusePath
 	}
-
-	// Combine FUSE prefix with relative path
-	fusePath := filepath.Join(fusePrefix, relativePath)
 
 	return fusePath
 }
