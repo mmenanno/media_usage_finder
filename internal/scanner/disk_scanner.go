@@ -170,6 +170,9 @@ func (ds *DiskScanner) scanDisk(diskCfg config.DiskConfig, fileChan chan<- diskF
 		ds.filesScanned++
 		ds.mu.Unlock()
 
+		// Update Progress tracker for UI
+		ds.progress.IncrementFiles(info.Size())
+
 		return nil
 	})
 
