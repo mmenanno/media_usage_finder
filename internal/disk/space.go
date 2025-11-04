@@ -42,6 +42,15 @@ func GetDiskSpace(path string) (*SpaceInfo, error) {
 		usedPercent = float64(used) / float64(total) * 100
 	}
 
+	// Debug logging to diagnose incorrect percentages
+	fmt.Printf("DEBUG GetDiskSpace(%s):\n", path)
+	fmt.Printf("  Raw syscall values: Blocks=%d, Bfree=%d, Bavail=%d, Bsize=%d\n",
+		stat.Blocks, stat.Bfree, stat.Bavail, stat.Bsize)
+	fmt.Printf("  Calculated: total=%d, free=%d, available=%d, used=%d\n",
+		total, free, available, used)
+	fmt.Printf("  Result: %.2f TB total, %.2f TB used, %.1f%% full\n",
+		float64(total)/1024/1024/1024/1024, float64(used)/1024/1024/1024/1024, usedPercent)
+
 	return &SpaceInfo{
 		TotalBytes:  int64(total),
 		FreeBytes:   int64(available), // Use available (not free) for user-accessible space

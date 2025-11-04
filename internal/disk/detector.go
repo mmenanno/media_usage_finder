@@ -103,14 +103,21 @@ func (d *Detector) GetDiskForFile(deviceID int64) (*DiskInfo, error) {
 	return diskInfo, nil
 }
 
-// GetAllDisks returns all detected disks
+// GetAllDisks returns all detected disks in configuration order
 func (d *Detector) GetAllDisks() []*DiskInfo {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
+	// Build result in config order to maintain consistent ordering
 	disks := make([]*DiskInfo, 0, len(d.diskMap))
-	for _, disk := range d.diskMap {
-		disks = append(disks, disk)
+	for _, diskConfig := range d.config {
+		// Find disk in map by matching mount path
+		for _, disk := range d.diskMap {
+			if disk.MountPath == diskConfig.MountPath {
+				disks = append(disks, disk)
+				break
+			}
+		}
 	}
 
 	return disks
