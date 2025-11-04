@@ -1479,7 +1479,8 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse duplicate detection settings
-	s.config.DuplicateDetection.Enabled = r.FormValue("duplicate_detection_enabled") == "true"
+	// Note: HTML checkboxes send "on" when checked, or nothing when unchecked
+	s.config.DuplicateDetection.Enabled = r.FormValue("duplicate_detection_enabled") != ""
 	s.config.DuplicateDetection.HashAlgorithm = r.FormValue("hash_algorithm")
 	if s.config.DuplicateDetection.HashAlgorithm == "" {
 		s.config.DuplicateDetection.HashAlgorithm = "sha256"
@@ -1512,9 +1513,11 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse consolidation settings
-	s.config.DuplicateConsolidation.Enabled = r.FormValue("consolidation_enabled") == "true"
-	s.config.DuplicateConsolidation.DryRun = r.FormValue("dry_run") == "true"
-	s.config.DuplicateConsolidation.RequireManualApproval = r.FormValue("require_manual_approval") == "true"
+	// Note: HTML checkboxes send "on" when checked, or nothing when unchecked
+	s.config.DuplicateConsolidation.Enabled = r.FormValue("consolidation_enabled") != ""
+	s.config.DuplicateConsolidation.DryRun = r.FormValue("dry_run") != ""
+	s.config.DuplicateConsolidation.RequireManualApproval = r.FormValue("require_manual_approval") != ""
+	s.config.DuplicateConsolidation.VerifyBeforeDelete = r.FormValue("verify_before_delete") != ""
 	s.config.DuplicateConsolidation.Strategy = r.FormValue("consolidation_strategy")
 	if s.config.DuplicateConsolidation.Strategy == "" {
 		s.config.DuplicateConsolidation.Strategy = "least_full_disk"
