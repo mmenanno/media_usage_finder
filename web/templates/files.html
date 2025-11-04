@@ -12,9 +12,9 @@
     <!-- Search and Filters -->
     <div class="bg-gray-800 rounded-lg p-6">
         <form hx-get="/files" hx-target="#files-table" hx-select="#files-table" hx-push-url="true" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Search -->
-                <div>
+                <div class="md:col-span-3">
                     <label for="search-input" class="block text-sm font-medium text-gray-400 mb-2">Search Files</label>
                     <div class="relative">
                         <input
@@ -136,10 +136,54 @@
                     </div>
                 </div>
 
+                <!-- Device/Disk Filter -->
+                {{if .HasDiskLocations}}
+                <div>
+                    <span class="block text-sm font-medium text-gray-400 mb-2">Device/Disk</span>
+                    <div class="relative z-20" data-device-multiselect>
+                        <input type="hidden" name="devices" value="{{range $i, $dev := .Devices}}{{if $i}},{{end}}{{$dev}}{{end}}" data-devices-input>
+                        <button
+                            type="button"
+                            data-devices-button
+                            aria-expanded="false"
+                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                            <span data-devices-text>{{if .Devices}}{{len .Devices}} device(s){{else}}All Devices{{end}}</span>
+                            <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div data-devices-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                            <div class="px-4 py-2 border-b border-gray-600">
+                                <div class="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        data-select-all-devices
+                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded cursor-pointer">
+                                    <label class="text-sm font-medium text-gray-300 cursor-pointer">Select All</label>
+                                </div>
+                            </div>
+                            <div data-devices-list>
+                                {{$selectedDevices := .Devices}}
+                                {{range $disk := .AvailableDisks}}
+                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        value="{{$disk.Name}}"
+                                        {{range $selectedDevices}}{{if eq . $disk.Name}}checked{{end}}{{end}}
+                                        class="device-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                                    <span class="text-gray-100">{{$disk.Name}}</span>
+                                </label>
+                                {{end}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {{end}}
+
                 <!-- Extension Filter -->
                 <div>
                     <span class="block text-sm font-medium text-gray-400 mb-2">File Extensions</span>
-                    <div class="relative z-20" data-extension-multiselect>
+                    <div class="relative z-10" data-extension-multiselect>
                         <input type="hidden" name="extensions" value="{{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}" data-extensions-input>
                         <button
                             type="button"
@@ -725,6 +769,97 @@
 
         // Initial state
         updateSelectAllServicesState();
+    }
+
+    // Device multiselect functionality
+    const deviceMultiselect = document.querySelector('[data-device-multiselect]');
+    if (deviceMultiselect) {
+        const button = deviceMultiselect.querySelector('[data-devices-button]');
+        const menu = deviceMultiselect.querySelector('[data-devices-menu]');
+        const devicesInput = deviceMultiselect.querySelector('[data-devices-input]');
+        const textSpan = deviceMultiselect.querySelector('[data-devices-text]');
+        const devicesList = deviceMultiselect.querySelector('[data-devices-list]');
+        const selectAllCheckbox = deviceMultiselect.querySelector('[data-select-all-devices]');
+
+        let selectedDevices = new Set();
+
+        // Parse initial selected devices from hidden input
+        if (devicesInput.value) {
+            devicesInput.value.split(',').forEach(dev => {
+                if (dev.trim()) selectedDevices.add(dev.trim());
+            });
+        }
+
+        // Toggle dropdown
+        button.addEventListener('click', function() {
+            const isOpen = menu.classList.contains('hidden');
+            menu.classList.toggle('hidden');
+            button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+
+        // Close on click outside
+        document.addEventListener('click', function(e) {
+            if (!deviceMultiselect.contains(e.target)) {
+                menu.classList.add('hidden');
+                button.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        // Handle individual checkbox change
+        devicesList.querySelectorAll('.device-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', function(e) {
+                const dev = e.target.value;
+                if (e.target.checked) {
+                    selectedDevices.add(dev);
+                } else {
+                    selectedDevices.delete(dev);
+                }
+                updateDevicesInput();
+                updateSelectAllDevicesState();
+            });
+        });
+
+        // Handle select all checkbox
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function(e) {
+                const checkboxes = devicesList.querySelectorAll('.device-checkbox');
+                checkboxes.forEach(cb => {
+                    cb.checked = e.target.checked;
+                    if (e.target.checked) {
+                        selectedDevices.add(cb.value);
+                    } else {
+                        selectedDevices.delete(cb.value);
+                    }
+                });
+                updateDevicesInput();
+            });
+        }
+
+        // Update select all checkbox state
+        function updateSelectAllDevicesState() {
+            if (!selectAllCheckbox) return;
+            const checkboxes = devicesList.querySelectorAll('.device-checkbox');
+            const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            selectAllCheckbox.checked = checkedCount === checkboxes.length && checkboxes.length > 0;
+            selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+        }
+
+        // Update hidden input and button text
+        function updateDevicesInput() {
+            const values = Array.from(selectedDevices).join(',');
+            devicesInput.value = values;
+
+            if (selectedDevices.size === 0) {
+                textSpan.textContent = 'All Devices';
+            } else if (selectedDevices.size === 1) {
+                textSpan.textContent = '1 device';
+            } else {
+                textSpan.textContent = `${selectedDevices.size} devices`;
+            }
+        }
+
+        // Initial state
+        updateSelectAllDevicesState();
     }
     </script>
 
