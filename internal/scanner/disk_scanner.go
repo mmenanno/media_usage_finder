@@ -58,6 +58,9 @@ func (ds *DiskScanner) ScanDiskLocations() error {
 		return fmt.Errorf("failed to load file cache: %w", err)
 	}
 
+	// Set total files for progress tracking
+	ds.progress.SetTotalFiles(int64(ds.fileCacheSize))
+
 	// Get worker count from config (default: 5)
 	workers := 5
 	if ds.cfg.DiskScanWorkers > 0 {

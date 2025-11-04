@@ -49,24 +49,6 @@
         </div>
     </div>
 
-    <!-- Disk Scan Progress -->
-    <div class="bg-gray-800 rounded-lg p-6">
-        <h3 class="text-xl font-semibold mb-4">Disk Scan Progress</h3>
-        <div
-            id="disk-progress-container"
-            hx-get="/api/scan/disk-progress-html"
-            hx-trigger="load, every 2s"
-            hx-swap="innerHTML">
-            <div class="flex items-center text-gray-400">
-                <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Loading disk scan status...</span>
-            </div>
-        </div>
-    </div>
-
     <!-- JavaScript to handle scan completion -->
     <script>
         // Listen for the scanCompleted event from HTMX response headers
@@ -91,26 +73,6 @@
 
             // Refresh stats and service breakdown after a short delay
             // This allows the completion UI to be visible briefly before refresh
-            setTimeout(function() {
-                window.location.reload();
-            }, 2000); // 2 second delay to show completion state
-        });
-
-        // Listen for the diskScanCompleted event from HTMX response headers
-        document.body.addEventListener('diskScanCompleted', function() {
-            // Stop the polling by removing the hx-trigger attribute
-            const diskProgressContainer = document.getElementById('disk-progress-container');
-            if (diskProgressContainer) {
-                // Remove the polling trigger attribute entirely to stop updates
-                diskProgressContainer.removeAttribute('hx-trigger');
-
-                // Also clear any pending HTMX timers on this element
-                if (window.htmx) {
-                    htmx.trigger(diskProgressContainer, 'htmx:abort');
-                }
-            }
-
-            // Refresh disk status after a short delay
             setTimeout(function() {
                 window.location.reload();
             }, 2000); // 2 second delay to show completion state
