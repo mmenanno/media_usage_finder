@@ -726,7 +726,8 @@ func (s *Scanner) updatePlexUsage() error {
 		"plex",
 		func(ctx context.Context) ([]serviceFile, error) {
 			client := api.NewPlexClient(s.config.Services.Plex.URL, s.config.Services.Plex.Token, s.config.APITimeout)
-			files, err := client.GetAllFiles(ctx)
+			// Pass library filter from config (empty = scan all libraries)
+			files, err := client.GetAllFiles(ctx, s.config.Services.Plex.Libraries)
 			if err != nil {
 				return nil, err
 			}

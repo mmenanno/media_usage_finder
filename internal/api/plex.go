@@ -24,6 +24,13 @@ type PlexFile struct {
 	Size int64
 }
 
+// PlexLibrarySection represents a Plex library section
+type PlexLibrarySection struct {
+	Key   string `json:"key"`
+	Title string `json:"title"`
+	Type  string `json:"type"`
+}
+
 // NewPlexClient creates a new Plex API client
 func NewPlexClient(baseURL, token string, timeout time.Duration) *PlexClient {
 	return &PlexClient{
@@ -62,7 +69,8 @@ func (p *PlexClient) Test() error {
 }
 
 // GetAllFiles retrieves all files tracked by Plex
-func (p *PlexClient) GetAllFiles(ctx context.Context) ([]PlexFile, error) {
+// If libraryKeys is empty, all libraries are scanned. Otherwise, only specified libraries are processed.
+func (p *PlexClient) GetAllFiles(ctx context.Context, libraryKeys []string) ([]PlexFile, error) {
 	// First, get all library sections
 	sections, err := p.getLibrarySections(ctx)
 	if err != nil {
@@ -70,6 +78,18 @@ func (p *PlexClient) GetAllFiles(ctx context.Context) ([]PlexFile, error) {
 	}
 
 	log.Printf("Found %d Plex library sections", len(sections))
+
+	// Create a map for quick library key lookup if filtering is enabled
+	var libraryFilter map[string]bool
+	if len(libraryKeys) > 0 {
+		libraryFilter = make(map[string]bool)
+		for _, key := range libraryKeys {
+			libraryFilter[key] = true
+		}
+		log.Printf("Filtering to %d specific libraries: %v", len(libraryKeys), libraryKeys)
+	} else {
+		log.Printf("No library filter specified - scanning all libraries")
+	}
 
 	var allFiles []PlexFile
 
@@ -80,6 +100,12 @@ func (p *PlexClient) GetAllFiles(ctx context.Context) ([]PlexFile, error) {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		default:
+		}
+
+		// Skip this section if library filtering is enabled and this section is not in the filter
+		if libraryFilter != nil && !libraryFilter[section.Key] {
+			log.Printf("Skipping Plex section: %s (key: %s) - not in library filter", section.Title, section.Key)
+			continue
 		}
 
 		log.Printf("Processing Plex section: %s (type: %s, key: %s)", section.Title, section.Type, section.Key)
@@ -94,6 +120,27 @@ func (p *PlexClient) GetAllFiles(ctx context.Context) ([]PlexFile, error) {
 
 	log.Printf("Total Plex files found: %d", len(allFiles))
 	return allFiles, nil
+}
+
+// GetLibrarySections retrieves all library sections from Plex
+// This is exposed publicly for UI to fetch available libraries
+func (p *PlexClient) GetLibrarySections(ctx context.Context) ([]PlexLibrarySection, error) {
+	sections, err := p.getLibrarySections(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert internal struct to public PlexLibrarySection
+	result := make([]PlexLibrarySection, len(sections))
+	for i, section := range sections {
+		result[i] = PlexLibrarySection{
+			Key:   section.Key,
+			Title: section.Title,
+			Type:  section.Type,
+		}
+	}
+
+	return result, nil
 }
 
 // GetSampleFile retrieves a single sample file from Plex that matches the path prefix

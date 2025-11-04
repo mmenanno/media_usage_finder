@@ -52,8 +52,9 @@ type Services struct {
 
 // PlexConfig contains Plex server configuration
 type PlexConfig struct {
-	URL   string `yaml:"url"`
-	Token string `yaml:"token"`
+	URL       string   `yaml:"url"`
+	Token     string   `yaml:"token"`
+	Libraries []string `yaml:"libraries"` // Library keys to scan (empty = all libraries)
 }
 
 // SonarrConfig contains Sonarr configuration

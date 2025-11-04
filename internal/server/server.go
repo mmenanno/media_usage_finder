@@ -45,6 +45,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/config/save", s.HandleSaveConfig)
 	mux.HandleFunc("/api/config/test", s.HandleTestService)
 	mux.HandleFunc("/api/config/test-scan-paths", s.HandleTestScanPaths)
+	mux.HandleFunc("/api/plex/libraries", s.HandleGetPlexLibraries)
 	mux.HandleFunc("/api/config/test-path-mappings", s.HandleTestPathMappings)
 	mux.HandleFunc("/api/export", s.HandleExport)
 	mux.HandleFunc("/api/files/extensions", s.HandleGetFileExtensions)

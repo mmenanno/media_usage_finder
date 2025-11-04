@@ -152,6 +152,33 @@
                         value="{{.Config.Services.Plex.Token}}"
                         class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                 </div>
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-medium text-gray-400">Libraries</label>
+                        <button
+                            type="button"
+                            id="fetch-plex-libraries-btn"
+                            class="flex items-center gap-2 px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs transition cursor-pointer">
+                            <svg class="hidden animate-spin h-3 w-3 text-white" id="plex-libraries-spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span id="fetch-libraries-text">Fetch Libraries</span>
+                        </button>
+                    </div>
+                    <div id="plex-libraries-container" class="hidden">
+                        <div class="mb-2">
+                            <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-700 px-2 py-1 rounded">
+                                <input type="checkbox" id="plex-select-all" class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                                <span class="text-sm font-medium">Select All</span>
+                            </label>
+                        </div>
+                        <div id="plex-libraries-list" class="space-y-1 max-h-48 overflow-y-auto border border-gray-700 rounded p-2 bg-gray-900">
+                            <!-- Libraries will be populated here via JavaScript -->
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Select specific libraries to scan (leave empty to scan all)</p>
+                </div>
             </div>
         </div>
 
@@ -348,5 +375,142 @@
         </div>
     </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const fetchBtn = document.getElementById('fetch-plex-libraries-btn');
+    const spinner = document.getElementById('plex-libraries-spinner');
+    const fetchText = document.getElementById('fetch-libraries-text');
+    const container = document.getElementById('plex-libraries-container');
+    const librariesList = document.getElementById('plex-libraries-list');
+    const selectAllCheckbox = document.getElementById('plex-select-all');
+    const plexURLInput = document.getElementById('plex_url');
+    const plexTokenInput = document.getElementById('plex_token');
+    const testConnectionBtn = container.closest('.bg-gray-800').querySelector('button[hx-post]');
+
+    // Store fetched libraries
+    let currentLibraries = [];
+
+    // Fetch libraries function
+    async function fetchLibraries() {
+        const url = plexURLInput.value.trim();
+        const token = plexTokenInput.value.trim();
+
+        if (!url) {
+            alert('Please enter a Plex URL first');
+            return;
+        }
+
+        if (!token) {
+            alert('Please enter a Plex token first');
+            return;
+        }
+
+        // Show loading state
+        spinner.classList.remove('hidden');
+        fetchText.textContent = 'Loading...';
+        fetchBtn.disabled = true;
+
+        try {
+            const response = await fetch(`/api/plex/libraries?url=${encodeURIComponent(url)}&token=${encodeURIComponent(token)}`);
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to fetch libraries');
+            }
+
+            const libraries = await response.json();
+            currentLibraries = libraries;
+            renderLibraries(libraries);
+            container.classList.remove('hidden');
+        } catch (error) {
+            alert('Failed to fetch libraries: ' + error.message);
+            container.classList.add('hidden');
+        } finally {
+            // Hide loading state
+            spinner.classList.add('hidden');
+            fetchText.textContent = 'Fetch Libraries';
+            fetchBtn.disabled = false;
+        }
+    }
+
+    // Render libraries as checkboxes
+    function renderLibraries(libraries) {
+        if (!libraries || libraries.length === 0) {
+            librariesList.innerHTML = '<p class="text-sm text-gray-400 p-2">No libraries found</p>';
+            return;
+        }
+
+        // Get currently selected libraries from config
+        const selectedLibraries = {{ .Config.Services.Plex.Libraries | len }} > 0
+            ? [{{range $i, $lib := .Config.Services.Plex.Libraries}}{{if $i}}, {{end}}"{{$lib}}"{{end}}]
+            : [];
+
+        librariesList.innerHTML = libraries.map(lib => `
+            <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-700 px-2 py-1 rounded">
+                <input type="checkbox"
+                       name="plex_libraries"
+                       value="${lib.key}"
+                       class="plex-library-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded"
+                       ${selectedLibraries.includes(lib.key) ? 'checked' : ''}>
+                <span class="text-sm">${lib.title}</span>
+            </label>
+        `).join('');
+
+        updateSelectAllState();
+    }
+
+    // Update "Select All" checkbox state
+    function updateSelectAllState() {
+        const checkboxes = document.querySelectorAll('.plex-library-checkbox');
+        const checkedCount = document.querySelectorAll('.plex-library-checkbox:checked').length;
+
+        if (checkedCount === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else if (checkedCount === checkboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
+
+    // Handle "Select All" checkbox click
+    selectAllCheckbox.addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.plex-library-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = this.checked;
+        });
+    });
+
+    // Handle individual checkbox changes
+    librariesList.addEventListener('change', function(e) {
+        if (e.target.classList.contains('plex-library-checkbox')) {
+            updateSelectAllState();
+        }
+    });
+
+    // Fetch libraries on button click
+    fetchBtn.addEventListener('click', fetchLibraries);
+
+    // Auto-fetch libraries when test connection succeeds
+    if (testConnectionBtn) {
+        testConnectionBtn.addEventListener('htmx:afterRequest', function(event) {
+            if (event.detail.successful) {
+                // Test was successful, auto-fetch libraries
+                setTimeout(fetchLibraries, 100);
+            }
+        });
+    }
+
+    // Load libraries on page load if URL and token are already set
+    if (plexURLInput.value.trim() && plexTokenInput.value.trim()) {
+        fetchLibraries();
+    }
+});
+</script>
+
 {{end}}
 

@@ -1290,6 +1290,8 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	// All validations passed, update config
 	s.config.Services.Plex.URL = plexURL
 	s.config.Services.Plex.Token = r.FormValue("plex_token")
+	// Parse selected Plex libraries (multiple checkbox values)
+	s.config.Services.Plex.Libraries = r.Form["plex_libraries"]
 
 	s.config.Services.Sonarr.URL = sonarrURL
 	s.config.Services.Sonarr.APIKey = sonarrAPIKey
@@ -1511,6 +1513,47 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 		Service: serviceName,
 	}
 	respondJSON(w, http.StatusOK, response)
+}
+
+// HandleGetPlexLibraries fetches available Plex libraries for selection in UI
+func (s *Server) HandleGetPlexLibraries(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	// Get Plex URL and token from query parameters
+	plexURL := strings.TrimSpace(r.URL.Query().Get("url"))
+	plexToken := strings.TrimSpace(r.URL.Query().Get("token"))
+
+	if plexURL == "" {
+		respondError(w, http.StatusBadRequest, "Plex URL is required", "missing_url")
+		return
+	}
+
+	if plexToken == "" {
+		respondError(w, http.StatusBadRequest, "Plex token is required", "missing_token")
+		return
+	}
+
+	// Create a temporary Plex client
+	client := api.NewPlexClient(plexURL, plexToken, s.config.APITimeout)
+
+	// First test the connection
+	if err := client.Test(); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Connection failed: %v", err), "connection_failed")
+		return
+	}
+
+	// Fetch library sections
+	ctx := r.Context()
+	libraries, err := client.GetLibrarySections(ctx)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to fetch libraries: %v", err), "fetch_failed")
+		return
+	}
+
+	// Return libraries as JSON
+	respondJSON(w, http.StatusOK, libraries)
 }
 
 // HandleTestScanPaths tests if configured scan paths exist and are accessible
