@@ -60,7 +60,7 @@ class FileDetailsModal {
         // Build usage badges
         const usageBadges = fileData.usage && fileData.usage.length > 0
             ? fileData.usage.map(u => `
-                <span class="px-2 py-1 bg-${this.getServiceColor(u.service)}-600 rounded text-xs">
+                <span class="px-2 py-1 bg-service-${u.service} text-on-service-${u.service} rounded text-xs">
                     ${this.formatServiceName(u.service)}
                 </span>
               `).join('')
@@ -216,25 +216,8 @@ class FileDetailsModal {
     }
 
     formatServiceName(service) {
-        const names = {
-            qbittorrent: 'qBittorrent',
-            plex: 'Plex',
-            sonarr: 'Sonarr',
-            radarr: 'Radarr',
-            stash: 'Stash'
-        };
-        return names[service] || service;
-    }
-
-    getServiceColor(service) {
-        const colors = {
-            plex: 'blue',
-            sonarr: 'green',
-            radarr: 'amber',
-            qbittorrent: 'red',
-            stash: 'purple'
-        };
-        return colors[service] || 'gray';
+        // Use global SERVICE_COLORS object defined in layout.html
+        return window.formatServiceName ? window.formatServiceName(service) : service;
     }
 
     formatSize(bytes) {

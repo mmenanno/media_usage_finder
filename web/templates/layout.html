@@ -7,6 +7,52 @@
     <link rel="icon" type="image/png" href="/static/logo.png">
     <link href="/static/css/styles.css" rel="stylesheet">
     <link href="/static/css/accessibility.css" rel="stylesheet">
+
+    <!-- Service brand colors for JavaScript -->
+    <script>
+        const SERVICE_COLORS = {
+            plex: {
+                hex: '#FF9500',
+                name: 'Plex',
+                rgba: 'rgba(255, 149, 0, 1)',
+                light: 'rgba(255, 149, 0, 0.1)'
+            },
+            sonarr: {
+                hex: '#00D9FF',
+                name: 'Sonarr',
+                rgba: 'rgba(0, 217, 255, 1)',
+                light: 'rgba(0, 217, 255, 0.1)'
+            },
+            radarr: {
+                hex: '#FFD60A',
+                name: 'Radarr',
+                rgba: 'rgba(255, 214, 10, 1)',
+                light: 'rgba(255, 214, 10, 0.1)'
+            },
+            qbittorrent: {
+                hex: '#0A84FF',
+                name: 'qBittorrent',
+                rgba: 'rgba(10, 132, 255, 1)',
+                light: 'rgba(10, 132, 255, 0.1)'
+            },
+            stash: {
+                hex: '#FF6B35',
+                name: 'Stash',
+                rgba: 'rgba(255, 107, 53, 1)',
+                light: 'rgba(255, 107, 53, 0.1)'
+            }
+        };
+
+        // Helper to get color by service name
+        function getServiceColor(service) {
+            return SERVICE_COLORS[service]?.hex || '#6B7280'; // fallback gray
+        }
+
+        // Helper to format service name
+        function formatServiceName(service) {
+            return SERVICE_COLORS[service]?.name || service;
+        }
+    </script>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
     <!-- Skip to main content link for accessibility -->

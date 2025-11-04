@@ -14,7 +14,55 @@
   --color-bg-primary: #111827;
   --color-bg-secondary: #1F2937;
   --color-bg-tertiary: #374151;
+
+  /* Service brand colors */
+  --color-service-plex: #FF9500;
+  --color-service-sonarr: #00D9FF;
+  --color-service-radarr: #FFD60A;
+  --color-service-qbittorrent: #0A84FF;
+  --color-service-stash: #FF6B35;
 }
+
+/* Service color utility classes */
+.bg-service-plex { background-color: var(--color-service-plex); }
+.bg-service-plex-faded { background-color: rgba(255, 149, 0, 0.1); }
+.bg-service-plex-gradient { background: radial-gradient(circle at top left, rgba(255, 149, 0, 0.45) 0%, rgba(255, 149, 0, 0.25) 35%, rgba(255, 149, 0, 0.08) 100%); }
+.border-service-plex { border-color: var(--color-service-plex); }
+.text-service-plex { color: var(--color-service-plex); }
+.text-on-service-plex { color: #1F2937; } /* Dark text for badge contrast */
+.hover\:bg-service-plex-dark:hover { background-color: #CC7700; }
+
+.bg-service-sonarr { background-color: var(--color-service-sonarr); }
+.bg-service-sonarr-faded { background-color: rgba(0, 217, 255, 0.1); }
+.bg-service-sonarr-gradient { background: radial-gradient(circle at top left, rgba(0, 217, 255, 0.45) 0%, rgba(0, 217, 255, 0.25) 35%, rgba(0, 217, 255, 0.08) 100%); }
+.border-service-sonarr { border-color: var(--color-service-sonarr); }
+.text-service-sonarr { color: var(--color-service-sonarr); }
+.text-on-service-sonarr { color: #1F2937; } /* Dark text for badge contrast */
+.hover\:bg-service-sonarr-dark:hover { background-color: #00B3D9; }
+
+.bg-service-radarr { background-color: var(--color-service-radarr); }
+.bg-service-radarr-faded { background-color: rgba(255, 214, 10, 0.1); }
+.bg-service-radarr-gradient { background: radial-gradient(circle at top left, rgba(255, 214, 10, 0.45) 0%, rgba(255, 214, 10, 0.25) 35%, rgba(255, 214, 10, 0.08) 100%); }
+.border-service-radarr { border-color: var(--color-service-radarr); }
+.text-service-radarr { color: var(--color-service-radarr); }
+.text-on-service-radarr { color: #1F2937; } /* Dark text for yellow background */
+.hover\:bg-service-radarr-dark:hover { background-color: #CCAA08; }
+
+.bg-service-qbittorrent { background-color: var(--color-service-qbittorrent); }
+.bg-service-qbittorrent-faded { background-color: rgba(10, 132, 255, 0.1); }
+.bg-service-qbittorrent-gradient { background: radial-gradient(circle at top left, rgba(10, 132, 255, 0.45) 0%, rgba(10, 132, 255, 0.25) 35%, rgba(10, 132, 255, 0.08) 100%); }
+.border-service-qbittorrent { border-color: var(--color-service-qbittorrent); }
+.text-service-qbittorrent { color: var(--color-service-qbittorrent); }
+.text-on-service-qbittorrent { color: #1F2937; } /* Dark text for badge contrast */
+.hover\:bg-service-qbittorrent-dark:hover { background-color: #0868CC; }
+
+.bg-service-stash { background-color: var(--color-service-stash); }
+.bg-service-stash-faded { background-color: rgba(255, 107, 53, 0.1); }
+.bg-service-stash-gradient { background: radial-gradient(circle at top left, rgba(255, 107, 53, 0.45) 0%, rgba(255, 107, 53, 0.25) 35%, rgba(255, 107, 53, 0.08) 100%); }
+.border-service-stash { border-color: var(--color-service-stash); }
+.text-service-stash { color: var(--color-service-stash); }
+.text-on-service-stash { color: #1F2937; } /* Dark text for badge contrast */
+.hover\:bg-service-stash-dark:hover { background-color: #CC562A; }
 
 /* HTMX loading indicators */
 .htmx-request {

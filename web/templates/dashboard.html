@@ -115,12 +115,12 @@
         <h3 class="text-xl font-semibold mb-4">Service Breakdown</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {{range $service, $stats := .Stats.ServiceBreakdown}}
-            <div class="bg-gray-700 rounded p-4">
+            <div class="bg-gray-700 {{serviceClass $service "bg-gradient"}} rounded p-4 border-l-4 {{serviceClass $service "border"}}">
                 <div class="flex justify-between items-center">
                     <span class="text-lg font-medium">{{formatServiceName $service}}</span>
-                    <span class="text-gray-400">{{$stats.FileCount}} files</span>
+                    <span class="text-gray-300">{{$stats.FileCount}} files</span>
                 </div>
-                <div class="text-sm text-gray-500 mt-1">{{formatSize $stats.TotalSize}}</div>
+                <div class="text-sm text-gray-400 mt-1">{{formatSize $stats.TotalSize}}</div>
             </div>
             {{end}}
         </div>
@@ -212,17 +212,17 @@
                 hx-post="/api/scan/update-services"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-purple-600 hover:bg-purple-700 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium">Update All Services</div>
-                <div class="text-sm text-purple-200 mt-1">Check all services and recalculate orphaned status</div>
+                class="p-4 bg-gray-700 border-l-4 border-purple-500 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="text-lg font-medium text-white">Update All Services</div>
+                <div class="text-sm text-gray-300 mt-1">Check all services and recalculate orphaned status</div>
             </button>
             <button
                 hx-post="/api/scan/recalculate-orphaned"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-orange-600 hover:bg-orange-700 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium">Recalculate Orphaned</div>
-                <div class="text-sm text-orange-200 mt-1">Update orphaned status without checking services</div>
+                class="p-4 bg-gray-700 border-l-4 border-orange-500 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="text-lg font-medium text-white">Recalculate Orphaned</div>
+                <div class="text-sm text-gray-300 mt-1">Update orphaned status without checking services</div>
             </button>
         </div>
 
@@ -232,41 +232,41 @@
                 hx-post="/api/scan/update-service?service=plex"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium">Update Plex</div>
-                <div class="text-sm text-gray-400 mt-1">Check Plex only</div>
+                class="p-4 bg-gray-700 {{serviceClass "plex" "bg-gradient"}} border-l-4 {{serviceClass "plex" "border"}} hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="text-lg font-medium text-white">Update Plex</div>
+                <div class="text-sm text-gray-300 mt-1">Check Plex only</div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=sonarr"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium">Update Sonarr</div>
-                <div class="text-sm text-gray-400 mt-1">Check Sonarr only</div>
+                class="p-4 bg-gray-700 {{serviceClass "sonarr" "bg-gradient"}} border-l-4 {{serviceClass "sonarr" "border"}} hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="text-lg font-medium text-white">Update Sonarr</div>
+                <div class="text-sm text-gray-300 mt-1">Check Sonarr only</div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=radarr"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium">Update Radarr</div>
-                <div class="text-sm text-gray-400 mt-1">Check Radarr only</div>
+                class="p-4 bg-gray-700 {{serviceClass "radarr" "bg-gradient"}} border-l-4 {{serviceClass "radarr" "border"}} hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="text-lg font-medium text-white">Update Radarr</div>
+                <div class="text-sm text-gray-300 mt-1">Check Radarr only</div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=qbittorrent"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium">Update qBittorrent</div>
-                <div class="text-sm text-gray-400 mt-1">Check qBittorrent only</div>
+                class="p-4 bg-gray-700 {{serviceClass "qbittorrent" "bg-gradient"}} border-l-4 {{serviceClass "qbittorrent" "border"}} hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="text-lg font-medium text-white">Update qBittorrent</div>
+                <div class="text-sm text-gray-300 mt-1">Check qBittorrent only</div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=stash"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium">Update Stash</div>
-                <div class="text-sm text-gray-400 mt-1">Check Stash only</div>
+                class="p-4 bg-gray-700 {{serviceClass "stash" "bg-gradient"}} border-l-4 {{serviceClass "stash" "border"}} hover:bg-gray-600 rounded transition text-center cursor-pointer {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="text-lg font-medium text-white">Update Stash</div>
+                <div class="text-sm text-gray-300 mt-1">Check Stash only</div>
             </button>
         </div>
     </div>

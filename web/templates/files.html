@@ -296,7 +296,7 @@
                             {{if .Usage}}
                                 <div class="flex flex-wrap gap-1">
                                     {{range .Usage}}
-                                    <span class="px-2 py-1 bg-gray-600 rounded text-xs">{{formatServiceName .Service}}</span>
+                                    <span class="px-2 py-1 {{serviceClass .Service "bg"}} {{serviceClass .Service "text-on-bg"}} rounded text-xs">{{formatServiceName .Service}}</span>
                                     {{end}}
                                 </div>
                             {{else}}

@@ -2665,6 +2665,35 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 				return service
 			}
 		},
+		"serviceClass": func(service string, variant string) string {
+			// Returns CSS class for service-specific styling
+			// Variants: "bg", "bg-faded", "bg-gradient", "border", "text", "text-on-bg", "hover"
+			validServices := map[string]bool{
+				"plex": true, "sonarr": true, "radarr": true,
+				"qbittorrent": true, "stash": true,
+			}
+			if !validServices[service] {
+				return "" // Invalid service, return empty string
+			}
+
+			// Handle compound variants (bg-faded, bg-gradient, text-on-bg)
+			// Need to rearrange from "bg-gradient" to "bg-service-{service}-gradient"
+			// or from "text-on-bg" to "text-on-service-{service}"
+			if strings.Contains(variant, "-") {
+				parts := strings.Split(variant, "-")
+				if len(parts) == 2 {
+					// bg-gradient -> bg-service-plex-gradient
+					// bg-faded -> bg-service-plex-faded
+					return fmt.Sprintf("%s-service-%s-%s", parts[0], service, parts[1])
+				} else if len(parts) == 3 && variant == "text-on-bg" {
+					// text-on-bg -> text-on-service-plex
+					return fmt.Sprintf("text-on-service-%s", service)
+				}
+			}
+
+			// Simple variants: border, text, bg, hover
+			return fmt.Sprintf("%s-service-%s", variant, service)
+		},
 		"add": func(a, b int64) int64 {
 			return a + b
 		},

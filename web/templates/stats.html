@@ -73,19 +73,19 @@
         <div class="space-y-4">
             {{range $service, $stats := .Stats.ServiceBreakdown}}
             {{if gt $stats.FileCount 0}}
-            <div class="bg-gray-700 rounded-lg p-4">
+            <div class="bg-gray-700 {{serviceClass $service "bg-gradient"}} rounded-lg p-4 border-l-4 {{serviceClass $service "border"}}">
                 <div class="flex justify-between items-center mb-2">
-                    <span class="text-lg font-medium">{{formatServiceName $service}}</span>
-                    <span class="text-gray-400">{{$stats.FileCount}} files</span>
+                    <span class="text-lg font-medium text-white">{{formatServiceName $service}}</span>
+                    <span class="text-gray-200">{{$stats.FileCount}} files</span>
                 </div>
                 <div class="w-full bg-gray-600 rounded-full h-2 mb-2">
-                    <div class="bg-blue-500 h-2 rounded-full" style="width: {{if gt $.Stats.TotalFiles 0}}{{div (mul $stats.FileCount 100.0) $.Stats.TotalFiles}}{{else}}0{{end}}%"></div>
+                    <div class="{{serviceClass $service "bg"}} h-2 rounded-full" style="width: {{if gt $.Stats.TotalFiles 0}}{{div (mul $stats.FileCount 100.0) $.Stats.TotalFiles}}{{else}}0{{end}}%"></div>
                 </div>
-                <div class="flex justify-between text-sm text-gray-500">
+                <div class="flex justify-between text-sm text-gray-300">
                     <span>{{formatSize $stats.TotalSize}}</span>
                     <span>{{if gt $.Stats.TotalFiles 0}}{{printf "%.1f%%" (div (mul $stats.FileCount 100.0) $.Stats.TotalFiles)}}{{else}}0%{{end}} of total files</span>
                 </div>
-                <div class="mt-2 text-xs text-gray-500">
+                <div class="mt-2 text-xs text-gray-400">
                     Average: {{formatSize (toInt64 $stats.AverageSize)}} per file
                 </div>
             </div>
@@ -323,17 +323,7 @@
 Chart.defaults.color = '#9CA3AF';
 Chart.defaults.borderColor = '#374151';
 
-// Helper function to format service names
-function formatServiceName(service) {
-    const names = {
-        'qbittorrent': 'qBittorrent',
-        'plex': 'Plex',
-        'sonarr': 'Sonarr',
-        'radarr': 'Radarr',
-        'stash': 'Stash'
-    };
-    return names[service] || service;
-}
+// Note: formatServiceName and getServiceColor are defined globally in layout.html
 
 // Helper function to format numbers with thousand separators
 function formatNumber(num) {
@@ -390,13 +380,7 @@ if (filesCtx && hasServiceData) {
             labels: serviceData.map(s => formatServiceName(s.service)),
             datasets: [{
                 data: serviceData.map(s => s.count),
-                backgroundColor: [
-                    '#3B82F6', // blue
-                    '#10B981', // green
-                    '#F59E0B', // amber
-                    '#EF4444', // red
-                    '#8B5CF6', // purple
-                ],
+                backgroundColor: serviceData.map(s => getServiceColor(s.service)),
                 borderWidth: 2,
                 borderColor: '#1F2937'
             }]
@@ -448,13 +432,7 @@ if (storageCtx && hasServiceData) {
             datasets: [{
                 label: 'Storage (GB)',
                 data: storageData.map(s => s.size),
-                backgroundColor: [
-                    '#3B82F6', // blue
-                    '#10B981', // green
-                    '#F59E0B', // amber
-                    '#EF4444', // red
-                    '#8B5CF6', // purple
-                ],
+                backgroundColor: storageData.map(s => getServiceColor(s.service)),
                 borderWidth: 0
             }]
         },
