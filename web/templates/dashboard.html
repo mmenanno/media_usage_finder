@@ -77,6 +77,13 @@
                 window.location.reload();
             }, 2000); // 2 second delay to show completion state
         });
+
+        // Set disk usage bar widths from data attributes
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('[data-width]').forEach(function(el) {
+                el.style.width = el.getAttribute('data-width') + '%';
+            });
+        });
     </script>
 
     <!-- Statistics Grid -->
@@ -109,6 +116,42 @@
             <div class="text-gray-500 text-sm mt-1">Tracking files</div>
         </div>
     </div>
+
+    <!-- Disk Status (if configured) -->
+    {{if .Disks}}
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-xl font-semibold mb-4">Disk Status</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {{range .Disks}}
+            <div class="bg-gray-700 rounded p-4 border-l-4 {{if ge .UsedPercent 90.0}}border-red-500{{else if ge .UsedPercent 80.0}}border-yellow-500{{else}}border-green-500{{end}}">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-lg font-medium">{{.Name}}</span>
+                    <span class="text-sm {{if ge .UsedPercent 90.0}}text-red-400{{else if ge .UsedPercent 80.0}}text-yellow-400{{else}}text-green-400{{end}} font-semibold">{{printf "%.1f%%" .UsedPercent}}</span>
+                </div>
+                <div class="text-sm text-gray-400 mb-2">
+                    {{formatBytes .UsedBytes}} / {{formatBytes .TotalBytes}}
+                </div>
+                <!-- Usage bar -->
+                <div class="w-full bg-gray-600 rounded-full h-2">
+                    <div class="{{if ge .UsedPercent 90.0}}bg-red-500{{else if ge .UsedPercent 80.0}}bg-yellow-500{{else}}bg-green-500{{end}} h-2 rounded-full transition-all duration-300" data-width="{{.UsedPercent}}"></div>
+                </div>
+                <div class="text-xs text-gray-500 mt-1">{{formatBytes .FreeBytes}} free</div>
+            </div>
+            {{end}}
+        </div>
+        <div class="text-sm text-gray-400 mt-4">
+            <span class="mr-4"><span class="inline-block w-3 h-3 bg-green-500 rounded mr-1"></span> &lt;80% full</span>
+            <span class="mr-4"><span class="inline-block w-3 h-3 bg-yellow-500 rounded mr-1"></span> 80-90% full</span>
+            <span><span class="inline-block w-3 h-3 bg-red-500 rounded mr-1"></span> &gt;90% full</span>
+        </div>
+    </div>
+    {{else}}
+    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 class="text-xl font-semibold mb-2">Disk Status</h3>
+        <p class="text-gray-400 text-sm mb-2">No disks configured for cross-disk duplicate detection.</p>
+        <p class="text-gray-500 text-xs">To enable: configure 'disks' in <a href="/config" class="text-blue-400 hover:underline">config</a> and mount disks in docker-compose.yml</p>
+    </div>
+    {{end}}
 
     <!-- Service Breakdown -->
     <div class="bg-gray-800 rounded-lg p-6">
@@ -145,7 +188,7 @@
     (function() {
         const logsContainer = document.getElementById('scan-logs-container');
         const placeholder = document.getElementById('scan-logs-placeholder');
-        let hasReceivedLogs = {{.HasActiveScan}};
+        let hasReceivedLogs = ('{{.HasActiveScan}}' === 'true');
 
         if (logsContainer) {
             // Clear placeholder when first log arrives

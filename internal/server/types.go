@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/mmenanno/media-usage-finder/internal/database"
+	"github.com/mmenanno/media-usage-finder/internal/disk"
 	"github.com/mmenanno/media-usage-finder/internal/stats"
 )
 
@@ -99,6 +100,7 @@ type DashboardData struct {
 	HasInterruptedScan   bool
 	InterruptedScanID    int64
 	InterruptedScanPhase string
+	Disks                []*disk.DiskInfo // Detected disks with usage information
 }
 
 // FilesData represents data for the files list template
@@ -130,6 +132,7 @@ type ConfigData struct {
 type StatsData struct {
 	Stats *stats.Stats
 	Title string
+	Disks []*disk.DiskInfo
 }
 
 // HardlinksData represents data for the hardlinks template

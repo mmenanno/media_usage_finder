@@ -209,6 +209,26 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 6: Add hash columns for duplicate detection if they don't exist
+	var hasFileHash int
+	err = db.conn.QueryRow(`
+		SELECT COUNT(*)
+		FROM pragma_table_info('files')
+		WHERE name = 'file_hash'
+	`).Scan(&hasFileHash)
+
+	if err != nil {
+		return fmt.Errorf("failed to check for file_hash column: %w", err)
+	}
+
+	// If file_hash column doesn't exist, add all hash columns
+	if hasFileHash == 0 {
+		_, err = db.conn.Exec(migrateAddHashColumns)
+		if err != nil {
+			return fmt.Errorf("failed to add hash columns: %w", err)
+		}
+	}
+
 	return nil
 }
 

@@ -29,6 +29,13 @@ type Config struct {
 	ScanPaths           []string                 `yaml:"scan_paths"`
 	Services            Services                 `yaml:"services"`
 
+	// Disk configuration for cross-disk duplicate detection
+	Disks []DiskConfig `yaml:"disks"`
+
+	// Duplicate detection configuration
+	DuplicateDetection     DuplicateDetectionConfig     `yaml:"duplicate_detection"`
+	DuplicateConsolidation DuplicateConsolidationConfig `yaml:"duplicate_consolidation"`
+
 	// Internal caching (not serialized)
 	pathCache *PathCache `yaml:"-"`
 }
@@ -83,6 +90,30 @@ type StashConfig struct {
 	APIKey string `yaml:"api_key"`
 }
 
+// DiskConfig contains configuration for a single disk
+type DiskConfig struct {
+	Name      string `yaml:"name"`       // User-friendly name (e.g., "Disk 1")
+	MountPath string `yaml:"mount_path"` // Container mount path (e.g., "/disk1")
+}
+
+// DuplicateDetectionConfig contains configuration for file hashing and duplicate detection
+type DuplicateDetectionConfig struct {
+	Enabled       bool   `yaml:"enabled"`         // Enable duplicate detection features
+	HashAlgorithm string `yaml:"hash_algorithm"`  // Hash algorithm to use ("sha256" or "blake3")
+	HashWorkers   int    `yaml:"hash_workers"`    // Number of parallel hash workers
+	MinFileSize   int64  `yaml:"min_file_size"`   // Only hash files larger than this (bytes)
+	MaxHashRateMB int    `yaml:"max_hash_rate_mbps"` // Rate limit for hashing (MB/s, 0 = unlimited)
+}
+
+// DuplicateConsolidationConfig contains configuration for duplicate file consolidation
+type DuplicateConsolidationConfig struct {
+	Enabled              bool   `yaml:"enabled"`                // Enable consolidation features
+	DryRun               bool   `yaml:"dry_run"`                // Run in dry-run mode (preview only)
+	RequireManualApproval bool  `yaml:"require_manual_approval"` // Require manual approval for each group
+	VerifyBeforeDelete   bool   `yaml:"verify_before_delete"`   // Re-hash files before deletion
+	Strategy             string `yaml:"strategy"`               // Consolidation strategy ("least_full_disk" or "preferred_disk")
+}
+
 // Default returns a default configuration
 func Default() *Config {
 	return &Config{
@@ -116,6 +147,21 @@ func Default() *Config {
 			},
 		},
 		ScanPaths: []string{"/media", "/downloads"},
+		Disks: []DiskConfig{},
+		DuplicateDetection: DuplicateDetectionConfig{
+			Enabled:       true,
+			HashAlgorithm: "sha256",
+			HashWorkers:   4,
+			MinFileSize:   10485760, // 10MB
+			MaxHashRateMB: 200,
+		},
+		DuplicateConsolidation: DuplicateConsolidationConfig{
+			Enabled:              true,
+			DryRun:               true,
+			RequireManualApproval: false,
+			VerifyBeforeDelete:   true,
+			Strategy:             "least_full_disk",
+		},
 	}
 }
 

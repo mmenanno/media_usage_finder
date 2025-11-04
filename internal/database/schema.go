@@ -235,3 +235,27 @@ CREATE INDEX IF NOT EXISTS idx_files_extension ON files(extension);
 -- Create composite index for orphaned files by extension (common query pattern)
 CREATE INDEX IF NOT EXISTS idx_files_orphaned_extension ON files(is_orphaned, extension);
 `
+
+// Migration to add hash columns for duplicate detection
+const migrateAddHashColumns = `
+-- Add file_hash column to files table
+ALTER TABLE files ADD COLUMN file_hash TEXT DEFAULT NULL;
+
+-- Add hash_algorithm column to files table
+ALTER TABLE files ADD COLUMN hash_algorithm TEXT DEFAULT NULL;
+
+-- Add hash_calculated flag to files table
+ALTER TABLE files ADD COLUMN hash_calculated INTEGER DEFAULT 0;
+
+-- Create index on file_hash for duplicate detection
+CREATE INDEX IF NOT EXISTS idx_files_hash ON files(file_hash) WHERE file_hash IS NOT NULL;
+
+-- Create composite index for duplicate candidates (same size + hash)
+CREATE INDEX IF NOT EXISTS idx_files_duplicate_candidates ON files(size, file_hash) WHERE file_hash IS NOT NULL;
+
+-- Create index for finding files that need hashing
+CREATE INDEX IF NOT EXISTS idx_files_needs_hash ON files(hash_calculated, size) WHERE hash_calculated = 0;
+
+-- Create composite index for cross-disk duplicate detection (hash + device_id)
+CREATE INDEX IF NOT EXISTS idx_files_hash_device ON files(file_hash, device_id) WHERE file_hash IS NOT NULL;
+`

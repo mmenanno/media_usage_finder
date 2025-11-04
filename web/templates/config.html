@@ -363,6 +363,185 @@
             </div>
         </div>
 
+        <!-- Disk Configuration -->
+        <div class="bg-gray-800 rounded-lg p-6 border border-purple-500 border-opacity-20">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="text-xl font-semibold">Disk Configuration</h3>
+                    <p class="text-sm text-gray-400 mt-1">Configure individual disk mounts for cross-disk duplicate detection</p>
+                </div>
+                <button
+                    type="button"
+                    id="test-disk-detection-btn"
+                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer">
+                    <svg class="hidden animate-spin h-4 w-4 text-white" id="disk-detection-spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span id="test-disk-detection-text">Test Disk Detection</span>
+                </button>
+            </div>
+
+            <div id="disks-container" class="space-y-2 mb-4">
+                {{range $i, $disk := .Config.Disks}}
+                <div class="disk-row flex gap-2 items-center bg-gray-700 p-3 rounded">
+                    <input type="text" name="disk_name_{{$i}}" value="{{$disk.Name}}" placeholder="Disk Name"
+                           class="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-blue-500">
+                    <input type="text" name="disk_mount_{{$i}}" value="{{$disk.MountPath}}" placeholder="/disk1"
+                           class="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-blue-500 font-mono text-sm">
+                    <button type="button" onclick="this.parentElement.remove()"
+                            class="px-3 py-2 bg-red-600 hover:bg-red-700 rounded text-sm transition">Remove</button>
+                </div>
+                {{end}}
+            </div>
+
+            <button type="button" id="add-disk-btn"
+                    class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-sm transition">
+                + Add Disk
+            </button>
+
+            <p class="text-xs text-gray-500 mt-3">
+                <strong>Important:</strong> Disks must be mounted in docker-compose.yml (e.g., <code class="bg-gray-700 px-1 rounded">/mnt/disk1:/disk1:ro</code>)
+            </p>
+        </div>
+
+        <!-- Duplicate Detection Settings -->
+        <div class="bg-gray-800 rounded-lg p-6 border border-purple-500 border-opacity-20">
+            <h3 class="text-xl font-semibold mb-4">Duplicate Detection Settings</h3>
+            <div class="space-y-4">
+                <div class="flex items-center gap-2 mb-4">
+                    <input type="checkbox" id="duplicate_detection_enabled" name="duplicate_detection_enabled"
+                           {{if .Config.DuplicateDetection.Enabled}}checked{{end}}
+                           class="w-5 h-5 bg-gray-700 border-gray-600 rounded">
+                    <label for="duplicate_detection_enabled" class="text-sm font-medium">Enable Duplicate Detection</label>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Hash Algorithm</label>
+                        <div class="relative" data-custom-dropdown>
+                            <input type="hidden" name="hash_algorithm" value="{{.Config.DuplicateDetection.HashAlgorithm}}" data-dropdown-input>
+                            <button
+                                type="button"
+                                data-dropdown-button
+                                aria-expanded="false"
+                                class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                                <span data-dropdown-text>
+                                    {{if eq .Config.DuplicateDetection.HashAlgorithm "blake3"}}BLAKE3 (Faster, experimental){{else}}SHA-256 (Recommended){{end}}
+                                </span>
+                                <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg">
+                                <div data-dropdown-option data-value="sha256" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashAlgorithm "sha256"}}bg-blue-600{{end}}">SHA-256 (Recommended)</div>
+                                <div data-dropdown-option data-value="blake3" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashAlgorithm "blake3"}}bg-blue-600{{end}}">BLAKE3 (Faster, experimental)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="hash_workers" class="block text-sm font-medium text-gray-400 mb-2">Hash Workers</label>
+                        <input type="number" id="hash_workers" name="hash_workers" min="1" max="32"
+                               value="{{.Config.DuplicateDetection.HashWorkers}}"
+                               class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Parallel hash calculation workers (default: 4)</p>
+                    </div>
+
+                    <div>
+                        <label for="min_file_size" class="block text-sm font-medium text-gray-400 mb-2">Minimum File Size (MB)</label>
+                        <input type="number" id="min_file_size" name="min_file_size" min="0" step="1"
+                               value="{{div .Config.DuplicateDetection.MinFileSize 1048576}}"
+                               class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Only hash files larger than this (0 = all files)</p>
+                    </div>
+
+                    <div>
+                        <label for="max_hash_rate" class="block text-sm font-medium text-gray-400 mb-2">Max Hash Rate (MB/s)</label>
+                        <input type="number" id="max_hash_rate" name="max_hash_rate" min="0" step="10"
+                               value="{{.Config.DuplicateDetection.MaxHashRateMB}}"
+                               class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Rate limit for hashing (0 = unlimited)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Duplicate Consolidation Settings -->
+        <div class="bg-gray-800 rounded-lg p-6 border border-purple-500 border-opacity-20">
+            <h3 class="text-xl font-semibold mb-4">Duplicate Consolidation Settings</h3>
+            <div class="space-y-4">
+                <div class="flex items-center gap-2 mb-4">
+                    <input type="checkbox" id="consolidation_enabled" name="consolidation_enabled"
+                           {{if .Config.DuplicateConsolidation.Enabled}}checked{{end}}
+                           class="w-5 h-5 bg-gray-700 border-gray-600 rounded">
+                    <label for="consolidation_enabled" class="text-sm font-medium">Enable Consolidation Features</label>
+                </div>
+
+                <div class="space-y-3 bg-gray-700 p-4 rounded">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="dry_run" name="dry_run"
+                               {{if .Config.DuplicateConsolidation.DryRun}}checked{{end}}
+                               class="w-5 h-5 bg-gray-600 border-gray-500 rounded">
+                        <label for="dry_run" class="text-sm">
+                            <span class="font-medium">Dry-Run Mode</span>
+                            <span class="text-gray-400"> - Preview changes without deleting files (recommended)</span>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="require_manual_approval" name="require_manual_approval"
+                               {{if .Config.DuplicateConsolidation.RequireManualApproval}}checked{{end}}
+                               class="w-5 h-5 bg-gray-600 border-gray-500 rounded">
+                        <label for="require_manual_approval" class="text-sm">
+                            <span class="font-medium">Require Manual Approval</span>
+                            <span class="text-gray-400"> - Confirm each duplicate group before consolidation</span>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="verify_before_delete" name="verify_before_delete"
+                               {{if .Config.DuplicateConsolidation.VerifyBeforeDelete}}checked{{end}}
+                               class="w-5 h-5 bg-gray-600 border-gray-500 rounded">
+                        <label for="verify_before_delete" class="text-sm">
+                            <span class="font-medium">Verify Before Delete</span>
+                            <span class="text-gray-400"> - Re-hash files to ensure integrity before deletion</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Consolidation Strategy</label>
+                    <div class="relative" data-custom-dropdown>
+                        <input type="hidden" name="consolidation_strategy" value="{{.Config.DuplicateConsolidation.Strategy}}" data-dropdown-input>
+                        <button
+                            type="button"
+                            data-dropdown-button
+                            aria-expanded="false"
+                            class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                            <span data-dropdown-text>
+                                {{if eq .Config.DuplicateConsolidation.Strategy "preferred_disk"}}Preferred Disk - Keep file based on predefined disk priority order{{else}}Least Full Disk - Keep file on disk with lowest usage percentage{{end}}
+                            </span>
+                            <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg">
+                            <div data-dropdown-option data-value="least_full_disk" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateConsolidation.Strategy "least_full_disk"}}bg-blue-600{{end}}">
+                                Least Full Disk - Keep file on disk with lowest usage percentage
+                            </div>
+                            <div data-dropdown-option data-value="preferred_disk" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateConsolidation.Strategy "preferred_disk"}}bg-blue-600{{end}}">
+                                Preferred Disk - Keep file based on predefined disk priority order
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">
+                        Strategy for choosing which copy to keep when duplicates span multiple disks
+                    </p>
+                </div>
+            </div>
+        </div>
+
         <!-- Save Button -->
         <div class="flex justify-end space-x-4">
             <button
@@ -378,6 +557,65 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ===========================
+    // Disk Configuration
+    // ===========================
+    const addDiskBtn = document.getElementById('add-disk-btn');
+    const disksContainer = document.getElementById('disks-container');
+    const testDiskDetectionBtn = document.getElementById('test-disk-detection-btn');
+    const diskDetectionSpinner = document.getElementById('disk-detection-spinner');
+    const diskDetectionText = document.getElementById('test-disk-detection-text');
+
+    // Initialize disk counter from template
+    let diskCounter = parseInt('{{len .Config.Disks}}', 10);
+
+    // Add new disk row
+    addDiskBtn.addEventListener('click', function() {
+        const diskRow = document.createElement('div');
+        diskRow.className = 'disk-row flex gap-2 items-center bg-gray-700 p-3 rounded';
+        diskRow.innerHTML = `
+            <input type="text" name="disk_name_${diskCounter}" placeholder="Disk Name"
+                   class="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-blue-500">
+            <input type="text" name="disk_mount_${diskCounter}" placeholder="/disk${diskCounter + 1}"
+                   class="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-blue-500 font-mono text-sm">
+            <button type="button" onclick="this.parentElement.remove()"
+                    class="px-3 py-2 bg-red-600 hover:bg-red-700 rounded text-sm transition">Remove</button>
+        `;
+        disksContainer.appendChild(diskRow);
+        diskCounter++;
+    });
+
+    // Test disk detection
+    testDiskDetectionBtn.addEventListener('click', async function() {
+        // Show loading state
+        diskDetectionSpinner.classList.remove('hidden');
+        diskDetectionText.textContent = 'Testing...';
+        testDiskDetectionBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/disks/detect');
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to detect disks');
+            }
+
+            const result = await response.json();
+            alert(`Successfully detected ${result.count} disk(s):\n\n` +
+                  result.disks.map(d => `${d.name}: ${d.mount_path} (${d.used_percent.toFixed(1)}% full)`).join('\n'));
+        } catch (error) {
+            alert('Disk detection failed: ' + error.message);
+        } finally {
+            // Hide loading state
+            diskDetectionSpinner.classList.add('hidden');
+            diskDetectionText.textContent = 'Test Disk Detection';
+            testDiskDetectionBtn.disabled = false;
+        }
+    });
+
+    // ===========================
+    // Plex Library Configuration
+    // ===========================
     const fetchBtn = document.getElementById('fetch-plex-libraries-btn');
     const spinner = document.getElementById('plex-libraries-spinner');
     const fetchText = document.getElementById('fetch-libraries-text');
@@ -389,7 +627,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const testConnectionBtn = container.closest('.bg-gray-800').querySelector('button[hx-post]');
 
     // Get currently selected libraries from config (Go template evaluated once)
-    const savedLibraries = [{{range $i, $lib := .Config.Services.Plex.Libraries}}{{if $i}}, {{end}}"{{$lib}}"{{end}}];
+    const savedLibrariesJSON = '{{range $i, $lib := .Config.Services.Plex.Libraries}}{{if $i}},{{end}}"{{$lib}}"{{end}}';
+    const savedLibraries = savedLibrariesJSON ? JSON.parse('[' + savedLibrariesJSON + ']') : [];
     console.log('Saved libraries from config:', savedLibraries);
 
     // Store fetched libraries
@@ -514,6 +753,68 @@ document.addEventListener('DOMContentLoaded', function() {
     if (plexURLInput.value.trim() && plexTokenInput.value.trim()) {
         fetchLibraries();
     }
+
+    // ===========================
+    // Custom Dropdown Handlers
+    // ===========================
+    // Initialize all custom dropdowns on the page
+    document.querySelectorAll('[data-custom-dropdown]').forEach(dropdown => {
+        const button = dropdown.querySelector('[data-dropdown-button]');
+        const menu = dropdown.querySelector('[data-dropdown-menu]');
+        const input = dropdown.querySelector('[data-dropdown-input]');
+        const textSpan = dropdown.querySelector('[data-dropdown-text]');
+        const options = dropdown.querySelectorAll('[data-dropdown-option]');
+
+        if (!button || !menu || !input || !textSpan) return;
+
+        // Toggle dropdown
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const isOpen = menu.classList.contains('hidden');
+
+            // Close all other dropdowns first
+            document.querySelectorAll('[data-dropdown-menu]').forEach(m => {
+                if (m !== menu) {
+                    m.classList.add('hidden');
+                    const btn = m.parentElement.querySelector('[data-dropdown-button]');
+                    if (btn) btn.setAttribute('aria-expanded', 'false');
+                }
+            });
+
+            menu.classList.toggle('hidden');
+            button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+
+        // Handle option selection
+        options.forEach(option => {
+            option.addEventListener('click', function() {
+                const value = this.getAttribute('data-value');
+                const text = this.textContent.trim();
+
+                // Update hidden input
+                input.value = value;
+
+                // Update button text
+                textSpan.textContent = text;
+
+                // Update active state on options
+                options.forEach(opt => opt.classList.remove('bg-blue-600'));
+                this.classList.add('bg-blue-600');
+
+                // Close dropdown
+                menu.classList.add('hidden');
+                button.setAttribute('aria-expanded', 'false');
+            });
+        });
+
+        // Close on click outside
+        document.addEventListener('click', function(e) {
+            if (!dropdown.contains(e.target)) {
+                menu.classList.add('hidden');
+                button.setAttribute('aria-expanded', 'false');
+            }
+        });
+    });
 });
 </script>
 

@@ -11,7 +11,17 @@ services:
       # Application data (config and database)
       - ./appdata:/appdata
 
-      # Media paths (adjust these to match your setup)
+      # Individual disk mounts (required for cross-disk duplicate detection)
+      # Mount each physical disk to detect which disk files are on
+      - /mnt/disk1:/disk1:ro
+      - /mnt/disk2:/disk2:ro
+      - /mnt/disk3:/disk3:ro
+      - /mnt/disk4:/disk4:ro
+      - /mnt/disk5:/disk5:ro
+      # Add more disks as needed (e.g., /mnt/disk6:/disk6:ro)
+
+      # User share paths (for existing functionality)
+      # These paths aggregate all disks via Unraid's FUSE layer
       - /mnt/user/data/media:/media:ro
       - /mnt/user/data/downloads/torrents:/downloads:ro
     environment:

@@ -18,6 +18,7 @@ import (
 	"github.com/mmenanno/media-usage-finder/internal/config"
 	"github.com/mmenanno/media-usage-finder/internal/constants"
 	"github.com/mmenanno/media-usage-finder/internal/database"
+	"github.com/mmenanno/media-usage-finder/internal/disk"
 	"github.com/mmenanno/media-usage-finder/internal/scanner"
 	"github.com/mmenanno/media-usage-finder/internal/stats"
 )
@@ -32,6 +33,7 @@ type Server struct {
 	templateFuncs template.FuncMap   // Cached template functions
 	version       string             // Application version
 	clientFactory *api.ClientFactory // Factory for creating service clients
+	diskDetector  *disk.Detector     // Disk detector for cross-disk duplicate detection
 }
 
 // NewServer creates a new server instance
@@ -53,6 +55,20 @@ func NewServer(db *database.DB, cfg *config.Config, version string) *Server {
 	srv.templateFuncs = srv.createTemplateFuncs()
 
 	srv.scanner = scanner.NewScanner(db, cfg)
+
+	// Initialize disk detector if disks are configured
+	if len(cfg.Disks) > 0 {
+		srv.diskDetector = disk.NewDetector(cfg.Disks)
+		if err := srv.diskDetector.DetectDisks(); err != nil {
+			log.Printf("Warning: Failed to detect disks: %v", err)
+			log.Printf("Duplicate detection features will be limited without disk information")
+		} else {
+			log.Printf("Successfully detected %d disk(s)", srv.diskDetector.GetDiskCount())
+		}
+	} else {
+		log.Printf("No disks configured - cross-disk duplicate detection disabled")
+		log.Printf("To enable: configure 'disks' in config.yaml and mount disks in docker-compose.yml")
+	}
 
 	// Invalidate stats cache when scan completes
 	srv.scanner.SetOnScanComplete(func() {
@@ -147,6 +163,16 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get disk information if disk detector is configured
+	var disks []*disk.DiskInfo
+	if s.diskDetector != nil {
+		// Refresh disk space information before displaying
+		if err := s.diskDetector.RefreshDiskSpace(); err != nil {
+			log.Printf("Warning: Failed to refresh disk space: %v", err)
+		}
+		disks = s.diskDetector.GetAllDisks()
+	}
+
 	data := DashboardData{
 		Stats:                statistics,
 		Title:                "Dashboard",
@@ -154,6 +180,7 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		HasInterruptedScan:   hasInterruptedScan,
 		InterruptedScanID:    interruptedScanID,
 		InterruptedScanPhase: interruptedScanPhase,
+		Disks:                disks,
 	}
 
 	s.renderTemplate(w, "dashboard.html", data)
@@ -335,9 +362,19 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get disk information if disk detector is configured
+	var disks []*disk.DiskInfo
+	if s.diskDetector != nil {
+		if err := s.diskDetector.RefreshDiskSpace(); err != nil {
+			log.Printf("Warning: Failed to refresh disk space: %v", err)
+		}
+		disks = s.diskDetector.GetAllDisks()
+	}
+
 	data := StatsData{
 		Stats: statistics,
 		Title: "Statistics",
+		Disks: disks,
 	}
 
 	s.renderTemplate(w, "stats.html", data)
@@ -2690,6 +2727,7 @@ func CalculateTotalPages(total, limit int) int {
 func (s *Server) createTemplateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"formatSize":     stats.FormatSize,
+		"formatBytes":    disk.FormatBytes, // For disk space formatting
 		"formatDuration": stats.FormatDuration,
 		"formatServiceName": func(service string) string {
 			// Map internal service names to proper display names

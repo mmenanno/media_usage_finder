@@ -79,7 +79,7 @@
                     <span class="text-gray-200">{{$stats.FileCount}} files</span>
                 </div>
                 <div class="w-full bg-gray-600 rounded-full h-2 mb-2">
-                    <div class="{{serviceClass $service "bg"}} h-2 rounded-full" style="width: {{if gt $.Stats.TotalFiles 0}}{{div (mul $stats.FileCount 100.0) $.Stats.TotalFiles}}{{else}}0{{end}}%"></div>
+                    <div class="{{serviceClass $service "bg"}} h-2 rounded-full" data-width="{{if gt $.Stats.TotalFiles 0}}{{div (mul $stats.FileCount 100.0) $.Stats.TotalFiles}}{{else}}0{{end}}"></div>
                 </div>
                 <div class="flex justify-between text-sm text-gray-300">
                     <span>{{formatSize $stats.TotalSize}}</span>
@@ -93,6 +93,102 @@
             {{end}}
         </div>
     </div>
+
+    <!-- Disk Distribution (if disks configured) -->
+    {{if .Disks}}
+    <div class="bg-gray-800 rounded-lg p-6">
+        <h3 class="text-xl font-semibold mb-6">Disk Distribution</h3>
+
+        <!-- Disk Status Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {{range .Disks}}
+            <div class="bg-gray-700 rounded-lg p-4 border-l-4 {{if ge .UsedPercent 90.0}}border-red-500{{else if ge .UsedPercent 80.0}}border-yellow-500{{else}}border-green-500{{end}}">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-lg font-medium">{{.Name}}</span>
+                    <span class="text-sm {{if ge .UsedPercent 90.0}}text-red-400{{else if ge .UsedPercent 80.0}}text-yellow-400{{else}}text-green-400{{end}} font-semibold">
+                        {{printf "%.1f%%" .UsedPercent}}
+                    </span>
+                </div>
+                <div class="text-sm text-gray-400 mb-2">
+                    {{formatBytes .UsedBytes}} / {{formatBytes .TotalBytes}}
+                </div>
+                <!-- Usage bar -->
+                <div class="w-full bg-gray-600 rounded-full h-2">
+                    <div class="{{if ge .UsedPercent 90.0}}bg-red-500{{else if ge .UsedPercent 80.0}}bg-yellow-500{{else}}bg-green-500{{end}} h-2 rounded-full transition-all duration-300"
+                         data-width="{{.UsedPercent}}"></div>
+                </div>
+                <div class="text-xs text-gray-500 mt-1">{{formatBytes .FreeBytes}} free</div>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Disk Usage Chart -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="text-sm font-medium text-gray-400 mb-4 text-center">Storage by Disk</h4>
+                <canvas id="diskStorageChart" class="max-h-64"></canvas>
+            </div>
+
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="text-sm font-medium text-gray-400 mb-4 text-center">Disk Usage Comparison</h4>
+                <canvas id="diskUsageChart" class="max-h-64"></canvas>
+            </div>
+        </div>
+
+        <!-- Detailed Disk Table -->
+        <div class="mt-6 overflow-x-auto">
+            <h4 class="text-sm font-medium text-gray-400 mb-4">Detailed Disk Information</h4>
+            <table class="w-full text-sm">
+                <thead class="bg-gray-900 text-gray-400 uppercase text-xs">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Disk</th>
+                        <th class="px-4 py-3 text-right">Total</th>
+                        <th class="px-4 py-3 text-right">Used</th>
+                        <th class="px-4 py-3 text-right">Free</th>
+                        <th class="px-4 py-3 text-right">Usage %</th>
+                        <th class="px-4 py-3 text-left">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                    {{range .Disks}}
+                    <tr class="hover:bg-gray-750">
+                        <td class="px-4 py-3 font-medium">
+                            {{.Name}}
+                            <div class="text-xs text-gray-500 font-mono">{{.MountPath}}</div>
+                        </td>
+                        <td class="px-4 py-3 text-right">{{formatBytes .TotalBytes}}</td>
+                        <td class="px-4 py-3 text-right">{{formatBytes .UsedBytes}}</td>
+                        <td class="px-4 py-3 text-right">{{formatBytes .FreeBytes}}</td>
+                        <td class="px-4 py-3 text-right {{if ge .UsedPercent 90.0}}text-red-400{{else if ge .UsedPercent 80.0}}text-yellow-400{{else}}text-green-400{{end}} font-semibold">
+                            {{printf "%.1f%%" .UsedPercent}}
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 text-xs rounded {{if ge .UsedPercent 90.0}}bg-red-900 text-red-300{{else if ge .UsedPercent 80.0}}bg-yellow-900 text-yellow-300{{else}}bg-green-900 text-green-300{{end}}">
+                                {{if ge .UsedPercent 90.0}}Critical{{else if ge .UsedPercent 80.0}}Warning{{else}}Healthy{{end}}
+                            </span>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+
+        <p class="text-xs text-gray-500 mt-4 italic">
+            Note: Disk statistics are updated when the server starts or when configuration is refreshed.
+        </p>
+    </div>
+    {{else}}
+    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 class="text-xl font-semibold mb-2">Disk Distribution</h3>
+        <p class="text-gray-400 text-sm mb-2">No disks configured for cross-disk duplicate detection.</p>
+        <p class="text-gray-500 text-xs">
+            To enable disk tracking, configure 'disks' in config.yaml and mount individual disks in docker-compose.yml
+        </p>
+        <a href="/config" class="inline-block mt-2 text-sm text-blue-400 hover:text-blue-300">
+            Configure disks →
+        </a>
+    </div>
+    {{end}}
 
     <!-- Orphaned File Analysis -->
     {{if gt .Stats.OrphanedFiles 0}}
@@ -262,7 +358,7 @@
             {{if gt .Stats.OrphanedFiles 0}}
             <div class="p-4 bg-yellow-900/30 border border-yellow-700 rounded">
                 <div class="flex items-start space-x-3">
-                    <svg class="w-6 h-6 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-6 h-6 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                     </svg>
                     <div class="flex-1">
@@ -282,7 +378,7 @@
             {{if gt .Stats.HardlinkGroups 0}}
             <div class="p-4 bg-blue-900/30 border border-blue-700 rounded">
                 <div class="flex items-start space-x-3">
-                    <svg class="w-6 h-6 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-6 h-6 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                     </svg>
                     <div class="flex-1">
@@ -299,7 +395,7 @@
             {{if eq .Stats.TotalFiles 0}}
             <div class="p-4 bg-gray-700 border border-gray-600 rounded">
                 <div class="flex items-start space-x-3">
-                    <svg class="w-6 h-6 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-6 h-6 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                     <div class="flex-1">
@@ -317,6 +413,56 @@
         </div>
     </div>
 </div>
+
+<!-- Stats data for charts (JSON) -->
+<script type="application/json" id="stats-data">
+{
+    "serviceBreakdown": [
+        {{range $service, $stats := .Stats.ServiceBreakdown}}
+        {{if gt $stats.FileCount 0}}
+        {
+            "service": "{{$service}}",
+            "fileCount": {{$stats.FileCount}},
+            "totalSize": {{$stats.TotalSize}}
+        },
+        {{end}}
+        {{end}}
+        null
+    ],
+    "orphanedExtensions": [
+        {{range .Stats.OrphanedExtensions}}
+        {
+            "extension": "{{.Extension}}",
+            "fileCount": {{.FileCount}},
+            "totalSize": {{.TotalSize}}
+        },
+        {{end}}
+        null
+    ],
+    "orphanedByAge": [
+        {{range .Stats.OrphanedByAge}}
+        {
+            "ageGroup": "{{.AgeGroup}}",
+            "fileCount": {{.FileCount}},
+            "totalSize": {{.TotalSize}}
+        },
+        {{end}}
+        null
+    ],
+    "disks": [
+        {{range .Disks}}
+        {
+            "name": "{{.Name}}",
+            "totalBytes": {{.TotalBytes}},
+            "usedBytes": {{.UsedBytes}},
+            "freeBytes": {{.FreeBytes}},
+            "usedPercent": {{.UsedPercent}}
+        },
+        {{end}}
+        null
+    ]
+}
+</script>
 
 <script>
 // Chart.js configuration
@@ -360,26 +506,23 @@ function formatGBValue(gbValue) {
     return formatBytes(bytes);
 }
 
-// Check if we have service data
-const hasServiceData = {{.Stats.ActiveServiceCount}} > 0;
+// Parse stats data from JSON script tag
+const statsDataElement = document.getElementById('stats-data');
+const statsData = JSON.parse(statsDataElement.textContent);
+const serviceBreakdown = statsData.serviceBreakdown.filter(function(item) { return item !== null; });
+const hasServiceData = serviceBreakdown.length > 0;
 
 // Files by Service Chart
 const filesCtx = document.getElementById('filesChart');
 if (filesCtx && hasServiceData) {
-    const serviceData = [
-        {{range $service, $stats := .Stats.ServiceBreakdown}}
-        {{if gt $stats.FileCount 0}}
-        { service: '{{$service}}', count: {{$stats.FileCount}} },
-        {{end}}
-        {{end}}
-    ];
+    const serviceData = serviceBreakdown;
 
     new Chart(filesCtx, {
         type: 'doughnut',
         data: {
             labels: serviceData.map(s => formatServiceName(s.service)),
             datasets: [{
-                data: serviceData.map(s => s.count),
+                data: serviceData.map(s => s.fileCount),
                 backgroundColor: serviceData.map(s => getServiceColor(s.service)),
                 borderWidth: 2,
                 borderColor: '#1F2937'
@@ -417,13 +560,9 @@ if (filesCtx && hasServiceData) {
 // Storage by Service Chart
 const storageCtx = document.getElementById('storageChart');
 if (storageCtx && hasServiceData) {
-    const storageData = [
-        {{range $service, $stats := .Stats.ServiceBreakdown}}
-        {{if gt $stats.FileCount 0}}
-        { service: '{{$service}}', size: {{div $stats.TotalSize 1073741824.0}} },
-        {{end}}
-        {{end}}
-    ];
+    const storageData = serviceBreakdown.map(function(s) {
+        return { service: s.service, size: s.totalSize / 1073741824.0 };
+    });
 
     new Chart(storageCtx, {
         type: 'bar',
@@ -476,11 +615,10 @@ if (storageCtx && hasServiceData) {
 // Orphaned Extensions Chart
 const extensionsCtx = document.getElementById('extensionsChart');
 if (extensionsCtx) {
-    const extensionData = [
-        {{range .Stats.OrphanedExtensions}}
-        { ext: '{{.Extension}}', count: {{.FileCount}}, size: {{div .TotalSize 1073741824.0}} },
-        {{end}}
-    ];
+    const orphanedExts = statsData.orphanedExtensions.filter(function(item) { return item !== null; });
+    const extensionData = orphanedExts.map(function(e) {
+        return { ext: e.extension, count: e.fileCount, size: e.totalSize / 1073741824.0 };
+    });
 
     // Distinct, high-contrast color palette for easy differentiation
     const extensionColors = [
@@ -646,11 +784,10 @@ if (extensionsCtx) {
 // Orphaned Files by Age Chart
 const ageCtx = document.getElementById('ageChart');
 if (ageCtx) {
-    const ageData = [
-        {{range .Stats.OrphanedByAge}}
-        { age: '{{.AgeGroup}}', count: {{.FileCount}}, size: {{div .TotalSize 1073741824.0}} },
-        {{end}}
-    ];
+    const orphanedByAge = statsData.orphanedByAge.filter(function(item) { return item !== null; });
+    const ageData = orphanedByAge.map(function(a) {
+        return { age: a.ageGroup, count: a.fileCount, size: a.totalSize / 1073741824.0 };
+    });
 
     // Use different colors for different age groups
     const ageColors = {
@@ -703,6 +840,182 @@ if (ageCtx) {
         }
     });
 }
+
+// Disk Storage Chart
+const diskStorageCtx = document.getElementById('diskStorageChart');
+const disksData = statsData.disks.filter(function(item) { return item !== null; });
+if (diskStorageCtx && disksData.length > 0) {
+    const diskData = disksData.map(function(d) {
+        return {
+            name: d.name,
+            total: d.totalBytes / 1073741824.0,
+            used: d.usedBytes / 1073741824.0,
+            free: d.freeBytes / 1073741824.0,
+            percent: d.usedPercent
+        };
+    });
+
+    // Use distinct colors for each disk
+    const diskColors = [
+        '#3B82F6',  // blue
+        '#10B981',  // green
+        '#F59E0B',  // amber
+        '#EC4899',  // pink
+        '#8B5CF6',  // purple
+        '#14B8A6',  // teal
+        '#F97316',  // orange
+        '#06B6D4',  // cyan
+    ];
+
+    new Chart(diskStorageCtx, {
+        type: 'doughnut',
+        data: {
+            labels: diskData.map(d => d.name),
+            datasets: [{
+                data: diskData.map(d => d.used),
+                backgroundColor: diskColors.slice(0, diskData.length),
+                borderWidth: 2,
+                borderColor: '#1F2937'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const idx = context.dataIndex;
+                            const data = diskData[idx];
+                            const total = diskData.reduce((sum, d) => sum + d.used, 0);
+                            const percentage = ((data.used / total) * 100).toFixed(1);
+                            return [
+                                data.name + ':',
+                                'Used: ' + formatGBValue(data.used),
+                                'Total: ' + formatGBValue(data.total),
+                                percentage + '% of all disks'
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Disk Usage Comparison Chart
+const diskUsageCtx = document.getElementById('diskUsageChart');
+if (diskUsageCtx && disksData.length > 0) {
+    const diskData = disksData.map(function(d) {
+        return {
+            name: d.name,
+            total: d.totalBytes / 1073741824.0,
+            used: d.usedBytes / 1073741824.0,
+            free: d.freeBytes / 1073741824.0,
+            percent: d.usedPercent
+        };
+    });
+
+    // Color bars based on usage percentage
+    const diskBarColors = diskData.map(d => {
+        if (d.percent >= 90) return '#EF4444'; // red
+        if (d.percent >= 80) return '#F59E0B'; // amber
+        return '#10B981'; // green
+    });
+
+    new Chart(diskUsageCtx, {
+        type: 'bar',
+        data: {
+            labels: diskData.map(d => d.name),
+            datasets: [
+                {
+                    label: 'Used',
+                    data: diskData.map(d => d.used),
+                    backgroundColor: diskBarColors,
+                    borderWidth: 0
+                },
+                {
+                    label: 'Free',
+                    data: diskData.map(d => d.free),
+                    backgroundColor: '#4B5563',
+                    borderWidth: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                x: {
+                    stacked: true,
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    grid: {
+                        color: '#374151'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return formatGBValue(value);
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 10,
+                        font: {
+                            size: 11
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const idx = context.dataIndex;
+                            const data = diskData[idx];
+                            if (context.datasetIndex === 0) {
+                                return 'Used: ' + formatGBValue(data.used) + ' (' + data.percent.toFixed(1) + '%)';
+                            } else {
+                                return 'Free: ' + formatGBValue(data.free);
+                            }
+                        },
+                        afterLabel: function(context) {
+                            if (context.datasetIndex === 0) {
+                                const idx = context.dataIndex;
+                                const data = diskData[idx];
+                                return 'Total: ' + formatGBValue(data.total);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Set widths for progress bars from data attributes
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('[data-width]').forEach(function(el) {
+        el.style.width = el.getAttribute('data-width') + '%';
+    });
+});
+{{end}}
 </script>
 {{end}}
 

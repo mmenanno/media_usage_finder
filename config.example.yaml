@@ -99,3 +99,89 @@ scan_paths:
   - /media
   - /downloads
 
+# ===========================
+# Disk Configuration
+# ===========================
+# Configure individual disk mounts for cross-disk duplicate detection
+# IMPORTANT: These paths must be mounted in your docker-compose.yml
+# Example docker-compose.yml volume configuration:
+#   volumes:
+#     - /mnt/disk1:/disk1:ro
+#     - /mnt/disk2:/disk2:ro
+#     - /mnt/disk3:/disk3:ro
+disks:
+  - name: "Disk 1"
+    mount_path: "/disk1"
+  - name: "Disk 2"
+    mount_path: "/disk2"
+  - name: "Disk 3"
+    mount_path: "/disk3"
+  # Add more disks as needed
+  # - name: "Disk 4"
+  #   mount_path: "/disk4"
+
+# ===========================
+# Duplicate Detection Configuration
+# ===========================
+duplicate_detection:
+  # Enable duplicate detection features
+  enabled: true
+
+  # Hash algorithm to use for file comparison
+  # Options: "sha256" (default, widely supported) or "blake3" (faster, requires additional implementation)
+  hash_algorithm: "sha256"
+
+  # Number of parallel hash calculation workers
+  # - Default: 4 (good balance for most systems)
+  # - Increase to 8-12 for fast NVMe storage
+  # - Decrease to 2-3 for slower HDDs to avoid disk thrashing
+  hash_workers: 4
+
+  # Only hash files larger than this size (in bytes)
+  # - Default: 10485760 (10 MB)
+  # - Smaller files are generally unique and not worth the hashing overhead
+  # - Set to 0 to hash all files
+  min_file_size: 10485760
+
+  # Rate limit for hashing in MB/s (0 = unlimited)
+  # - Default: 200 (200 MB/s)
+  # - Helps prevent disk saturation during hash scanning
+  # - Adjust based on your disk speed and I/O capacity
+  max_hash_rate_mbps: 200
+
+# ===========================
+# Duplicate Consolidation Configuration
+# ===========================
+duplicate_consolidation:
+  # Enable consolidation features
+  enabled: true
+
+  # Dry-run mode: Preview changes without actually deleting files
+  # - Default: true (safe mode)
+  # - Set to false to allow actual file deletions (USE WITH CAUTION)
+  dry_run: true
+
+  # Require manual approval for each duplicate group before consolidation
+  # - Default: false (consolidate all at once)
+  # - Set to true for per-group confirmation prompts
+  require_manual_approval: false
+
+  # Verify file integrity by re-hashing before deletion
+  # - Default: true (recommended for safety)
+  # - Ensures the file to keep is not corrupted
+  verify_before_delete: true
+
+  # Consolidation strategy
+  # Options:
+  #   - "least_full_disk": Keep file on the disk with lowest usage percentage (default)
+  #   - "preferred_disk": Keep file based on a predefined disk priority order
+  strategy: "least_full_disk"
+
+  # Optional: Define preferred disk order (only used if strategy = "preferred_disk")
+  # Files will be kept on the first disk in this list, then second, etc.
+  # preferred_disk_order:
+  #   - "Cache"
+  #   - "Disk 1"
+  #   - "Disk 2"
+  #   - "Disk 3"
+
