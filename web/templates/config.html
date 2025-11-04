@@ -441,6 +441,43 @@
                     </div>
 
                     <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Hash Mode</label>
+                        <div class="relative" data-custom-dropdown>
+                            <input type="hidden" name="hash_mode" value="{{.Config.DuplicateDetection.HashMode}}" data-dropdown-input>
+                            <button
+                                type="button"
+                                data-dropdown-button
+                                aria-expanded="false"
+                                class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                                <span data-dropdown-text>
+                                    {{if eq .Config.DuplicateDetection.HashMode "full"}}Full File Hashing{{else if eq .Config.DuplicateDetection.HashMode "quick_auto"}}Quick Hash (Auto Verify){{else}}Quick Hash (Manual Verify){{end}}
+                                </span>
+                                <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg">
+                                <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "full"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Full File Hashing</div>
+                                    <div class="text-xs text-gray-400">Hash entire file content (slowest, most accurate)</div>
+                                </div>
+                                <div data-dropdown-option data-value="quick_manual" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "quick_manual"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Quick Hash (Manual Verify)</div>
+                                    <div class="text-xs text-gray-400">Hash first+last 1MB only, manually verify duplicates (recommended)</div>
+                                </div>
+                                <div data-dropdown-option data-value="quick_auto" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "quick_auto"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Quick Hash (Auto Verify)</div>
+                                    <div class="text-xs text-gray-400">Hash first+last 1MB, auto full-hash any quick duplicates</div>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">
+                            <strong>Quick hashing</strong> reads only the first and last 1MB of each file for fast duplicate detection,
+                            then optionally full-hashes files with matching quick hashes to confirm they are true duplicates.
+                        </p>
+                    </div>
+
+                    <div>
                         <label for="hash_workers" class="block text-sm font-medium text-gray-400 mb-2">Hash Workers</label>
                         <input type="number" id="hash_workers" name="hash_workers" min="1" max="32"
                                value="{{.Config.DuplicateDetection.HashWorkers}}"

@@ -29,6 +29,7 @@ type Server struct {
 	db            *database.DB
 	config        *config.Config
 	scanner       *scanner.Scanner
+	hashScanner   *scanner.HashScanner // Hash scanner for duplicate detection
 	templates     map[string]*template.Template // Map of template name to parsed template
 	statsCache    *stats.Cache
 	templateFuncs template.FuncMap   // Cached template functions
@@ -57,6 +58,14 @@ func NewServer(db *database.DB, cfg *config.Config, version string) *Server {
 	srv.templateFuncs = srv.createTemplateFuncs()
 
 	srv.scanner = scanner.NewScanner(db, cfg)
+
+	// Initialize hash scanner if duplicate detection is enabled
+	if cfg.DuplicateDetection.Enabled {
+		srv.hashScanner = scanner.NewHashScanner(db, &cfg.DuplicateDetection)
+		log.Printf("Hash scanner initialized with algorithm: %s", cfg.DuplicateDetection.HashAlgorithm)
+	} else {
+		log.Printf("Duplicate detection disabled in configuration")
+	}
 
 	// Initialize disk detector if disks are configured
 	if len(cfg.Disks) > 0 {
@@ -3423,4 +3432,353 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 			return result
 		},
 	}
+}
+
+// Hash Scanning Handlers
+
+// HandleStartHashScan starts a hash scanning operation
+func (s *Server) HandleStartHashScan(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	if s.hashScanner == nil {
+		respondError(w, http.StatusBadRequest, "Hash scanning is disabled in configuration", "hash_disabled")
+		return
+	}
+
+	// Check if a hash scan is already running
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check scan status", "scan_check_failed")
+		return
+	}
+
+	if currentScan != nil && currentScan.ScanType == "hash_scan" {
+		respondError(w, http.StatusConflict, "A hash scan is already running", "hash_scan_already_running")
+		return
+	}
+
+	// Start hash scan in background
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 48*time.Hour) // Hash scans can take a while
+		defer cancel()
+
+		minSize := s.config.DuplicateDetection.MinFileSize
+		if err := s.hashScanner.Start(ctx, minSize, 0); err != nil {
+			log.Printf("ERROR: Hash scan failed: %v", err)
+		} else {
+			log.Printf("INFO: Hash scan completed successfully")
+		}
+	}()
+
+	w.Header().Set("X-Toast-Message", "Hash scan started successfully")
+	w.Header().Set("X-Toast-Type", "info")
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": "Hash scan started",
+	})
+}
+
+// HandleCancelHashScan cancels the current hash scan
+func (s *Server) HandleCancelHashScan(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	if s.hashScanner == nil {
+		respondError(w, http.StatusBadRequest, "Hash scanning is disabled", "hash_disabled")
+		return
+	}
+
+	if s.hashScanner.Cancel() {
+		w.Header().Set("X-Toast-Message", "Hash scan cancelled")
+		w.Header().Set("X-Toast-Type", "info")
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"status":  "success",
+			"message": "Hash scan cancelled",
+		})
+	} else {
+		respondError(w, http.StatusBadRequest, "No hash scan is running", "no_hash_scan")
+	}
+}
+
+// HandleHashProgress streams hash scan progress via Server-Sent Events
+func (s *Server) HandleHashProgress(w http.ResponseWriter, r *http.Request) {
+	if s.hashScanner == nil {
+		respondError(w, http.StatusBadRequest, "Hash scanning is disabled", "hash_disabled")
+		return
+	}
+
+	progress := s.hashScanner.GetProgress()
+	if progress == nil {
+		respondError(w, http.StatusNotFound, "No hash scan in progress", "no_hash_scan")
+		return
+	}
+
+	// Set SSE headers
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		respondError(w, http.StatusInternalServerError, "Streaming not supported", "streaming_error")
+		return
+	}
+
+	// Subscribe to log messages
+	logChan := progress.Subscribe()
+	defer progress.Unsubscribe(logChan)
+
+	// Create a ticker for periodic progress updates
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	ctx := r.Context()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-logChan:
+			if !ok {
+				return // Channel closed
+			}
+			// Send log message
+			fmt.Fprintf(w, "event: log\ndata: %s\n\n", msg)
+			flusher.Flush()
+		case <-ticker.C:
+			snapshot := progress.GetSnapshot()
+
+			// If scan is no longer running, send final update and exit
+			if !snapshot.IsRunning {
+				data, _ := json.Marshal(snapshot)
+				fmt.Fprintf(w, "event: progress\ndata: %s\n\n", data)
+				fmt.Fprintf(w, "event: complete\ndata: {\"status\":\"completed\"}\n\n")
+				flusher.Flush()
+				return
+			}
+
+			// Send progress update
+			data, _ := json.Marshal(snapshot)
+			fmt.Fprintf(w, "event: progress\ndata: %s\n\n", data)
+			flusher.Flush()
+		}
+	}
+}
+
+// HandleHashProgressHTML returns HTML fragment for hash scan progress
+func (s *Server) HandleHashProgressHTML(w http.ResponseWriter, r *http.Request) {
+	if s.hashScanner == nil {
+		// Hash scanning disabled - show nothing
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(""))
+		return
+	}
+
+	progress := s.hashScanner.GetProgress()
+	if progress == nil || !progress.IsRunning {
+		// No hash scan running
+		hashedCount, _ := s.db.GetHashedFileCount()
+		totalCount, _ := s.db.GetTotalHashableFileCount(s.config.DuplicateDetection.MinFileSize)
+		quickDupCount, _ := s.db.GetQuickHashDuplicateCount()
+		quickHashCount, _ := s.db.GetQuickHashCount()
+
+		tmpl := `
+		<div class="text-gray-400 space-y-2">
+			<p>No hash scan running</p>
+			<div class="text-sm space-y-1">
+				<p>Files hashed: {{.HashedCount}} / {{.TotalCount}}</p>
+				<p>Hash mode: <span class="text-purple-400 font-medium">{{.HashMode}}</span></p>
+				{{if gt .QuickHashCount 0}}
+				<p class="text-blue-400">
+					📝 {{.QuickHashCount}} files with quick hashes
+				</p>
+				{{end}}
+				{{if gt .QuickDupCount 0}}
+				<p class="text-yellow-400">
+					⚠️ {{.QuickDupCount}} files with quick-hash duplicates need verification
+				</p>
+				{{end}}
+			</div>
+		</div>
+		`
+
+		hashModeText := "Unknown"
+		switch s.config.DuplicateDetection.HashMode {
+		case "full":
+			hashModeText = "Full File Hashing"
+		case "quick_manual":
+			hashModeText = "Quick Hash (Manual Verify)"
+		case "quick_auto":
+			hashModeText = "Quick Hash (Auto Verify)"
+		}
+
+		t := template.Must(template.New("hash-idle").Parse(tmpl))
+		t.Execute(w, map[string]interface{}{
+			"HashedCount":    hashedCount,
+			"TotalCount":     totalCount,
+			"QuickDupCount":  quickDupCount,
+			"QuickHashCount": quickHashCount,
+			"HashMode":       hashModeText,
+		})
+		return
+	}
+
+	snapshot := progress.GetSnapshot()
+
+	tmpl := `
+	<div class="space-y-3">
+		<div class="flex justify-between items-center">
+			<div>
+				<div class="text-lg font-semibold">Hash Scan: {{.CurrentPhase}}</div>
+				<div class="text-sm text-gray-400">{{.ProcessedFiles}} / {{.TotalFiles}} files ({{printf "%.1f" .PercentComplete}}%)</div>
+			</div>
+			<button
+				hx-post="/api/hash/cancel"
+				hx-swap="none"
+				class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm">
+				Cancel
+			</button>
+		</div>
+
+		<!-- Progress Bar -->
+		<div class="w-full bg-gray-700 rounded-full h-2.5">
+			<div class="bg-purple-600 h-2.5 rounded-full transition-all duration-300"
+				 style="width: {{printf "%.1f" .PercentComplete}}%"></div>
+		</div>
+
+		<!-- Stats -->
+		<div class="grid grid-cols-3 gap-4 text-sm">
+			<div>
+				<div class="text-gray-400">Elapsed</div>
+				<div class="font-semibold">{{.Elapsed}}</div>
+			</div>
+			<div>
+				<div class="text-gray-400">ETA</div>
+				<div class="font-semibold">{{if gt .ETA 0}}{{.ETA}}{{else}}-{{end}}</div>
+			</div>
+			<div>
+				<div class="text-gray-400">Errors</div>
+				<div class="font-semibold {{if gt .ErrorCount 0}}text-red-400{{end}}">{{.ErrorCount}}</div>
+			</div>
+		</div>
+	</div>
+	`
+
+	funcMap := template.FuncMap{
+		"formatDuration": func(d time.Duration) string {
+			if d < time.Minute {
+				return fmt.Sprintf("%ds", int(d.Seconds()))
+			}
+			if d < time.Hour {
+				return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
+			}
+			return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
+		},
+	}
+
+	t := template.Must(template.New("hash-progress").Funcs(funcMap).Parse(tmpl))
+	t.Execute(w, map[string]interface{}{
+		"CurrentPhase":    snapshot.CurrentPhase,
+		"ProcessedFiles":  snapshot.ProcessedFiles,
+		"TotalFiles":      snapshot.TotalFiles,
+		"PercentComplete": snapshot.PercentComplete,
+		"Elapsed":         snapshot.Elapsed,
+		"ETA":             snapshot.ETA,
+		"ErrorCount":      snapshot.ErrorCount,
+	})
+}
+
+// HandleClearHashes clears all hash data from the database
+func (s *Server) HandleClearHashes(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodDelete) {
+		return
+	}
+
+	if s.hashScanner == nil {
+		respondError(w, http.StatusBadRequest, "Hash scanning is disabled", "hash_disabled")
+		return
+	}
+
+	// Check if hash scan is running
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check scan status", "scan_check_failed")
+		return
+	}
+
+	if currentScan != nil && currentScan.ScanType == "hash_scan" {
+		respondError(w, http.StatusConflict, "Cannot clear hashes while scan is running", "hash_scan_running")
+		return
+	}
+
+	if err := s.db.ClearAllHashes(); err != nil {
+		log.Printf("Failed to clear hashes: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to clear hashes", "clear_failed")
+		return
+	}
+
+	w.Header().Set("X-Toast-Message", "All hashes cleared successfully")
+	w.Header().Set("X-Toast-Type", "success")
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": "All hashes cleared",
+	})
+}
+
+// HandleVerifyDuplicates starts verification of quick-hash duplicates (full hash them)
+func (s *Server) HandleVerifyDuplicates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.hashScanner == nil {
+		http.Error(w, "Hash scanner not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	// Start verification in background
+	go func() {
+		ctx := context.Background()
+		if err := s.hashScanner.VerifyDuplicates(ctx); err != nil {
+			log.Printf("Verification error: %v", err)
+		}
+	}()
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": "Duplicate verification started",
+	})
+}
+
+// HandleUpgradeAllHashes upgrades all quick hashes to full hashes
+func (s *Server) HandleUpgradeAllHashes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.hashScanner == nil {
+		http.Error(w, "Hash scanner not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	// Start upgrade in background
+	go func() {
+		ctx := context.Background()
+		if err := s.hashScanner.UpgradeAllQuickHashes(ctx); err != nil {
+			log.Printf("Hash upgrade error: %v", err)
+		}
+	}()
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": "Hash upgrade started",
+	})
 }

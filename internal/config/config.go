@@ -101,6 +101,7 @@ type DiskConfig struct {
 type DuplicateDetectionConfig struct {
 	Enabled       bool   `yaml:"enabled"`         // Enable duplicate detection features
 	HashAlgorithm string `yaml:"hash_algorithm"`  // Hash algorithm to use ("sha256" or "blake3")
+	HashMode      string `yaml:"hash_mode"`       // Hash mode: "full", "quick_manual", or "quick_auto"
 	HashWorkers   int    `yaml:"hash_workers"`    // Number of parallel hash workers
 	MinFileSize   int64  `yaml:"min_file_size"`   // Only hash files larger than this (bytes)
 	MaxHashRateMB int    `yaml:"max_hash_rate_mbps"` // Rate limit for hashing (MB/s, 0 = unlimited)
@@ -152,6 +153,7 @@ func Default() *Config {
 		DuplicateDetection: DuplicateDetectionConfig{
 			Enabled:       true,
 			HashAlgorithm: "sha256",
+			HashMode:      "quick_manual", // Default to quick hash with manual verification
 			HashWorkers:   4,
 			MinFileSize:   10485760, // 10MB
 			MaxHashRateMB: 200,

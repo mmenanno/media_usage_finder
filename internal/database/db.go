@@ -339,6 +339,61 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 9: Update scans table CHECK constraint to include hash_scan scan type
+	// Test if migration is needed by trying to insert a test record with scan_type='hash_scan'
+	needsHashScanMigration := false
+
+	// Start a transaction for the test
+	tx4, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction for hash_scan migration check: %w", err)
+	}
+	defer tx4.Rollback()
+
+	// Try to insert a test record with scan_type='hash_scan'
+	_, err = tx4.Exec(`
+		INSERT INTO scans (started_at, status, scan_type)
+		VALUES (?, 'completed', 'hash_scan')
+	`, time.Now().Unix())
+
+	if err != nil {
+		// Check if the error is a CHECK constraint failure
+		if strings.Contains(err.Error(), "CHECK constraint failed") {
+			needsHashScanMigration = true
+		}
+	} else {
+		// If insert succeeded, delete the test record
+		_, _ = tx4.Exec(`DELETE FROM scans WHERE scan_type = 'hash_scan'`)
+	}
+
+	// Rollback the test transaction
+	tx4.Rollback()
+
+	// Run migration if needed
+	if needsHashScanMigration {
+		// Disable foreign key constraints for migration
+		_, err = db.conn.Exec("PRAGMA foreign_keys = OFF")
+		if err != nil {
+			return fmt.Errorf("failed to disable foreign keys: %w", err)
+		}
+
+		// Run the migration
+		_, err = db.conn.Exec(migrateAddHashScanToScanType)
+
+		// Re-enable foreign key constraints
+		_, fkErr := db.conn.Exec("PRAGMA foreign_keys = ON")
+
+		// Check migration error first
+		if err != nil {
+			return fmt.Errorf("failed to update scans table CHECK constraint for hash_scan: %w", err)
+		}
+
+		// Then check if we could re-enable foreign keys
+		if fkErr != nil {
+			return fmt.Errorf("failed to re-enable foreign keys: %w", fkErr)
+		}
+	}
+
 	return nil
 }
 

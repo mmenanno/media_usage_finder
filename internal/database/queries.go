@@ -2230,3 +2230,191 @@ func (db *DB) DeleteDiskLocationsByDisk(diskDeviceID int64) error {
 	_, err := db.conn.Exec(query, diskDeviceID)
 	return err
 }
+
+// Hash Scanning Methods
+
+// GetFilesNeedingHash returns files that need hashing (optionally filtered by size)
+func (db *DB) GetFilesNeedingHash(minSize, maxSize int64) ([]File, error) {
+	query := `
+		SELECT id, path, size, inode, device_id, modified_time, last_verified, is_orphaned
+		FROM files
+		WHERE hash_calculated = 0
+	`
+
+	args := []interface{}{}
+	if minSize > 0 {
+		query += ` AND size >= ?`
+		args = append(args, minSize)
+	}
+	if maxSize > 0 {
+		query += ` AND size <= ?`
+		args = append(args, maxSize)
+	}
+
+	query += ` ORDER BY size ASC` // Hash smaller files first for faster initial progress
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query files needing hash: %w", err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		var file File
+		err := rows.Scan(
+			&file.ID,
+			&file.Path,
+			&file.Size,
+			&file.Inode,
+			&file.DeviceID,
+			&file.ModifiedTime,
+			&file.LastVerified,
+			&file.IsOrphaned,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan file row: %w", err)
+		}
+		files = append(files, file)
+	}
+
+	return files, rows.Err()
+}
+
+// UpdateFileHash updates the hash for a file
+func (db *DB) UpdateFileHash(fileID int64, hash, algorithm, hashType string) error {
+	query := `
+		UPDATE files
+		SET file_hash = ?, hash_algorithm = ?, hash_type = ?, hash_calculated = 1
+		WHERE id = ?
+	`
+	_, err := db.conn.Exec(query, hash, algorithm, hashType, fileID)
+	if err != nil {
+		return fmt.Errorf("failed to update file hash: %w", err)
+	}
+	return nil
+}
+
+// GetHashedFileCount returns the count of files that have been hashed
+func (db *DB) GetHashedFileCount() (int64, error) {
+	var count int64
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM files WHERE hash_calculated = 1`).Scan(&count)
+	return count, err
+}
+
+// GetTotalHashableFileCount returns the count of all files (for progress tracking)
+func (db *DB) GetTotalHashableFileCount(minSize int64) (int64, error) {
+	query := `SELECT COUNT(*) FROM files WHERE 1=1`
+	args := []interface{}{}
+
+	if minSize > 0 {
+		query += ` AND size >= ?`
+		args = append(args, minSize)
+	}
+
+	var count int64
+	err := db.conn.QueryRow(query, args...).Scan(&count)
+	return count, err
+}
+
+// ClearAllHashes resets all hash data (useful when changing algorithms)
+func (db *DB) ClearAllHashes() error {
+	query := `UPDATE files SET file_hash = NULL, hash_algorithm = NULL, hash_type = NULL, hash_calculated = 0`
+	_, err := db.conn.Exec(query)
+	return err
+}
+
+// GetFilesWithQuickHashDuplicates returns files that have quick-hash duplicates
+// These are files where 2+ files share the same quick hash (same size + quick hash match)
+// Used for verification workflow: find potential duplicates, then full-hash them
+func (db *DB) GetFilesWithQuickHashDuplicates() ([]File, error) {
+	query := `
+		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
+		       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
+		FROM files f
+		WHERE f.hash_type = 'quick'
+		  AND f.file_hash IN (
+		      SELECT file_hash
+		      FROM files
+		      WHERE hash_type = 'quick' AND file_hash IS NOT NULL
+		      GROUP BY file_hash, size
+		      HAVING COUNT(*) > 1
+		  )
+		ORDER BY f.size DESC, f.file_hash
+	`
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query files with quick hash duplicates: %w", err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		file, err := scanFileRow(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan file row: %w", err)
+		}
+		files = append(files, *file)
+	}
+
+	return files, rows.Err()
+}
+
+// GetQuickHashDuplicateCount returns the count of files with quick-hash duplicates
+func (db *DB) GetQuickHashDuplicateCount() (int64, error) {
+	query := `
+		SELECT COUNT(DISTINCT f.id)
+		FROM files f
+		WHERE f.hash_type = 'quick'
+		  AND f.file_hash IN (
+		      SELECT file_hash
+		      FROM files
+		      WHERE hash_type = 'quick' AND file_hash IS NOT NULL
+		      GROUP BY file_hash, size
+		      HAVING COUNT(*) > 1
+		  )
+	`
+
+	var count int64
+	err := db.conn.QueryRow(query).Scan(&count)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return count, err
+}
+
+// GetFilesWithQuickHashes returns all files that have quick hashes (for upgrading to full)
+func (db *DB) GetFilesWithQuickHashes() ([]File, error) {
+	query := `
+		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
+		       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
+		FROM files f
+		WHERE f.hash_type = 'quick'
+		ORDER BY f.size DESC
+	`
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query files with quick hashes: %w", err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		file, err := scanFileRow(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan file row: %w", err)
+		}
+		files = append(files, *file)
+	}
+
+	return files, rows.Err()
+}
+
+// GetQuickHashCount returns the count of all files with quick hashes
+func (db *DB) GetQuickHashCount() (int64, error) {
+	var count int64
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM files WHERE hash_type = 'quick'`).Scan(&count)
+	return count, err
+}
