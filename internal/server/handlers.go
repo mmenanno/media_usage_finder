@@ -1591,6 +1591,17 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Reinitialize hash scanner if duplicate detection was enabled/disabled
+	if s.config.DuplicateDetection.Enabled && s.hashScanner == nil {
+		// Duplicate detection was enabled - initialize hash scanner
+		s.hashScanner = scanner.NewHashScanner(s.db, &s.config.DuplicateDetection)
+		log.Printf("Hash scanner initialized with algorithm: %s", s.config.DuplicateDetection.HashAlgorithm)
+	} else if !s.config.DuplicateDetection.Enabled && s.hashScanner != nil {
+		// Duplicate detection was disabled - clear hash scanner
+		s.hashScanner = nil
+		log.Printf("Hash scanner disabled")
+	}
+
 	// Success - show toast and clear error panel
 	w.Header().Set("X-Toast-Message", "Configuration saved successfully")
 	w.Header().Set("X-Toast-Type", "success")
