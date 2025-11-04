@@ -261,9 +261,26 @@ func (db *DB) runMigrations() error {
 
 	// Run migration if needed
 	if needsScanTypeMigration {
+		// Disable foreign key constraints for migration
+		_, err = db.conn.Exec("PRAGMA foreign_keys = OFF")
+		if err != nil {
+			return fmt.Errorf("failed to disable foreign keys: %w", err)
+		}
+
+		// Run the migration
 		_, err = db.conn.Exec(migrateAddDiskLocationToScanType)
+
+		// Re-enable foreign key constraints
+		_, fkErr := db.conn.Exec("PRAGMA foreign_keys = ON")
+
+		// Check migration error first
 		if err != nil {
 			return fmt.Errorf("failed to update scans table CHECK constraint: %w", err)
+		}
+
+		// Then check if we could re-enable foreign keys
+		if fkErr != nil {
+			return fmt.Errorf("failed to re-enable foreign keys: %w", fkErr)
 		}
 	}
 

@@ -285,8 +285,11 @@ CREATE INDEX IF NOT EXISTS idx_files_hash_device ON files(file_hash, device_id) 
 
 // Migration to add 'disk_location' to scans table CHECK constraint
 const migrateAddDiskLocationToScanType = `
+-- Drop scans_new if it exists from a previous failed migration
+DROP TABLE IF EXISTS scans_new;
+
 -- Create new scans table with updated CHECK constraint
-CREATE TABLE IF NOT EXISTS scans_new (
+CREATE TABLE scans_new (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	started_at INTEGER NOT NULL,
 	completed_at INTEGER,
