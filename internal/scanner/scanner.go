@@ -903,9 +903,15 @@ func (s *Scanner) logCacheStats() {
 // UpdateAllServices manually updates all service usage information
 // This can be called independently without a full scan
 func (s *Scanner) UpdateAllServices() error {
+	// Create scan record
+	scan, err := s.db.CreateScan("service_update_all")
+	if err != nil {
+		return fmt.Errorf("failed to create scan record: %w", err)
+	}
+
 	// Create temporary progress for logging
 	tempProgress := NewProgress()
-	tempProgress.SetPhase("Updating services")
+	tempProgress.SetPhase("Updating all services")
 	originalProgress := s.progress
 	s.progress = tempProgress
 	defer func() {
@@ -915,31 +921,55 @@ func (s *Scanner) UpdateAllServices() error {
 
 	s.progress.Log("Manually updating all services...")
 
+	// Track if we had any errors
+	hadErrors := false
+
 	// Update each service
 	s.progress.Log("Checking Plex...")
 	if err := s.updatePlexUsage(); err != nil {
 		s.progress.Log(fmt.Sprintf("Warning: Failed to update Plex usage: %v", err))
+		hadErrors = true
 	}
 
 	s.progress.Log("Checking Sonarr...")
 	if err := s.updateSonarrUsage(); err != nil {
 		s.progress.Log(fmt.Sprintf("Warning: Failed to update Sonarr usage: %v", err))
+		hadErrors = true
 	}
 
 	s.progress.Log("Checking Radarr...")
 	if err := s.updateRadarrUsage(); err != nil {
 		s.progress.Log(fmt.Sprintf("Warning: Failed to update Radarr usage: %v", err))
+		hadErrors = true
 	}
 
 	s.progress.Log("Checking qBittorrent...")
 	if err := s.updateQBittorrentUsage(); err != nil {
 		s.progress.Log(fmt.Sprintf("Warning: Failed to update qBittorrent usage: %v", err))
+		hadErrors = true
+	}
+
+	s.progress.Log("Checking Stash...")
+	if err := s.updateStashUsage(); err != nil {
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+		hadErrors = true
 	}
 
 	// Update orphaned status after service checks
 	s.progress.Log("Recalculating orphaned status...")
 	if err := s.db.UpdateOrphanedStatus(context.Background()); err != nil {
+		// Mark scan as failed
+		s.db.UpdateScanStatus(scan.ID, "failed", fmt.Sprintf("Failed to update orphaned status: %v", err))
 		return fmt.Errorf("failed to update orphaned status: %w", err)
+	}
+
+	// Complete scan record
+	status := "completed"
+	if hadErrors {
+		status = "completed_with_errors"
+	}
+	if err := s.db.CompleteScan(scan.ID, status, ""); err != nil {
+		log.Printf("Warning: Failed to complete scan record: %v", err)
 	}
 
 	s.progress.Log("All services updated successfully!")
@@ -949,6 +979,13 @@ func (s *Scanner) UpdateAllServices() error {
 // UpdateSingleService manually updates a specific service's usage information
 // serviceName should be one of: plex, sonarr, radarr, qbittorrent
 func (s *Scanner) UpdateSingleService(serviceName string) error {
+	// Create scan record
+	scanType := fmt.Sprintf("service_update_%s", serviceName)
+	scan, err := s.db.CreateScan(scanType)
+	if err != nil {
+		return fmt.Errorf("failed to create scan record: %w", err)
+	}
+
 	// Create temporary progress for logging
 	tempProgress := NewProgress()
 	tempProgress.SetPhase(fmt.Sprintf("Updating %s", serviceName))
@@ -961,30 +998,41 @@ func (s *Scanner) UpdateSingleService(serviceName string) error {
 
 	s.progress.Log(fmt.Sprintf("Manually updating %s...", serviceName))
 
-	var err error
+	var updateErr error
 	switch serviceName {
 	case "plex":
-		err = s.updatePlexUsage()
+		updateErr = s.updatePlexUsage()
 	case "sonarr":
-		err = s.updateSonarrUsage()
+		updateErr = s.updateSonarrUsage()
 	case "radarr":
-		err = s.updateRadarrUsage()
+		updateErr = s.updateRadarrUsage()
 	case "qbittorrent":
-		err = s.updateQBittorrentUsage()
+		updateErr = s.updateQBittorrentUsage()
 	case "stash":
-		err = s.updateStashUsage()
+		updateErr = s.updateStashUsage()
 	default:
-		return fmt.Errorf("unknown service: %s", serviceName)
+		errMsg := fmt.Sprintf("unknown service: %s", serviceName)
+		s.db.UpdateScanStatus(scan.ID, "failed", errMsg)
+		return fmt.Errorf(errMsg)
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed to update %s usage: %w", serviceName, err)
+	if updateErr != nil {
+		// Mark scan as failed
+		s.db.UpdateScanStatus(scan.ID, "failed", fmt.Sprintf("Failed to update %s: %v", serviceName, updateErr))
+		return fmt.Errorf("failed to update %s usage: %w", serviceName, updateErr)
 	}
 
 	// Update orphaned status after service check
 	s.progress.Log("Recalculating orphaned status...")
 	if err := s.db.UpdateOrphanedStatus(context.Background()); err != nil {
+		// Mark scan as failed
+		s.db.UpdateScanStatus(scan.ID, "failed", fmt.Sprintf("Failed to update orphaned status: %v", err))
 		return fmt.Errorf("failed to update orphaned status: %w", err)
+	}
+
+	// Complete scan record
+	if err := s.db.CompleteScan(scan.ID, "completed", ""); err != nil {
+		log.Printf("Warning: Failed to complete scan record: %v", err)
 	}
 
 	s.progress.Log(fmt.Sprintf("%s updated successfully!", serviceName))

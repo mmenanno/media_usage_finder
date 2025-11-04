@@ -34,6 +34,18 @@
                                 <span class="px-2 py-1 bg-green-600 rounded text-xs">Incremental</span>
                             {{else if eq .ScanType "disk_location"}}
                                 <span class="px-2 py-1 bg-purple-600 rounded text-xs">Disk Location</span>
+                            {{else if eq .ScanType "service_update_all"}}
+                                <span class="px-2 py-1 bg-cyan-600 rounded text-xs">Update All Services</span>
+                            {{else if eq .ScanType "service_update_plex"}}
+                                <span class="px-2 py-1 bg-amber-600 rounded text-xs">Update Plex</span>
+                            {{else if eq .ScanType "service_update_sonarr"}}
+                                <span class="px-2 py-1 bg-teal-600 rounded text-xs">Update Sonarr</span>
+                            {{else if eq .ScanType "service_update_radarr"}}
+                                <span class="px-2 py-1 bg-yellow-600 rounded text-xs">Update Radarr</span>
+                            {{else if eq .ScanType "service_update_qbittorrent"}}
+                                <span class="px-2 py-1 bg-red-600 rounded text-xs">Update qBittorrent</span>
+                            {{else if eq .ScanType "service_update_stash"}}
+                                <span class="px-2 py-1 bg-pink-600 rounded text-xs">Update Stash</span>
                             {{else}}
                                 <span class="px-2 py-1 bg-gray-600 rounded text-xs capitalize">{{.ScanType}}</span>
                             {{end}}

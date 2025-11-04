@@ -436,6 +436,22 @@ func (db *DB) UpdateScanPhase(scanID int64, phase string) error {
 	return err
 }
 
+// UpdateScanStatus updates only the status and optionally errors of a scan
+func (db *DB) UpdateScanStatus(scanID int64, status string, errors string) error {
+	query := `UPDATE scans SET status = ?, errors = ?, completed_at = ? WHERE id = ?`
+	completedAt := time.Now().Unix()
+	_, err := db.conn.Exec(query, status, errors, completedAt, scanID)
+	return err
+}
+
+// CompleteScan marks a scan as completed with a specific status
+func (db *DB) CompleteScan(scanID int64, status string, errors string) error {
+	query := `UPDATE scans SET status = ?, errors = ?, completed_at = ? WHERE id = ?`
+	completedAt := time.Now().Unix()
+	_, err := db.conn.Exec(query, status, errors, completedAt, scanID)
+	return err
+}
+
 // UpdateScanCheckpoint updates the last_processed_path checkpoint for resume functionality
 func (db *DB) UpdateScanCheckpoint(scanID int64, lastPath string) error {
 	query := `UPDATE scans SET last_processed_path = ? WHERE id = ?`
@@ -1051,13 +1067,17 @@ func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode 
 	}
 
 	// Filter by device IDs (for disk-based filtering)
+	// Use file_disk_locations table for accurate disk filtering (handles mergerfs setups)
 	if len(deviceIDs) > 0 {
 		placeholders := make([]string, len(deviceIDs))
 		for i, deviceID := range deviceIDs {
 			placeholders[i] = "?"
 			args = append(args, deviceID)
 		}
-		conditions = append(conditions, fmt.Sprintf("f.device_id IN (%s)", strings.Join(placeholders, ", ")))
+		conditions = append(conditions, fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM file_disk_locations fdl WHERE fdl.file_id = f.id AND fdl.disk_device_id IN (%s))",
+			strings.Join(placeholders, ", "),
+		))
 	}
 
 	// Multi-service filtering with three modes

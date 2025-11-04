@@ -284,6 +284,61 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 8: Update scans table CHECK constraint to include service_update scan types
+	// Test if migration is needed by trying to insert a test record with scan_type='service_update_all'
+	needsServiceUpdateMigration := false
+
+	// Start a transaction for the test
+	tx3, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction for service_update migration check: %w", err)
+	}
+	defer tx3.Rollback()
+
+	// Try to insert a test record with scan_type='service_update_all'
+	_, err = tx3.Exec(`
+		INSERT INTO scans (started_at, status, scan_type)
+		VALUES (?, 'completed', 'service_update_all')
+	`, time.Now().Unix())
+
+	if err != nil {
+		// Check if the error is a CHECK constraint failure
+		if strings.Contains(err.Error(), "CHECK constraint failed") {
+			needsServiceUpdateMigration = true
+		}
+	} else {
+		// If insert succeeded, delete the test record
+		_, _ = tx3.Exec(`DELETE FROM scans WHERE scan_type = 'service_update_all'`)
+	}
+
+	// Rollback the test transaction
+	tx3.Rollback()
+
+	// Run migration if needed
+	if needsServiceUpdateMigration {
+		// Disable foreign key constraints for migration
+		_, err = db.conn.Exec("PRAGMA foreign_keys = OFF")
+		if err != nil {
+			return fmt.Errorf("failed to disable foreign keys: %w", err)
+		}
+
+		// Run the migration
+		_, err = db.conn.Exec(migrateAddServiceUpdateToScanType)
+
+		// Re-enable foreign key constraints
+		_, fkErr := db.conn.Exec("PRAGMA foreign_keys = ON")
+
+		// Check migration error first
+		if err != nil {
+			return fmt.Errorf("failed to update scans table CHECK constraint for service updates: %w", err)
+		}
+
+		// Then check if we could re-enable foreign keys
+		if fkErr != nil {
+			return fmt.Errorf("failed to re-enable foreign keys: %w", fkErr)
+		}
+	}
+
 	return nil
 }
 
