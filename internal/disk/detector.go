@@ -45,8 +45,19 @@ func (d *Detector) DetectDisks() error {
 	// Clear existing map
 	d.diskMap = make(map[int64]*DiskInfo)
 
+	// Check if Unraid stats are available
+	var unraidReader *UnraidStatsReader
+	if IsUnraidStatsAvailable("") {
+		fmt.Printf("Unraid stats detected, using /unraid/stats for accurate disk usage\n")
+		unraidReader = NewUnraidStatsReader("")
+		if err := unraidReader.ParseDisksINI(); err != nil {
+			fmt.Printf("Warning: Failed to parse Unraid disks.ini: %v (falling back to statfs)\n", err)
+			unraidReader = nil
+		}
+	}
+
 	for _, diskConfig := range d.config {
-		// Stat the mount point to get device ID
+		// Stat the mount point to get device ID (always needed)
 		var stat syscall.Stat_t
 		if err := syscall.Stat(diskConfig.MountPath, &stat); err != nil {
 			// If mount doesn't exist, log warning but continue
@@ -56,11 +67,32 @@ func (d *Detector) DetectDisks() error {
 
 		deviceID := int64(stat.Dev)
 
-		// Get disk space information
-		spaceInfo, err := GetDiskSpace(diskConfig.MountPath)
-		if err != nil {
-			fmt.Printf("Warning: Could not get disk space for %s: %v\n", diskConfig.MountPath, err)
-			continue
+		// Try to get disk space from Unraid stats first
+		var spaceInfo *SpaceInfo
+		if unraidReader != nil {
+			diskName := ExtractDiskNameFromPath(diskConfig.MountPath)
+			if diskName != "" {
+				if unraidStats, ok := unraidReader.GetDiskStats(diskName); ok {
+					spaceInfo = GetSpaceInfoFromUnraid(unraidStats)
+					fmt.Printf("Using Unraid stats for %s (%s): %.2f TB total, %.2f TB used, %.1f%% full\n",
+						diskConfig.Name, diskName,
+						float64(spaceInfo.TotalBytes)/1024/1024/1024/1024,
+						float64(spaceInfo.UsedBytes)/1024/1024/1024/1024,
+						spaceInfo.UsedPercent)
+				} else {
+					fmt.Printf("Warning: No Unraid stats found for %s, falling back to statfs\n", diskName)
+				}
+			}
+		}
+
+		// Fall back to statfs if Unraid stats not available
+		if spaceInfo == nil {
+			var err error
+			spaceInfo, err = GetDiskSpace(diskConfig.MountPath)
+			if err != nil {
+				fmt.Printf("Warning: Could not get disk space for %s: %v\n", diskConfig.MountPath, err)
+				continue
+			}
 		}
 
 		// Create DiskInfo
