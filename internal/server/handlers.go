@@ -309,11 +309,22 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		usageMap = make(map[int64][]*database.Usage)
 	}
 
+	// Batch load disk locations for all files (if disk scanning is configured)
+	diskLocationsMap := make(map[int64][]*database.FileDiskLocation)
+	if len(s.config.Disks) > 0 {
+		diskLocationsMap, err = s.db.GetDiskLocationsByFileIDs(fileIDs)
+		if err != nil {
+			// Log error but continue with empty disk locations
+			diskLocationsMap = make(map[int64][]*database.FileDiskLocation)
+		}
+	}
+
 	filesWithUsage := make([]map[string]interface{}, 0, len(files))
 	for _, file := range files {
 		filesWithUsage = append(filesWithUsage, map[string]interface{}{
-			"File":  file,
-			"Usage": usageMap[file.ID],
+			"File":          file,
+			"Usage":         usageMap[file.ID],
+			"DiskLocations": diskLocationsMap[file.ID],
 		})
 	}
 
@@ -2825,8 +2836,20 @@ func (s *Server) HandleFileDetails(w http.ResponseWriter, r *http.Request) {
 		DiskLocations: diskLocations,
 	}
 
-	// Resolve device name and color if resolver is available
-	if s.diskResolver != nil {
+	// Resolve device name and color
+	// Prefer disk location info if available (more accurate for mergerfs setups)
+	if len(diskLocations) > 0 {
+		// Use the first disk location (files typically exist on one disk)
+		loc := diskLocations[0]
+		if s.diskResolver != nil {
+			response.DeviceName = s.diskResolver.ResolveDisplayName(loc.DiskDeviceID)
+			response.DeviceColor = s.diskResolver.ResolveColor(loc.DiskDeviceID)
+		} else {
+			response.DeviceName = fmt.Sprintf("%s (%d)", loc.DiskName, loc.DiskDeviceID)
+			response.DeviceColor = "blue"
+		}
+	} else if s.diskResolver != nil {
+		// Fallback to file's device_id (for files not yet scanned with disk locations)
 		response.DeviceName = s.diskResolver.ResolveDisplayName(file.DeviceID)
 		response.DeviceColor = s.diskResolver.ResolveColor(file.DeviceID)
 	}

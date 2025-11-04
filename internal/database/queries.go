@@ -2097,6 +2097,66 @@ func (db *DB) GetDiskLocationsForFile(fileID int64) ([]*FileDiskLocation, error)
 	return locations, rows.Err()
 }
 
+// GetDiskLocationsByFileIDs batch loads disk locations for multiple files
+// Returns a map of file_id -> []*FileDiskLocation
+func (db *DB) GetDiskLocationsByFileIDs(fileIDs []int64) (map[int64][]*FileDiskLocation, error) {
+	if len(fileIDs) == 0 {
+		return make(map[int64][]*FileDiskLocation), nil
+	}
+
+	// Build placeholders for IN clause
+	placeholders := make([]string, len(fileIDs))
+	args := make([]interface{}, len(fileIDs))
+	for i, id := range fileIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, file_id, disk_name, disk_device_id, disk_path, size, inode, modified_time, last_verified, created_at
+		FROM file_disk_locations
+		WHERE file_id IN (%s)
+		ORDER BY file_id, disk_name
+	`, strings.Join(placeholders, ","))
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Group by file_id
+	result := make(map[int64][]*FileDiskLocation)
+	for rows.Next() {
+		loc := &FileDiskLocation{}
+		var modTime, lastVerified, createdAt int64
+
+		err = rows.Scan(
+			&loc.ID,
+			&loc.FileID,
+			&loc.DiskName,
+			&loc.DiskDeviceID,
+			&loc.DiskPath,
+			&loc.Size,
+			&loc.Inode,
+			&modTime,
+			&lastVerified,
+			&createdAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		loc.ModifiedTime = time.Unix(modTime, 0)
+		loc.LastVerified = time.Unix(lastVerified, 0)
+		loc.CreatedAt = time.Unix(createdAt, 0)
+
+		result[loc.FileID] = append(result[loc.FileID], loc)
+	}
+
+	return result, rows.Err()
+}
+
 // GetFilesWithMultipleDiskLocations returns files that exist on multiple disks (cross-disk duplicates)
 func (db *DB) GetFilesWithMultipleDiskLocations() ([]*File, error) {
 	query := `
