@@ -623,15 +623,16 @@ document.addEventListener('DOMContentLoaded', function() {
             // Show success toast
             const diskList = result.disks.map(d =>
                 `${d.name}: ${d.mount_path} (${d.used_percent.toFixed(1)}% full)`
-            ).join('\\n');
+            ).join('<br>');
 
             if (window.showToast) {
                 window.showToast(
-                    `Successfully detected ${result.count} disk(s):\\n${diskList}`,
+                    `Successfully detected ${result.count} disk(s):<br>${diskList}`,
                     'success'
                 );
             } else {
-                alert(`Successfully detected ${result.count} disk(s):\\n\\n${diskList}`);
+                // For alert fallback, convert <br> tags to newlines
+                alert(`Successfully detected ${result.count} disk(s):\n\n${diskList.replace(/<br>/g, '\n')}`);
             }
         } catch (error) {
             // Show error toast
