@@ -160,11 +160,37 @@ func (d *Detector) RefreshDiskSpace() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
+	// Check if Unraid stats are available
+	var unraidReader *UnraidStatsReader
+	if IsUnraidStatsAvailable("") {
+		unraidReader = NewUnraidStatsReader("")
+		if err := unraidReader.ParseDisksINI(); err != nil {
+			fmt.Printf("Warning: Failed to parse Unraid disks.ini during refresh: %v (falling back to statfs)\n", err)
+			unraidReader = nil
+		}
+	}
+
 	for deviceID, diskInfo := range d.diskMap {
-		spaceInfo, err := GetDiskSpace(diskInfo.MountPath)
-		if err != nil {
-			fmt.Printf("Warning: Could not refresh disk space for %s: %v\n", diskInfo.Name, err)
-			continue
+		var spaceInfo *SpaceInfo
+		var err error
+
+		// Try to get disk space from Unraid stats first
+		if unraidReader != nil {
+			diskName := ExtractDiskNameFromPath(diskInfo.MountPath)
+			if diskName != "" {
+				if unraidStats, ok := unraidReader.GetDiskStats(diskName); ok {
+					spaceInfo = GetSpaceInfoFromUnraid(unraidStats)
+				}
+			}
+		}
+
+		// Fall back to statfs if Unraid stats not available
+		if spaceInfo == nil {
+			spaceInfo, err = GetDiskSpace(diskInfo.MountPath)
+			if err != nil {
+				fmt.Printf("Warning: Could not refresh disk space for %s: %v\n", diskInfo.Name, err)
+				continue
+			}
 		}
 
 		// Update space information
