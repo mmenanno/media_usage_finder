@@ -1,11 +1,13 @@
 package scanner
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/mmenanno/media-usage-finder/internal/constants"
+	"github.com/mmenanno/media-usage-finder/internal/stats"
 )
 
 // Progress tracks the progress of a scan
@@ -289,4 +291,18 @@ type ProgressSnapshot struct {
 	IsEstimated     bool // True if TotalFiles is estimated from previous scan
 	CurrentService  int  // Which service is being updated (1-based)
 	TotalServices   int  // Total number of configured services
+}
+
+// MarshalJSON customizes JSON serialization to format durations cleanly
+func (ps ProgressSnapshot) MarshalJSON() ([]byte, error) {
+	type Alias ProgressSnapshot
+	return json.Marshal(&struct {
+		Elapsed string `json:"Elapsed"`
+		ETA     string `json:"ETA"`
+		*Alias
+	}{
+		Elapsed: stats.FormatDuration(ps.Elapsed),
+		ETA:     stats.FormatDuration(ps.ETA),
+		Alias:   (*Alias)(&ps),
+	})
 }
