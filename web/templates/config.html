@@ -662,22 +662,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 `${d.name}: ${d.mount_path} (${d.used_percent.toFixed(1)}% full)`
             ).join('<br>');
 
-            if (window.showToast) {
-                window.showToast(
-                    `Successfully detected ${result.count} disk(s):<br>${diskList}`,
-                    'success'
-                );
-            } else {
-                // For alert fallback, convert <br> tags to newlines
-                alert(`Successfully detected ${result.count} disk(s):\n\n${diskList.replace(/<br>/g, '\n')}`);
-            }
+            showToast(
+                `Successfully detected ${result.count} disk(s):<br>${diskList}`,
+                'success'
+            );
         } catch (error) {
             // Show error toast
-            if (window.showToast) {
-                window.showToast('Disk detection failed: ' + error.message, 'error');
-            } else {
-                alert('Disk detection failed: ' + error.message);
-            }
+            showToast('Disk detection failed: ' + error.message, 'error');
         } finally {
             // Hide loading state
             diskDetectionSpinner.classList.add('hidden');
@@ -713,12 +704,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const token = plexTokenInput.value.trim();
 
         if (!url) {
-            alert('Please enter a Plex URL first');
+            showToast('Please enter a Plex URL first', 'warning');
             return;
         }
 
         if (!token) {
-            alert('Please enter a Plex token first');
+            showToast('Please enter a Plex token first', 'warning');
             return;
         }
 
@@ -740,7 +731,7 @@ document.addEventListener('DOMContentLoaded', function() {
             renderLibraries(libraries);
             container.classList.remove('hidden');
         } catch (error) {
-            alert('Failed to fetch libraries: ' + error.message);
+            showToast('Failed to fetch libraries: ' + error.message, 'error');
             container.classList.add('hidden');
         } finally {
             // Hide loading state

@@ -599,8 +599,13 @@ function sortDuplicates(type, sortBy) {
     applyFiltersAndSort(type);
 }
 
-function previewConsolidation(type) {
-    if (!confirm('Do you want to run a DRY RUN consolidation first?\n\nThis will show what would happen without actually deleting files.')) {
+async function previewConsolidation(type) {
+    const confirmed = await confirmDialog(
+        'This will show what would happen without actually deleting files.',
+        'Run Dry Run Consolidation?'
+    );
+
+    if (!confirmed) {
         return;
     }
 
@@ -611,7 +616,7 @@ function previewConsolidation(type) {
         body: JSON.stringify({dry_run: true})
     })
     .then(response => response.json())
-    .then(data => {
+    .then(async data => {
         if (data.status === 'success') {
             let message = `DRY RUN COMPLETE\n\n`;
             message += `Groups processed: ${data.groups_processed}\n`;
@@ -624,20 +629,26 @@ function previewConsolidation(type) {
 
             message += '\n\nProceed with actual consolidation?';
 
-            if (confirm(message)) {
+            const proceed = await confirmDialog(message, 'Dry Run Results');
+            if (proceed) {
                 executeConsolidation();
             }
         } else {
-            alert('Preview failed: ' + (data.message || 'Unknown error'));
+            showToast('Preview failed: ' + (data.message || 'Unknown error'), 'error');
         }
     })
     .catch(error => {
-        alert('Error: ' + error.message);
+        showToast('Error: ' + error.message, 'error');
     });
 }
 
-function executeConsolidation() {
-    if (!confirm('⚠️ WARNING: This will DELETE files!\n\nAre you absolutely sure you want to proceed?')) {
+async function executeConsolidation() {
+    const confirmed = await confirmDialog(
+        '⚠️ WARNING: This will DELETE files!\n\nAre you absolutely sure you want to proceed?',
+        'Confirm File Deletion'
+    );
+
+    if (!confirmed) {
         return;
     }
 
@@ -647,7 +658,7 @@ function executeConsolidation() {
         body: JSON.stringify({dry_run: false})
     })
     .then(response => response.json())
-    .then(data => {
+    .then(async data => {
         if (data.status === 'success') {
             let message = `CONSOLIDATION COMPLETE\n\n`;
             message += `Groups processed: ${data.groups_processed}\n`;
@@ -658,19 +669,24 @@ function executeConsolidation() {
                 message += `\nErrors encountered: ${data.errors.length}`;
             }
 
-            alert(message);
+            await alertDialog(message, 'Consolidation Complete', 'success');
             location.reload(); // Refresh to show updated data
         } else {
-            alert('Consolidation failed: ' + (data.message || 'Unknown error'));
+            showToast('Consolidation failed: ' + (data.message || 'Unknown error'), 'error');
         }
     })
     .catch(error => {
-        alert('Error: ' + error.message);
+        showToast('Error: ' + error.message, 'error');
     });
 }
 
-function previewHardlinks() {
-    if (!confirm('Do you want to run a DRY RUN hardlink operation first?\n\nThis will show what would happen without actually creating hardlinks.')) {
+async function previewHardlinks() {
+    const confirmed = await confirmDialog(
+        'This will show what would happen without actually creating hardlinks.',
+        'Run Dry Run Hardlink?'
+    );
+
+    if (!confirmed) {
         return;
     }
 
@@ -681,7 +697,7 @@ function previewHardlinks() {
         body: JSON.stringify({dry_run: true})
     })
     .then(response => response.json())
-    .then(data => {
+    .then(async data => {
         if (data.status === 'success') {
             let message = `DRY RUN COMPLETE\n\n`;
             message += `Groups processed: ${data.groups_processed}\n`;
@@ -694,20 +710,26 @@ function previewHardlinks() {
 
             message += '\n\nProceed with actual hardlink creation?';
 
-            if (confirm(message)) {
+            const proceed = await confirmDialog(message, 'Dry Run Results');
+            if (proceed) {
                 executeHardlinks();
             }
         } else {
-            alert('Preview failed: ' + (data.message || 'Unknown error'));
+            showToast('Preview failed: ' + (data.message || 'Unknown error'), 'error');
         }
     })
     .catch(error => {
-        alert('Error: ' + error.message);
+        showToast('Error: ' + error.message, 'error');
     });
 }
 
-function executeHardlinks() {
-    if (!confirm('This will replace duplicate files with hardlinks.\n\nProceed?')) {
+async function executeHardlinks() {
+    const confirmed = await confirmDialog(
+        'This will replace duplicate files with hardlinks.\n\nProceed?',
+        'Confirm Hardlink Creation'
+    );
+
+    if (!confirmed) {
         return;
     }
 
@@ -717,7 +739,7 @@ function executeHardlinks() {
         body: JSON.stringify({dry_run: false})
     })
     .then(response => response.json())
-    .then(data => {
+    .then(async data => {
         if (data.status === 'success') {
             let message = `HARDLINK CREATION COMPLETE\n\n`;
             message += `Groups processed: ${data.groups_processed}\n`;
@@ -728,14 +750,14 @@ function executeHardlinks() {
                 message += `\nErrors encountered: ${data.errors.length}`;
             }
 
-            alert(message);
+            await alertDialog(message, 'Hardlink Complete', 'success');
             location.reload(); // Refresh to show updated data
         } else {
-            alert('Hardlink creation failed: ' + (data.message || 'Unknown error'));
+            showToast('Hardlink creation failed: ' + (data.message || 'Unknown error'), 'error');
         }
     })
     .catch(error => {
-        alert('Error: ' + error.message);
+        showToast('Error: ' + error.message, 'error');
     });
 }
 
