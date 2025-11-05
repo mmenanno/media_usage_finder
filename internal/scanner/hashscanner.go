@@ -87,8 +87,8 @@ func (hs *HashScanner) Start(ctx context.Context, minSize, maxSize int64) error 
 	}
 	hs.progress.TotalSize = totalSize
 
-	// Start worker pool
-	go hs.processFiles(ctx, files, scan.ID)
+	// Process files (blocks until complete)
+	hs.processFiles(ctx, files, scan.ID)
 
 	return nil
 }
@@ -155,8 +155,8 @@ func (hs *HashScanner) VerifyDuplicates(ctx context.Context) error {
 	}
 	hs.progress.TotalSize = totalSize
 
-	// Start worker pool for verification (full hashing)
-	go hs.verifyFiles(ctx, files, scan.ID)
+	// Process files for verification (blocks until complete)
+	hs.verifyFiles(ctx, files, scan.ID)
 
 	return nil
 }
@@ -212,8 +212,8 @@ func (hs *HashScanner) UpgradeAllQuickHashes(ctx context.Context) error {
 	}
 	hs.progress.TotalSize = totalSize
 
-	// Start worker pool for upgrading (full hashing)
-	go hs.verifyFiles(ctx, files, scan.ID)
+	// Process files for upgrading (blocks until complete)
+	hs.verifyFiles(ctx, files, scan.ID)
 
 	return nil
 }
