@@ -94,7 +94,7 @@ class ToastManager {
         toast.innerHTML = `
             ${icon}
             <span class="flex-1 text-sm font-medium break-words">${message}</span>
-            <div class="flex items-start space-x-2 flex-shrink-0">
+            <div class="flex items-start space-x-2 shrink-0">
                 ${retryBtn}
                 ${closeBtn}
             </div>
