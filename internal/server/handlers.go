@@ -3718,15 +3718,7 @@ func (s *Server) HandleHashProgressHTML(w http.ResponseWriter, r *http.Request) 
 	`
 
 	funcMap := template.FuncMap{
-		"formatDuration": func(d time.Duration) string {
-			if d < time.Minute {
-				return fmt.Sprintf("%ds", int(d.Seconds()))
-			}
-			if d < time.Hour {
-				return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
-			}
-			return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
-		},
+		"formatDuration": stats.FormatDuration,
 	}
 
 	t := template.Must(template.New("hash-progress").Funcs(funcMap).Parse(tmpl))

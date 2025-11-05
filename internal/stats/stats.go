@@ -350,6 +350,18 @@ func FormatDuration(d time.Duration) string {
 	}
 
 	d = d.Round(time.Second)
+
+	// Calculate days if duration >= 48 hours
+	days := d / (24 * time.Hour)
+	if days >= 2 {
+		d -= days * 24 * time.Hour
+		h := d / time.Hour
+		d -= h * time.Hour
+		m := d / time.Minute
+		return fmt.Sprintf("%dd %dh %dm", days, h, m)
+	}
+
+	// Original logic for durations < 48 hours
 	h := d / time.Hour
 	d -= h * time.Hour
 	m := d / time.Minute
