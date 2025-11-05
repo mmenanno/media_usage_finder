@@ -20,6 +20,7 @@ import (
 	"github.com/mmenanno/media-usage-finder/internal/constants"
 	"github.com/mmenanno/media-usage-finder/internal/database"
 	"github.com/mmenanno/media-usage-finder/internal/disk"
+	"github.com/mmenanno/media-usage-finder/internal/duplicates"
 	"github.com/mmenanno/media-usage-finder/internal/scanner"
 	"github.com/mmenanno/media-usage-finder/internal/stats"
 )
@@ -107,6 +108,7 @@ func (s *Server) LoadTemplates(pattern string) error {
 	pages := []string{
 		"dashboard.html",
 		"files.html",
+		"duplicates.html",
 		"hardlinks.html",
 		"scans.html",
 		"stats.html",
@@ -187,14 +189,24 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		disks = s.diskDetector.GetAllDisks()
 	}
 
-	data := DashboardData{
-		Stats:                statistics,
-		Title:                "Dashboard",
-		HasActiveScan:        hasActiveScan,
-		HasInterruptedScan:   hasInterruptedScan,
-		InterruptedScanID:    interruptedScanID,
-		InterruptedScanPhase: interruptedScanPhase,
-		Disks:                disks,
+	// Get duplicate statistics if hash scanning is enabled
+	var duplicateStats *database.DuplicateStats
+	if s.config.DuplicateDetection.Enabled {
+		duplicateStats, err = s.db.GetDuplicateStats()
+		if err != nil {
+			log.Printf("Warning: Failed to get duplicate stats: %v", err)
+		}
+	}
+
+	data := map[string]interface{}{
+		"Stats":                statistics,
+		"Title":                "Dashboard",
+		"HasActiveScan":        hasActiveScan,
+		"HasInterruptedScan":   hasInterruptedScan,
+		"InterruptedScanID":    interruptedScanID,
+		"InterruptedScanPhase": interruptedScanPhase,
+		"Disks":                disks,
+		"DuplicateStats":       duplicateStats,
 	}
 
 	s.renderTemplate(w, "dashboard.html", data)
@@ -3360,6 +3372,9 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 		"formatSize":     stats.FormatSize,
 		"formatBytes":    disk.FormatBytes, // For disk space formatting
 		"formatDuration": stats.FormatDuration,
+		"formatTimestamp": func(t time.Time) string {
+			return t.Format("2006-01-02 15:04:05")
+		},
 		"formatServiceName": func(service string) string {
 			// Map internal service names to proper display names
 			switch service {
@@ -3814,4 +3829,85 @@ func (s *Server) HandleUpgradeAllHashes(w http.ResponseWriter, r *http.Request) 
 		"status":  "success",
 		"message": "Hash upgrade started",
 	})
+}
+
+// HandleDuplicates renders the duplicates page showing cross-disk and same-disk duplicates
+func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
+	// Get active tab from query parameter (default to cross-disk)
+	activeTab := r.URL.Query().Get("tab")
+	if activeTab == "" {
+		activeTab = "cross-disk"
+	}
+
+	// Check if hash scanning is enabled
+	if s.config.DuplicateDetection.Enabled == false {
+		// Show page with message that hash scanning is disabled
+		data := map[string]interface{}{
+			"Title":               "Duplicate Files",
+			"ActiveTab":           activeTab,
+			"CrossDiskGroups":     []*duplicates.ConsolidationPlan{},
+			"SameDiskGroups":      []*duplicates.ConsolidationPlan{},
+			"CrossDiskCount":      0,
+			"SameDiskCount":       0,
+			"TotalSavings":        int64(0),
+			"CrossDiskSavings":    int64(0),
+			"SameDiskSavings":     int64(0),
+			"HashScanningEnabled": false,
+		}
+
+		s.renderTemplate(w, "duplicates.html", data)
+		return
+	}
+
+	// Create analyzer
+	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
+
+	// Get cross-disk duplicates
+	crossDiskPlans, err := analyzer.AnalyzeCrossDiskDuplicates()
+	if err != nil {
+		log.Printf("ERROR: Failed to analyze cross-disk duplicates: %v", err)
+		crossDiskPlans = []*duplicates.ConsolidationPlan{}
+	}
+
+	// Get same-disk duplicates
+	sameDiskPlans, err := analyzer.AnalyzeSameDiskDuplicates()
+	if err != nil {
+		log.Printf("ERROR: Failed to analyze same-disk duplicates: %v", err)
+		sameDiskPlans = []*duplicates.ConsolidationPlan{}
+	}
+
+	// Calculate totals
+	crossDiskSavings := duplicates.CalculateTotalSavings(crossDiskPlans)
+	sameDiskSavings := duplicates.CalculateTotalSavings(sameDiskPlans)
+	totalSavings := crossDiskSavings + sameDiskSavings
+
+	// Count files to delete/link
+	crossDiskFilesToDelete := 0
+	for _, plan := range crossDiskPlans {
+		crossDiskFilesToDelete += len(plan.DeleteFiles)
+	}
+
+	sameDiskFilesToLink := 0
+	for _, plan := range sameDiskPlans {
+		sameDiskFilesToLink += len(plan.DeleteFiles)
+	}
+
+	// Prepare template data
+	data := map[string]interface{}{
+		"Title":                  "Duplicate Files",
+		"ActiveTab":              activeTab,
+		"CrossDiskGroups":        crossDiskPlans,
+		"SameDiskGroups":         sameDiskPlans,
+		"CrossDiskCount":         len(crossDiskPlans),
+		"SameDiskCount":          len(sameDiskPlans),
+		"TotalSavings":           totalSavings,
+		"CrossDiskSavings":       crossDiskSavings,
+		"SameDiskSavings":        sameDiskSavings,
+		"CrossDiskFilesToDelete": crossDiskFilesToDelete,
+		"SameDiskFilesToLink":    sameDiskFilesToLink,
+		"HashScanningEnabled":    true,
+	}
+
+	// Render template
+	s.renderTemplate(w, "duplicates.html", data)
 }

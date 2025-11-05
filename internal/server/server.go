@@ -25,6 +25,7 @@ func (s *Server) Run() error {
 	// Page routes
 	mux.HandleFunc("/", s.HandleIndex)
 	mux.HandleFunc("/files", s.HandleFiles)
+	mux.HandleFunc("/duplicates", s.HandleDuplicates)
 	mux.HandleFunc("/hardlinks", s.HandleHardlinks)
 	mux.HandleFunc("/scans", s.HandleScans)
 	mux.HandleFunc("/stats", s.HandleStats)
