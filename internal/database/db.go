@@ -394,6 +394,32 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 10: Add hash_type column if it's missing (for servers that had partial Migration 6)
+	var hasHashType int
+	err = db.conn.QueryRow(`
+		SELECT COUNT(*)
+		FROM pragma_table_info('files')
+		WHERE name = 'hash_type'
+	`).Scan(&hasHashType)
+
+	if err != nil {
+		return fmt.Errorf("failed to check for hash_type column: %w", err)
+	}
+
+	// If hash_type column doesn't exist, add it and the index
+	if hasHashType == 0 {
+		_, err = db.conn.Exec(`
+			-- Add hash_type column to files table ('quick' or 'full')
+			ALTER TABLE files ADD COLUMN hash_type TEXT DEFAULT NULL;
+
+			-- Create index for finding files with quick hashes (for verification)
+			CREATE INDEX IF NOT EXISTS idx_files_quick_hash ON files(hash_type) WHERE hash_type = 'quick';
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to add hash_type column: %w", err)
+		}
+	}
+
 	return nil
 }
 
