@@ -3688,11 +3688,11 @@ func (s *Server) HandleHashProgressHTML(w http.ResponseWriter, r *http.Request) 
 		<div class="grid grid-cols-3 gap-4 text-sm">
 			<div>
 				<div class="text-gray-400">Elapsed</div>
-				<div class="font-semibold">{{.Elapsed}}</div>
+				<div class="font-semibold">{{formatDuration .Elapsed}}</div>
 			</div>
 			<div>
 				<div class="text-gray-400">ETA</div>
-				<div class="font-semibold">{{if gt .ETA 0}}{{.ETA}}{{else}}-{{end}}</div>
+				<div class="font-semibold">{{if gt .ETA 0}}{{formatDuration .ETA}}{{else}}-{{end}}</div>
 			</div>
 			<div>
 				<div class="text-gray-400">Errors</div>
