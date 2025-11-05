@@ -64,34 +64,77 @@
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-400">{{.ActualFileCount}}</td>
                         <td class="px-6 py-4 text-sm">
-                            {{if eq .Status "completed"}}
-                                <span class="px-2 py-1 bg-green-600 rounded text-xs">Completed</span>
-                            {{else if eq .Status "running"}}
-                                <span class="px-2 py-1 bg-blue-600 rounded text-xs">Running</span>
+                            <div class="flex flex-col gap-2">
+                                <!-- Status Badge -->
+                                <div class="flex items-center gap-2">
+                                    {{if eq .Status "completed"}}
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-md text-xs font-medium shadow-sm">
+                                            <span>✓</span>
+                                            <span>Completed</span>
+                                        </span>
+                                    {{else if eq .Status "completed_with_errors"}}
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-md text-xs font-medium shadow-sm">
+                                            <span>⚠</span>
+                                            <span>Completed with Errors</span>
+                                        </span>
+                                    {{else if eq .Status "running"}}
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-md text-xs font-medium shadow-sm">
+                                            <span class="animate-pulse">●</span>
+                                            <span>Running</span>
+                                        </span>
+                                    {{else if eq .Status "failed"}}
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-md text-xs font-medium shadow-sm">
+                                            <span>✗</span>
+                                            <span>Failed</span>
+                                        </span>
+                                    {{else if eq .Status "interrupted"}}
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-600 text-white rounded-md text-xs font-medium shadow-sm">
+                                            <span>■</span>
+                                            <span>Interrupted</span>
+                                        </span>
+                                    {{else}}
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-600 text-white rounded-md text-xs font-medium shadow-sm">
+                                            <span>?</span>
+                                            <span class="capitalize">{{.Status}}</span>
+                                        </span>
+                                    {{end}}
+
+                                    <!-- Error indicator on badge -->
+                                    {{if .Errors}}
+                                        <span class="text-red-400 text-xs" title="Has errors">⚠</span>
+                                    {{end}}
+                                </div>
+
+                                <!-- Phase Information -->
                                 {{if .CurrentPhase}}
-                                    <div class="text-xs text-blue-300 mt-1">{{.CurrentPhase}}</div>
+                                    {{if eq .Status "running"}}
+                                        <div class="text-xs text-blue-400 flex items-center gap-1">
+                                            <span class="text-gray-500">Phase:</span>
+                                            <span class="font-medium">{{.CurrentPhase}}</span>
+                                        </div>
+                                    {{else}}
+                                        <div class="text-xs text-gray-400 flex items-center gap-1">
+                                            <span class="text-gray-500">Last phase:</span>
+                                            <span>{{.CurrentPhase}}</span>
+                                        </div>
+                                    {{end}}
                                 {{end}}
-                            {{else if eq .Status "failed"}}
-                                <span class="px-2 py-1 bg-red-600 rounded text-xs">Failed</span>
-                                {{if .CurrentPhase}}
-                                    <div class="text-xs text-gray-400 mt-1">Last phase: {{.CurrentPhase}}</div>
+
+                                <!-- Error Display -->
+                                {{if .Errors}}
+                                    <div class="flex flex-col gap-1">
+                                        <button
+                                            onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('span').textContent = this.nextElementSibling.classList.contains('hidden') ? '▼' : '▲';"
+                                            class="self-start inline-flex items-center gap-1.5 px-2 py-1 bg-red-900/40 hover:bg-red-900/60 border border-red-700/50 rounded text-xs text-red-300 hover:text-red-200 transition-colors">
+                                            <span>▼</span>
+                                            <span>View Error Details</span>
+                                        </button>
+                                        <div class="hidden p-3 bg-red-950/50 border border-red-800/50 rounded-md text-xs text-red-200 max-h-32 overflow-y-auto">
+                                            <pre class="whitespace-pre-wrap font-mono">{{.Errors}}</pre>
+                                        </div>
+                                    </div>
                                 {{end}}
-                            {{else if eq .Status "interrupted"}}
-                                <span class="px-2 py-1 bg-yellow-600 rounded text-xs">Interrupted</span>
-                                {{if .CurrentPhase}}
-                                    <div class="text-xs text-yellow-300 mt-1">Last phase: {{.CurrentPhase}}</div>
-                                {{end}}
-                            {{end}}
-                            {{if .Errors}}
-                            <button
-                                onclick="this.nextElementSibling.classList.toggle('hidden')"
-                                class="ml-2 text-xs text-red-400 hover:text-red-300">
-                                View Error
-                            </button>
-                            <div class="hidden mt-2 p-2 bg-red-900/30 border border-red-700 rounded text-xs text-red-300">
-                                {{.Errors}}
                             </div>
-                            {{end}}
                         </td>
                     </tr>
                     {{end}}
