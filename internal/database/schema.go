@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS config (
 -- Audit log for tracking deletions and modifications
 CREATE TABLE IF NOT EXISTS audit_log (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	action TEXT NOT NULL CHECK(action IN ('delete', 'mark_rescan', 'config_change')),
+	action TEXT NOT NULL CHECK(action IN ('delete', 'mark_rescan', 'config_change', 'consolidate', 'hardlink')),
 	entity_type TEXT NOT NULL,
 	entity_id INTEGER,
 	details TEXT,

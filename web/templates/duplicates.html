@@ -369,15 +369,152 @@ function sortDuplicates(type, sortBy) {
 }
 
 function previewConsolidation(type) {
-    console.log('Preview consolidation:', type);
-    // TODO: Implement consolidation preview (Phase 4)
-    alert('Consolidation preview will be implemented in Phase 4');
+    if (!confirm('Do you want to run a DRY RUN consolidation first?\n\nThis will show what would happen without actually deleting files.')) {
+        return;
+    }
+
+    // Run dry-run consolidation
+    fetch('/api/duplicates/consolidate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({dry_run: true})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            let message = `DRY RUN COMPLETE\n\n`;
+            message += `Groups processed: ${data.groups_processed}\n`;
+            message += `Files to delete: ${data.files_deleted}\n`;
+            message += `Space to free: ${formatBytes(data.space_freed)}\n`;
+
+            if (data.errors && data.errors.length > 0) {
+                message += `\nErrors: ${data.errors.length}`;
+            }
+
+            message += '\n\nProceed with actual consolidation?';
+
+            if (confirm(message)) {
+                executeConsolidation();
+            }
+        } else {
+            alert('Preview failed: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+    });
+}
+
+function executeConsolidation() {
+    if (!confirm('⚠️ WARNING: This will DELETE files!\n\nAre you absolutely sure you want to proceed?')) {
+        return;
+    }
+
+    fetch('/api/duplicates/consolidate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({dry_run: false})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            let message = `CONSOLIDATION COMPLETE\n\n`;
+            message += `Groups processed: ${data.groups_processed}\n`;
+            message += `Files deleted: ${data.files_deleted}\n`;
+            message += `Space freed: ${formatBytes(data.space_freed)}\n`;
+
+            if (data.errors && data.errors.length > 0) {
+                message += `\nErrors encountered: ${data.errors.length}`;
+            }
+
+            alert(message);
+            location.reload(); // Refresh to show updated data
+        } else {
+            alert('Consolidation failed: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+    });
 }
 
 function previewHardlinks() {
-    console.log('Preview hardlinks');
-    // TODO: Implement hardlink preview (Phase 4)
-    alert('Hardlink preview will be implemented in Phase 4');
+    if (!confirm('Do you want to run a DRY RUN hardlink operation first?\n\nThis will show what would happen without actually creating hardlinks.')) {
+        return;
+    }
+
+    // Run dry-run hardlink
+    fetch('/api/duplicates/hardlink', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({dry_run: true})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            let message = `DRY RUN COMPLETE\n\n`;
+            message += `Groups processed: ${data.groups_processed}\n`;
+            message += `Files to hardlink: ${data.files_linked}\n`;
+            message += `Space to save: ${formatBytes(data.space_saved)}\n`;
+
+            if (data.errors && data.errors.length > 0) {
+                message += `\nErrors: ${data.errors.length}`;
+            }
+
+            message += '\n\nProceed with actual hardlink creation?';
+
+            if (confirm(message)) {
+                executeHardlinks();
+            }
+        } else {
+            alert('Preview failed: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+    });
+}
+
+function executeHardlinks() {
+    if (!confirm('This will replace duplicate files with hardlinks.\n\nProceed?')) {
+        return;
+    }
+
+    fetch('/api/duplicates/hardlink', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({dry_run: false})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            let message = `HARDLINK CREATION COMPLETE\n\n`;
+            message += `Groups processed: ${data.groups_processed}\n`;
+            message += `Files hardlinked: ${data.files_linked}\n`;
+            message += `Space saved: ${formatBytes(data.space_saved)}\n`;
+
+            if (data.errors && data.errors.length > 0) {
+                message += `\nErrors encountered: ${data.errors.length}`;
+            }
+
+            alert(message);
+            location.reload(); // Refresh to show updated data
+        } else {
+            alert('Hardlink creation failed: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+    });
+}
+
+// Helper function to format bytes
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 </script>
 {{end}}

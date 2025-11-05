@@ -3911,3 +3911,185 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	// Render template
 	s.renderTemplate(w, "duplicates.html", data)
 }
+
+// HandleConsolidateDuplicates executes cross-disk consolidation
+func (s *Server) HandleConsolidateDuplicates(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		DryRun      bool     `json:"dry_run"`
+		GroupHashes []string `json:"group_hashes"` // Optional: specific groups only
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body", "invalid_request")
+		return
+	}
+
+	// Create analyzer and consolidator
+	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
+
+	// Create hasher for verification
+	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm)
+	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
+
+	// Get cross-disk duplicates
+	plans, err := analyzer.AnalyzeCrossDiskDuplicates()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to analyze duplicates", "analysis_failed")
+		return
+	}
+
+	// Filter to specific groups if requested
+	if len(req.GroupHashes) > 0 {
+		hashSet := make(map[string]bool)
+		for _, h := range req.GroupHashes {
+			hashSet[h] = true
+		}
+
+		filteredPlans := make([]*duplicates.ConsolidationPlan, 0)
+		for _, plan := range plans {
+			if hashSet[plan.Group.FileHash] {
+				filteredPlans = append(filteredPlans, plan)
+			}
+		}
+		plans = filteredPlans
+	}
+
+	// Execute consolidation
+	result, err := consolidator.ConsolidateCrossDisk(plans, req.DryRun)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Consolidation failed", "consolidation_failed")
+		return
+	}
+
+	// Invalidate stats cache
+	s.statsCache.Invalidate()
+
+	// Return result
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":           "success",
+		"dry_run":          result.DryRun,
+		"groups_processed": result.GroupsProcessed,
+		"files_deleted":    result.FilesDeleted,
+		"space_freed":      result.SpaceFreed,
+		"errors":           result.Errors,
+	})
+}
+
+// HandleCreateHardlinks creates hardlinks for same-disk duplicates
+func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		DryRun      bool     `json:"dry_run"`
+		GroupHashes []string `json:"group_hashes"` // Optional: specific groups only
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body", "invalid_request")
+		return
+	}
+
+	// Create analyzer and consolidator
+	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
+
+	// Create hasher for verification
+	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm)
+	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
+
+	// Get same-disk duplicates
+	plans, err := analyzer.AnalyzeSameDiskDuplicates()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to analyze duplicates", "analysis_failed")
+		return
+	}
+
+	// Filter to specific groups if requested
+	if len(req.GroupHashes) > 0 {
+		hashSet := make(map[string]bool)
+		for _, h := range req.GroupHashes {
+			hashSet[h] = true
+		}
+
+		filteredPlans := make([]*duplicates.ConsolidationPlan, 0)
+		for _, plan := range plans {
+			if hashSet[plan.Group.FileHash] {
+				filteredPlans = append(filteredPlans, plan)
+			}
+		}
+		plans = filteredPlans
+	}
+
+	// Execute hardlink creation
+	result, err := consolidator.CreateHardlinks(plans, req.DryRun)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Hardlink creation failed", "hardlink_failed")
+		return
+	}
+
+	// Invalidate stats cache
+	s.statsCache.Invalidate()
+
+	// Return result
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":           "success",
+		"dry_run":          result.DryRun,
+		"groups_processed": result.GroupsProcessed,
+		"files_linked":     result.FilesDeleted, // "Deleted" is used for linked in same-disk
+		"space_saved":      result.SpaceFreed,
+		"errors":           result.Errors,
+	})
+}
+
+// HandlePreviewConsolidation generates a preview of consolidation impact
+func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	// Get type parameter (cross-disk or same-disk)
+	consolidationType := r.URL.Query().Get("type")
+	if consolidationType == "" {
+		consolidationType = "cross-disk"
+	}
+
+	// Create analyzer
+	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
+
+	// Create hasher and consolidator
+	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm)
+	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
+
+	var plans []*duplicates.ConsolidationPlan
+	var err error
+
+	if consolidationType == "cross-disk" {
+		plans, err = analyzer.AnalyzeCrossDiskDuplicates()
+	} else {
+		plans, err = analyzer.AnalyzeSameDiskDuplicates()
+	}
+
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to analyze duplicates", "analysis_failed")
+		return
+	}
+
+	// Generate preview
+	preview := consolidator.PreviewConsolidation(plans)
+
+	// Return preview data
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"type":                 consolidationType,
+		"total_groups":         preview.TotalGroups,
+		"total_files_to_process": preview.TotalFilesToDelete,
+		"total_space_saved":    preview.TotalSpaceSaved,
+		"disk_impacts":         preview.DiskImpacts,
+	})
+}

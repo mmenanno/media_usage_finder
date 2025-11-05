@@ -2408,3 +2408,55 @@ func (db *DB) GetQuickHashCount() (int64, error) {
 	err := db.conn.QueryRow(`SELECT COUNT(*) FROM files WHERE hash_type = 'quick'`).Scan(&count)
 	return count, err
 }
+
+// LogConsolidation logs a cross-disk consolidation operation to the audit log
+func (db *DB) LogConsolidation(keepFile, deleteFile *DuplicateFile, reason string) error {
+	query := `
+		INSERT INTO audit_log (action, entity_type, entity_id, details, created_at)
+		VALUES (?, ?, ?, ?, ?)
+	`
+
+	details := map[string]interface{}{
+		"operation":    "cross_disk_consolidation",
+		"kept_file":    keepFile.Path,
+		"kept_disk":    keepFile.DiskName,
+		"deleted_file": deleteFile.Path,
+		"deleted_disk": deleteFile.DiskName,
+		"file_hash":    keepFile.ID, // Use ID as a reference
+		"size":         deleteFile.Size,
+		"reason":       reason,
+	}
+
+	detailsJSON, err := json.Marshal(details)
+	if err != nil {
+		return fmt.Errorf("failed to marshal details: %w", err)
+	}
+
+	_, err = db.conn.Exec(query, "consolidate", "file", deleteFile.ID, string(detailsJSON), time.Now().Unix())
+	return err
+}
+
+// LogHardlinkCreation logs a hardlink creation operation to the audit log
+func (db *DB) LogHardlinkCreation(primaryFile, duplicateFile *DuplicateFile, reason string) error {
+	query := `
+		INSERT INTO audit_log (action, entity_type, entity_id, details, created_at)
+		VALUES (?, ?, ?, ?, ?)
+	`
+
+	details := map[string]interface{}{
+		"operation":      "hardlink_creation",
+		"primary_file":   primaryFile.Path,
+		"duplicate_file": duplicateFile.Path,
+		"disk":           primaryFile.DiskName,
+		"size_saved":     duplicateFile.Size,
+		"reason":         reason,
+	}
+
+	detailsJSON, err := json.Marshal(details)
+	if err != nil {
+		return fmt.Errorf("failed to marshal details: %w", err)
+	}
+
+	_, err = db.conn.Exec(query, "hardlink", "file", duplicateFile.ID, string(detailsJSON), time.Now().Unix())
+	return err
+}
