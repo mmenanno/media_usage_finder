@@ -2236,7 +2236,7 @@ func (db *DB) DeleteDiskLocationsByDisk(diskDeviceID int64) error {
 // GetFilesNeedingHash returns files that need hashing (optionally filtered by size)
 func (db *DB) GetFilesNeedingHash(minSize, maxSize int64) ([]File, error) {
 	query := `
-		SELECT id, path, size, inode, device_id, modified_time, last_verified, is_orphaned
+		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, extension, created_at
 		FROM files
 		WHERE hash_calculated = 0
 	`
@@ -2261,21 +2261,11 @@ func (db *DB) GetFilesNeedingHash(minSize, maxSize int64) ([]File, error) {
 
 	var files []File
 	for rows.Next() {
-		var file File
-		err := rows.Scan(
-			&file.ID,
-			&file.Path,
-			&file.Size,
-			&file.Inode,
-			&file.DeviceID,
-			&file.ModifiedTime,
-			&file.LastVerified,
-			&file.IsOrphaned,
-		)
+		file, err := scanFileRow(rows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan file row: %w", err)
 		}
-		files = append(files, file)
+		files = append(files, *file)
 	}
 
 	return files, rows.Err()
