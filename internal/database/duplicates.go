@@ -323,8 +323,8 @@ func (db *DB) GetDuplicateStats() (*DuplicateStats, error) {
 
 // DuplicateStats contains summary statistics about duplicates
 type DuplicateStats struct {
-	CrossDiskGroups           int
-	SameDiskGroups            int
+	CrossDiskGroups           int64
+	SameDiskGroups            int64
 	CrossDiskPotentialSavings int64
 	SameDiskPotentialSavings  int64
 	TotalPotentialSavings     int64
