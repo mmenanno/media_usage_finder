@@ -34,6 +34,8 @@
                                 <span class="px-2 py-1 bg-green-600 rounded text-xs">Incremental</span>
                             {{else if eq .ScanType "disk_location"}}
                                 <span class="px-2 py-1 bg-purple-600 rounded text-xs">Disk Location</span>
+                            {{else if eq .ScanType "hash_scan"}}
+                                <span class="px-2 py-1 bg-indigo-600 rounded text-xs">Hash Scan</span>
                             {{else if eq .ScanType "service_update_all"}}
                                 <span class="px-2 py-1 bg-cyan-600 rounded text-xs">Update All Services</span>
                             {{else if eq .ScanType "service_update_plex"}}
