@@ -230,8 +230,99 @@ if isHTMX {
 - `hx-target`: Where to insert response
 - `hx-swap`: How to insert (innerHTML, outerHTML, etc.)
 - `hx-include`: Include form fields in request
+- `hx-confirm`: Triggers custom confirmation dialog (automatically intercepted)
 
-### 6. Server-Sent Events (SSE)
+### 6. Custom UI Components
+
+**IMPORTANT**: The application uses custom UI components instead of browser defaults for consistency, accessibility, and better UX.
+
+#### Custom Dialog System
+
+**Location**: [web/static/js/modal.js](web/static/js/modal.js)
+
+**NEVER use browser native `alert()` or `confirm()`.** Always use the custom dialog system:
+
+```javascript
+// For confirmations (returns Promise<boolean>)
+const confirmed = await confirmDialog(
+    'Are you sure you want to proceed?',
+    'Confirm Action'  // Optional title
+);
+
+if (confirmed) {
+    // User clicked "Confirm"
+}
+
+// For alerts/notifications (returns Promise<boolean>)
+await alertDialog(
+    'Operation completed successfully!',
+    'Success',  // Optional title
+    'success'   // Optional type: 'info', 'success', 'warning', 'error'
+);
+
+// For toast notifications (non-blocking)
+showToast(
+    'File deleted successfully',
+    'success',  // Type: 'info', 'success', 'warning', 'error'
+    { duration: 5000 }  // Optional options
+);
+```
+
+**Benefits**:
+- Styled to match app's dark theme
+- Accessible (keyboard navigation, ARIA attributes)
+- Mobile-friendly and responsive
+- Promise-based for easy async/await usage
+- Toast notifications for non-blocking messages
+
+**HTMX Integration**: The system automatically intercepts `hx-confirm` attributes:
+
+```html
+<button hx-post="/api/delete" hx-confirm="Delete this file?">
+    Delete
+</button>
+```
+
+#### Custom Dropdown System
+
+**Location**: [web/static/js/custom-dropdown.js](web/static/js/custom-dropdown.js)
+
+**NEVER use native `<select>` elements.** Always use custom dropdowns for consistency:
+
+```html
+<div class="relative" data-custom-dropdown>
+    <input type="hidden" id="filter-value" value="default" data-dropdown-input>
+    <button
+        type="button"
+        data-dropdown-button
+        aria-expanded="false"
+        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded">
+        <span data-dropdown-text>Select Option</span>
+        <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2">
+            <!-- Chevron icon -->
+        </svg>
+    </button>
+    <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700">
+        <div data-dropdown-option data-value="option1" class="px-4 py-2 hover:bg-gray-600 cursor-pointer">
+            Option 1
+        </div>
+        <div data-dropdown-option data-value="option2" class="px-4 py-2 hover:bg-gray-600 cursor-pointer">
+            Option 2
+        </div>
+    </div>
+</div>
+```
+
+**Benefits**:
+- Fully styled and themeable
+- Better mobile support than native selects
+- Consistent across all browsers
+- Accessible with keyboard navigation
+- Automatically initializes on page load
+
+**See examples**: [web/templates/files.html](web/templates/files.html), [web/templates/duplicates.html](web/templates/duplicates.html)
+
+### 7. Server-Sent Events (SSE)
 
 Real-time scan progress uses SSE to stream updates to the browser.
 
@@ -244,7 +335,7 @@ Real-time scan progress uses SSE to stream updates to the browser.
 3. JavaScript updates UI in real-time
 4. Connection closes when scan completes
 
-### 7. Statistics Caching
+### 8. Statistics Caching
 
 Statistics are expensive to calculate, so they're cached with configurable TTL.
 
