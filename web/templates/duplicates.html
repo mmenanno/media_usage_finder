@@ -61,40 +61,73 @@
                 <!-- Filter Options -->
                 <div class="bg-gray-750 rounded-lg p-4 border border-gray-700">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Hash Type Filter -->
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">Hash Type</label>
-                            <select
-                                id="cross-disk-hash-filter"
-                                onchange="filterDuplicates('cross-disk', this.value)"
-                                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
-                                <option value="all">All Hashes</option>
-                                <option value="full">Full Hash Only ✓</option>
-                                <option value="quick">Quick Hash Only ⚠️</option>
-                            </select>
+                            <div class="relative" data-custom-dropdown>
+                                <input type="hidden" id="cross-disk-hash-filter" value="all" data-dropdown-input>
+                                <button
+                                    type="button"
+                                    data-dropdown-button
+                                    aria-expanded="false"
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    <span data-dropdown-text>All Hashes</span>
+                                    <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                                    <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">All Hashes</div>
+                                    <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Full Hash Only ✓</div>
+                                    <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Quick Hash Only ⚠️</div>
+                                </div>
+                            </div>
                         </div>
+                        <!-- Minimum Savings Filter -->
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">Minimum Savings</label>
-                            <select
-                                id="cross-disk-size-filter"
-                                onchange="filterBySize('cross-disk', this.value)"
-                                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
-                                <option value="0">Any Size</option>
-                                <option value="10485760">10 MB+</option>
-                                <option value="104857600">100 MB+</option>
-                                <option value="1073741824">1 GB+</option>
-                                <option value="10737418240">10 GB+</option>
-                            </select>
+                            <div class="relative" data-custom-dropdown>
+                                <input type="hidden" id="cross-disk-size-filter" value="0" data-dropdown-input>
+                                <button
+                                    type="button"
+                                    data-dropdown-button
+                                    aria-expanded="false"
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    <span data-dropdown-text>Any Size</span>
+                                    <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                                    <div data-dropdown-option data-value="0" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">Any Size</div>
+                                    <div data-dropdown-option data-value="10485760" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">10 MB+</div>
+                                    <div data-dropdown-option data-value="104857600" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">100 MB+</div>
+                                    <div data-dropdown-option data-value="1073741824" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">1 GB+</div>
+                                    <div data-dropdown-option data-value="10737418240" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">10 GB+</div>
+                                </div>
+                            </div>
                         </div>
+                        <!-- Sort By Filter -->
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">Sort By</label>
-                            <select
-                                id="cross-disk-sort"
-                                onchange="sortDuplicates('cross-disk', this.value)"
-                                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
-                                <option value="savings">Largest Savings</option>
-                                <option value="size">Largest Files</option>
-                                <option value="copies">Most Copies</option>
-                            </select>
+                            <div class="relative" data-custom-dropdown>
+                                <input type="hidden" id="cross-disk-sort" value="savings" data-dropdown-input>
+                                <button
+                                    type="button"
+                                    data-dropdown-button
+                                    aria-expanded="false"
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    <span data-dropdown-text>Largest Savings</span>
+                                    <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                                    <div data-dropdown-option data-value="savings" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">Largest Savings</div>
+                                    <div data-dropdown-option data-value="size" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Largest Files</div>
+                                    <div data-dropdown-option data-value="copies" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Most Copies</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -103,7 +136,7 @@
                 <div id="cross-disk-groups" class="space-y-4">
                     {{if gt (len .CrossDiskGroups) 0}}
                         {{range .CrossDiskGroups}}
-                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{.SpaceSavings}}" data-hash-type="{{.Group.HashType}}">
+                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{.SpaceSavings}}" data-hash-type="{{.Group.HashType}}" data-copies="{{.Group.TotalCopies}}" data-file-size="{{.Group.TotalSize}}">
                             <!-- Group Header -->
                             <div class="bg-gray-800 px-6 py-4 border-b border-gray-700">
                                 <div class="flex justify-between items-start">
@@ -228,11 +261,85 @@
                     </div>
                 </div>
 
+                <!-- Filter Options -->
+                <div class="bg-gray-750 rounded-lg p-4 border border-gray-700">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Hash Type Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">Hash Type</label>
+                            <div class="relative" data-custom-dropdown>
+                                <input type="hidden" id="same-disk-hash-filter" value="all" data-dropdown-input>
+                                <button
+                                    type="button"
+                                    data-dropdown-button
+                                    aria-expanded="false"
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    <span data-dropdown-text>All Hashes</span>
+                                    <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                                    <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">All Hashes</div>
+                                    <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Full Hash Only ✓</div>
+                                    <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Quick Hash Only ⚠️</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Minimum Savings Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">Minimum Savings</label>
+                            <div class="relative" data-custom-dropdown>
+                                <input type="hidden" id="same-disk-size-filter" value="0" data-dropdown-input>
+                                <button
+                                    type="button"
+                                    data-dropdown-button
+                                    aria-expanded="false"
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    <span data-dropdown-text>Any Size</span>
+                                    <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                                    <div data-dropdown-option data-value="0" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">Any Size</div>
+                                    <div data-dropdown-option data-value="10485760" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">10 MB+</div>
+                                    <div data-dropdown-option data-value="104857600" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">100 MB+</div>
+                                    <div data-dropdown-option data-value="1073741824" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">1 GB+</div>
+                                    <div data-dropdown-option data-value="10737418240" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">10 GB+</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Sort By Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">Sort By</label>
+                            <div class="relative" data-custom-dropdown>
+                                <input type="hidden" id="same-disk-sort" value="savings" data-dropdown-input>
+                                <button
+                                    type="button"
+                                    data-dropdown-button
+                                    aria-expanded="false"
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    <span data-dropdown-text>Largest Savings</span>
+                                    <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                                    <div data-dropdown-option data-value="savings" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">Largest Savings</div>
+                                    <div data-dropdown-option data-value="size" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Largest Files</div>
+                                    <div data-dropdown-option data-value="copies" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Most Copies</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Duplicate Groups -->
                 <div id="same-disk-groups" class="space-y-4">
                     {{if gt (len .SameDiskGroups) 0}}
                         {{range .SameDiskGroups}}
-                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden">
+                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{.SpaceSavings}}" data-hash-type="{{.Group.HashType}}" data-copies="{{.Group.TotalCopies}}" data-file-size="{{.Group.TotalSize}}">
                             <!-- Group Header -->
                             <div class="bg-gray-800 px-6 py-4 border-b border-gray-700">
                                 <div class="flex justify-between items-start">
@@ -352,20 +459,144 @@ function switchTab(tabName) {
     activeBtn.classList.add('border-blue-500', 'text-blue-400');
 }
 
-// Filter and sort functions (to be implemented in Phase 4)
+// Initialize custom dropdown event handlers
+document.addEventListener('DOMContentLoaded', function() {
+    // Cross-disk dropdown handlers
+    const crossDiskHashFilter = document.getElementById('cross-disk-hash-filter');
+    const crossDiskSizeFilter = document.getElementById('cross-disk-size-filter');
+    const crossDiskSort = document.getElementById('cross-disk-sort');
+
+    if (crossDiskHashFilter) {
+        crossDiskHashFilter.addEventListener('change', function() {
+            applyFiltersAndSort('cross-disk');
+        });
+    }
+
+    if (crossDiskSizeFilter) {
+        crossDiskSizeFilter.addEventListener('change', function() {
+            applyFiltersAndSort('cross-disk');
+        });
+    }
+
+    if (crossDiskSort) {
+        crossDiskSort.addEventListener('change', function() {
+            applyFiltersAndSort('cross-disk');
+        });
+    }
+
+    // Same-disk dropdown handlers
+    const sameDiskHashFilter = document.getElementById('same-disk-hash-filter');
+    const sameDiskSizeFilter = document.getElementById('same-disk-size-filter');
+    const sameDiskSort = document.getElementById('same-disk-sort');
+
+    if (sameDiskHashFilter) {
+        sameDiskHashFilter.addEventListener('change', function() {
+            applyFiltersAndSort('same-disk');
+        });
+    }
+
+    if (sameDiskSizeFilter) {
+        sameDiskSizeFilter.addEventListener('change', function() {
+            applyFiltersAndSort('same-disk');
+        });
+    }
+
+    if (sameDiskSort) {
+        sameDiskSort.addEventListener('change', function() {
+            applyFiltersAndSort('same-disk');
+        });
+    }
+});
+
+// Apply all filters and sorting for a given type
+function applyFiltersAndSort(type) {
+    const hashFilter = document.getElementById(`${type}-hash-filter`);
+    const sizeFilter = document.getElementById(`${type}-size-filter`);
+    const sortSelect = document.getElementById(`${type}-sort`);
+
+    if (!hashFilter || !sizeFilter || !sortSelect) return;
+
+    const hashType = hashFilter.value;
+    const minSize = parseInt(sizeFilter.value);
+    const sortBy = sortSelect.value;
+
+    const container = document.getElementById(`${type}-groups`);
+    if (!container) return;
+
+    const groups = Array.from(container.querySelectorAll('.duplicate-group'));
+
+    // Filter groups
+    groups.forEach(group => {
+        let visible = true;
+
+        // Filter by hash type
+        if (hashType !== 'all') {
+            const groupHashType = group.getAttribute('data-hash-type');
+            if (groupHashType !== hashType) {
+                visible = false;
+            }
+        }
+
+        // Filter by minimum size
+        if (minSize > 0) {
+            const groupSize = parseInt(group.getAttribute('data-size') || '0');
+            if (groupSize < minSize) {
+                visible = false;
+            }
+        }
+
+        // Show/hide group
+        if (visible) {
+            group.style.display = '';
+        } else {
+            group.style.display = 'none';
+        }
+    });
+
+    // Sort visible groups
+    const visibleGroups = groups.filter(group => group.style.display !== 'none');
+
+    visibleGroups.sort((a, b) => {
+        let aValue, bValue;
+
+        switch (sortBy) {
+            case 'savings':
+                aValue = parseInt(a.getAttribute('data-size') || '0');
+                bValue = parseInt(b.getAttribute('data-size') || '0');
+                return bValue - aValue; // Descending (largest first)
+
+            case 'size':
+                aValue = parseInt(a.getAttribute('data-file-size') || '0');
+                bValue = parseInt(b.getAttribute('data-file-size') || '0');
+                return bValue - aValue; // Descending (largest first)
+
+            case 'copies':
+                aValue = parseInt(a.getAttribute('data-copies') || '0');
+                bValue = parseInt(b.getAttribute('data-copies') || '0');
+                return bValue - aValue; // Descending (most first)
+
+            default:
+                return 0;
+        }
+    });
+
+    // Re-append groups in sorted order
+    visibleGroups.forEach(group => {
+        container.appendChild(group);
+    });
+}
+
+// Legacy functions for backwards compatibility (now just call applyFiltersAndSort)
 function filterDuplicates(type, hashType) {
-    console.log('Filter duplicates:', type, hashType);
-    // TODO: Implement filtering
+    applyFiltersAndSort(type);
 }
 
 function filterBySize(type, minSize) {
-    console.log('Filter by size:', type, minSize);
-    // TODO: Implement size filtering
+    applyFiltersAndSort(type);
 }
 
 function sortDuplicates(type, sortBy) {
-    console.log('Sort duplicates:', type, sortBy);
-    // TODO: Implement sorting
+    applyFiltersAndSort(type);
 }
 
 function previewConsolidation(type) {
