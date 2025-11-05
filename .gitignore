@@ -50,6 +50,3 @@ web/static/css/styles.css
 tmp/
 temp/
 
-# Planning documents (not for commit)
-DUPLICATE_DETECTION_PLAN.md
-
