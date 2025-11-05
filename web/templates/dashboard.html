@@ -32,14 +32,14 @@
     </div>
 
     <!-- Scan Progress -->
-    <div class="bg-gray-800 rounded-lg p-6">
-        <h3 class="text-xl font-semibold mb-4">Scan Progress</h3>
+    <div class="bg-linear-to-br from-indigo-900 to-gray-800 rounded-lg p-6 border border-indigo-700">
+        <h3 class="text-xl font-semibold mb-4 text-indigo-100">Scan Progress</h3>
         <div
             id="progress-container"
             hx-get="/api/scan/progress-html"
             hx-trigger="load, every 2s"
             hx-swap="innerHTML">
-            <div class="flex items-center text-gray-400">
+            <div class="flex items-center text-indigo-300">
                 <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -50,9 +50,9 @@
     </div>
 
     <!-- Hash Scan Progress -->
-    <div class="bg-gray-800 rounded-lg p-6">
+    <div class="bg-linear-to-br from-purple-900 to-gray-800 rounded-lg p-6 border border-purple-700">
         <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-semibold">Hash Scan (Duplicate Detection)</h3>
+            <h3 class="text-xl font-semibold text-purple-100">Hash Scan (Duplicate Detection)</h3>
             <div class="flex gap-2">
                 <button
                     hx-post="/api/hash/verify"
@@ -79,7 +79,7 @@
             hx-get="/api/hash/progress-html"
             hx-trigger="load, every 2s"
             hx-swap="innerHTML">
-            <div class="flex items-center text-gray-400">
+            <div class="flex items-center text-purple-300">
                 <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -129,37 +129,37 @@
     <!-- Statistics Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <!-- Total Files -->
-        <div class="bg-gray-800 rounded-lg p-6">
-            <div class="text-gray-400 text-sm font-medium">Total Files</div>
-            <div class="text-3xl font-bold mt-2">{{.Stats.TotalFiles}}</div>
-            <div class="text-gray-500 text-sm mt-1">{{formatSize .Stats.TotalSize}}</div>
+        <div class="bg-linear-to-br from-blue-900 to-gray-800 rounded-lg p-6 border border-blue-700">
+            <div class="text-blue-200 text-sm font-medium">Total Files</div>
+            <div class="text-3xl font-bold mt-2 text-blue-100">{{.Stats.TotalFiles}}</div>
+            <div class="text-blue-300 text-sm mt-1">{{formatSize .Stats.TotalSize}}</div>
         </div>
 
         <!-- Orphaned Files -->
-        <div class="bg-gray-800 rounded-lg p-6">
-            <div class="text-gray-400 text-sm font-medium">Orphaned Files</div>
+        <div class="bg-linear-to-br from-yellow-900 to-gray-800 rounded-lg p-6 border border-yellow-700">
+            <div class="text-yellow-200 text-sm font-medium">Orphaned Files</div>
             <div class="text-3xl font-bold mt-2 text-yellow-400">{{.Stats.OrphanedFiles}}</div>
-            <div class="text-gray-500 text-sm mt-1">{{formatSize .Stats.OrphanedSize}}</div>
+            <div class="text-yellow-300 text-sm mt-1">{{formatSize .Stats.OrphanedSize}}</div>
         </div>
 
         <!-- Hardlink Groups -->
-        <div class="bg-gray-800 rounded-lg p-6">
-            <div class="text-gray-400 text-sm font-medium">Hardlink Groups</div>
-            <div class="text-3xl font-bold mt-2 text-blue-400">{{.Stats.HardlinkGroups}}</div>
-            <div class="text-gray-500 text-sm mt-1">Saving {{formatSize .Stats.HardlinkSavings}}</div>
+        <div class="bg-linear-to-br from-cyan-900 to-gray-800 rounded-lg p-6 border border-cyan-700">
+            <div class="text-cyan-200 text-sm font-medium">Hardlink Groups</div>
+            <div class="text-3xl font-bold mt-2 text-cyan-400">{{.Stats.HardlinkGroups}}</div>
+            <div class="text-cyan-300 text-sm mt-1">Saving {{formatSize .Stats.HardlinkSavings}}</div>
         </div>
 
         <!-- Services -->
-        <div class="bg-gray-800 rounded-lg p-6">
-            <div class="text-gray-400 text-sm font-medium">Active Services</div>
-            <div class="text-3xl font-bold mt-2">{{.Stats.ActiveServiceCount}}</div>
-            <div class="text-gray-500 text-sm mt-1">Tracking files</div>
+        <div class="bg-linear-to-br from-green-900 to-gray-800 rounded-lg p-6 border border-green-700">
+            <div class="text-green-200 text-sm font-medium">Active Services</div>
+            <div class="text-3xl font-bold mt-2 text-green-100">{{.Stats.ActiveServiceCount}}</div>
+            <div class="text-green-300 text-sm mt-1">Tracking files</div>
         </div>
     </div>
 
     <!-- Duplicate Files Card -->
     {{if .DuplicateStats}}
-    <div class="bg-gradient-to-br from-purple-900 to-gray-800 rounded-lg p-6 border border-purple-700">
+    <div class="bg-linear-to-br from-purple-900 to-gray-800 rounded-lg p-6 border border-purple-700">
         <div class="flex justify-between items-start mb-4">
             <div>
                 <h3 class="text-xl font-semibold text-purple-100">Duplicate Files</h3>
@@ -216,8 +216,8 @@
 
     <!-- Disk Status (if configured) -->
     {{if .Disks}}
-    <div class="bg-gray-800 rounded-lg p-6">
-        <h3 class="text-xl font-semibold mb-4">Disk Status</h3>
+    <div class="bg-linear-to-br from-teal-900 to-gray-800 rounded-lg p-6 border border-teal-700">
+        <h3 class="text-xl font-semibold mb-4 text-teal-100">Disk Status</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {{range .Disks}}
             <div class="bg-gray-700 rounded p-4 border-l-4 {{if ge .UsedPercent 90.0}}border-red-500{{else if ge .UsedPercent 80.0}}border-yellow-500{{else}}border-green-500{{end}}">
@@ -254,16 +254,16 @@
         </div>
     </div>
     {{else}}
-    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h3 class="text-xl font-semibold mb-2">Disk Status</h3>
-        <p class="text-gray-400 text-sm mb-2">No disks configured for cross-disk duplicate detection.</p>
-        <p class="text-gray-500 text-xs">To enable: configure 'disks' in <a href="/config" class="text-blue-400 hover:underline">config</a> and mount disks in docker-compose.yml</p>
+    <div class="bg-linear-to-br from-teal-900 to-gray-800 rounded-lg p-6 border border-teal-700">
+        <h3 class="text-xl font-semibold mb-2 text-teal-100">Disk Status</h3>
+        <p class="text-teal-300 text-sm mb-2">No disks configured for cross-disk duplicate detection.</p>
+        <p class="text-teal-400 text-xs">To enable: configure 'disks' in <a href="/config" class="text-blue-400 hover:underline">config</a> and mount disks in docker-compose.yml</p>
     </div>
     {{end}}
 
     <!-- Service Breakdown -->
-    <div class="bg-gray-800 rounded-lg p-6">
-        <h3 class="text-xl font-semibold mb-4">Service Breakdown</h3>
+    <div class="bg-linear-to-br from-gray-900 to-gray-800 rounded-lg p-6 border border-gray-600">
+        <h3 class="text-xl font-semibold mb-4 text-gray-100">Service Breakdown</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {{range $service, $stats := .Stats.ServiceBreakdown}}
             <div class="bg-gray-700 {{serviceClass $service "bg-gradient"}} rounded p-4 border-l-4 {{serviceClass $service "border"}}">
@@ -278,8 +278,8 @@
     </div>
 
     <!-- Recent Activity / Logs -->
-    <div class="bg-gray-800 rounded-lg p-6">
-        <h3 class="text-xl font-semibold mb-4">Scan Logs</h3>
+    <div class="bg-linear-to-br from-slate-900 to-gray-800 rounded-lg p-6 border border-slate-700">
+        <h3 class="text-xl font-semibold mb-4 text-slate-100">Scan Logs</h3>
         <div
             id="scan-logs-container"
             class="bg-gray-900 rounded p-4 font-mono text-sm h-64 overflow-y-auto"
