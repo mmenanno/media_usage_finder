@@ -261,6 +261,7 @@ func (db *DB) GetDuplicateStats() (*DuplicateStats, error) {
 		FROM files
 		WHERE file_hash IS NOT NULL
 		  AND hash_calculated = 1
+		  AND hash_type IS NOT NULL
 		GROUP BY file_hash
 		HAVING COUNT(DISTINCT device_id) > 1
 	`).Scan(&stats.CrossDiskGroups)
@@ -276,6 +277,7 @@ func (db *DB) GetDuplicateStats() (*DuplicateStats, error) {
 			FROM files
 			WHERE file_hash IS NOT NULL
 			  AND hash_calculated = 1
+			  AND hash_type IS NOT NULL
 			GROUP BY file_hash, device_id
 			HAVING COUNT(*) > 1
 		)
@@ -292,6 +294,7 @@ func (db *DB) GetDuplicateStats() (*DuplicateStats, error) {
 			FROM files
 			WHERE file_hash IS NOT NULL
 			  AND hash_calculated = 1
+			  AND hash_type IS NOT NULL
 			GROUP BY file_hash
 			HAVING COUNT(DISTINCT device_id) > 1
 		)
@@ -308,6 +311,7 @@ func (db *DB) GetDuplicateStats() (*DuplicateStats, error) {
 			FROM files
 			WHERE file_hash IS NOT NULL
 			  AND hash_calculated = 1
+			  AND hash_type IS NOT NULL
 			GROUP BY file_hash, device_id
 			HAVING COUNT(*) > 1
 		)
