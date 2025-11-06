@@ -147,6 +147,7 @@ type StatsData struct {
 	Title                  string
 	Disks                  []*disk.DiskInfo
 	CrossDiskDuplicates    int64 // Count of files on multiple disks
+	SameDiskDuplicates     int64 // Count of duplicate file groups on same disk
 	HasDiskLocations       bool  // True if disk location tracking is enabled
 	Version                string // Application version
 }

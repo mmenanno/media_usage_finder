@@ -489,10 +489,11 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 		disks = s.diskDetector.GetAllDisks()
 	}
 
-	// Cross-disk duplicates count is now in cached stats
-	var crossDiskDuplicates int64
+	// Cross-disk and same-disk duplicates counts are now in cached stats
+	var crossDiskDuplicates, sameDiskDuplicates int64
 	if statistics.DuplicateStats != nil {
 		crossDiskDuplicates = statistics.DuplicateStats.CrossDiskGroups
+		sameDiskDuplicates = statistics.DuplicateStats.SameDiskGroups
 	}
 
 	data := StatsData{
@@ -500,6 +501,7 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 		Title:               "Statistics",
 		Disks:               disks,
 		CrossDiskDuplicates: crossDiskDuplicates,
+		SameDiskDuplicates:  sameDiskDuplicates,
 		HasDiskLocations:    hasDiskLocations,
 		Version:             s.version,
 	}
