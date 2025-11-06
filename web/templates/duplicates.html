@@ -576,7 +576,7 @@
         <div class="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-75" onclick="closeDryRunSummary()"></div>
 
         <!-- Modal panel -->
-        <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+        <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full" onclick="event.stopPropagation()">
             <!-- Header -->
             <div class="bg-gray-750 px-6 py-4 border-b border-gray-700">
                 <div class="flex items-center justify-between">
@@ -865,8 +865,8 @@ async function previewConsolidation(type) {
         return;
     }
 
-    // Show loading toast
-    showToast('Analyzing duplicates...', 'info', {duration: 0});
+    // Show loading toast with long duration
+    showToast('Analyzing duplicates...', 'info', {duration: 30000}); // 30 seconds
 
     // Run dry-run consolidation
     fetch('/api/duplicates/consolidate', {
@@ -919,8 +919,8 @@ async function executeConsolidation() {
         return;
     }
 
-    // Show loading toast
-    showToast('Deleting duplicate files...', 'info', {duration: 0});
+    // Show loading toast with long duration for potentially long operation
+    showToast('Deleting duplicate files...', 'info', {duration: 60000}); // 60 seconds
 
     fetch('/api/duplicates/consolidate', {
         method: 'POST',
@@ -1049,8 +1049,8 @@ async function previewHardlinks() {
         return;
     }
 
-    // Show loading toast
-    showToast('Analyzing hardlinks...', 'info', {duration: 0}); // Duration 0 = stays until dismissed
+    // Show loading toast with long duration
+    showToast('Analyzing hardlinks...', 'info', {duration: 30000}); // 30 seconds - long enough for analysis
 
     // Run dry-run hardlink
     fetch('/api/duplicates/hardlink', {
@@ -1094,8 +1094,8 @@ async function executeHardlinks() {
         return;
     }
 
-    // Show loading toast
-    showToast('Creating hardlinks...', 'info', {duration: 0});
+    // Show loading toast with long duration for potentially long operation
+    showToast('Creating hardlinks...', 'info', {duration: 60000}); // 60 seconds
 
     fetch('/api/duplicates/hardlink', {
         method: 'POST',
@@ -1130,8 +1130,8 @@ async function executeHardlinks() {
 
 // Single group preview
 async function previewSingleGroup(groupHash) {
-    // Show loading toast
-    showToast('Analyzing group...', 'info', {duration: 0});
+    // Show loading toast with long duration
+    showToast('Analyzing group...', 'info', {duration: 30000}); // 30 seconds - long enough for analysis
 
     // Run dry-run hardlink for single group
     fetch('/api/duplicates/hardlink', {
@@ -1180,8 +1180,8 @@ async function linkSingleGroup(groupHash) {
 
 // Execute hardlink for single group
 function executeSingleGroupHardlink(groupHash) {
-    // Show loading toast
-    showToast('Creating hardlinks...', 'info', {duration: 0});
+    // Show loading toast with long duration
+    showToast('Creating hardlinks...', 'info', {duration: 30000}); // 30 seconds
 
     fetch('/api/duplicates/hardlink', {
         method: 'POST',
