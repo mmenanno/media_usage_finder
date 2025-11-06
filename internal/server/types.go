@@ -99,6 +99,7 @@ type TestServiceResponse struct {
 type DashboardData struct {
 	Stats                *stats.Stats
 	Title                string
+	Version              string // Application version
 	HasActiveScan        bool
 	HasInterruptedScan   bool
 	InterruptedScanID    int64

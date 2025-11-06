@@ -199,6 +199,7 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"Stats":                statistics,
 		"Title":                "Dashboard",
+		"Version":              s.version,
 		"HasActiveScan":        hasActiveScan,
 		"HasInterruptedScan":   hasInterruptedScan,
 		"InterruptedScanID":    interruptedScanID,
@@ -3880,6 +3881,7 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		// Show page with message that hash scanning is disabled
 		data := map[string]interface{}{
 			"Title":               "Duplicate Files",
+			"Version":             s.version,
 			"ActiveTab":           activeTab,
 			"CrossDiskGroups":     []*duplicates.ConsolidationPlan{},
 			"SameDiskGroups":      []*duplicates.ConsolidationPlan{},
@@ -3937,6 +3939,7 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	// Prepare template data with ACTUAL totals from database
 	data := map[string]interface{}{
 		"Title":                  "Duplicate Files",
+		"Version":                s.version,
 		"ActiveTab":              activeTab,
 		"CrossDiskGroups":        crossDiskPlans,
 		"SameDiskGroups":         sameDiskPlans,

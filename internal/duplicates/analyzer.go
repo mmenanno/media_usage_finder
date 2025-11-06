@@ -45,12 +45,16 @@ func (a *Analyzer) AnalyzeCrossDiskDuplicates(limit int) ([]*ConsolidationPlan, 
 		return nil, fmt.Errorf("failed to get cross-disk duplicates: %w", err)
 	}
 
+	fmt.Printf("DEBUG: AnalyzeCrossDiskDuplicates fetched %d groups (limit=%d)\n", len(groups), limit)
+
 	var plans []*ConsolidationPlan
-	for _, group := range groups {
+	errorCount := 0
+	for i, group := range groups {
 		plan, err := a.createConsolidationPlan(group)
 		if err != nil {
 			// Log error but continue with other groups
-			fmt.Printf("Warning: failed to create plan for group %s: %v\n", group.FileHash, err)
+			errorCount++
+			fmt.Printf("ERROR: Failed to create consolidation plan for group %d/%d (hash %s): %v\n", i+1, len(groups), group.FileHash, err)
 			continue
 		}
 
@@ -58,6 +62,8 @@ func (a *Analyzer) AnalyzeCrossDiskDuplicates(limit int) ([]*ConsolidationPlan, 
 			plans = append(plans, plan)
 		}
 	}
+
+	fmt.Printf("DEBUG: AnalyzeCrossDiskDuplicates created %d plans from %d groups (%d errors)\n", len(plans), len(groups), errorCount)
 
 	// Sort plans by space savings (descending)
 	sort.Slice(plans, func(i, j int) bool {
@@ -76,12 +82,16 @@ func (a *Analyzer) AnalyzeSameDiskDuplicates(limit int) ([]*ConsolidationPlan, e
 		return nil, fmt.Errorf("failed to get same-disk duplicates: %w", err)
 	}
 
+	fmt.Printf("DEBUG: AnalyzeSameDiskDuplicates fetched %d groups (limit=%d)\n", len(groups), limit)
+
 	var plans []*ConsolidationPlan
-	for _, group := range groups {
+	errorCount := 0
+	for i, group := range groups {
 		plan, err := a.createHardlinkPlan(group)
 		if err != nil {
 			// Log error but continue with other groups
-			fmt.Printf("Warning: failed to create hardlink plan for group %s: %v\n", group.FileHash, err)
+			errorCount++
+			fmt.Printf("ERROR: Failed to create hardlink plan for group %d/%d (hash %s): %v\n", i+1, len(groups), group.FileHash, err)
 			continue
 		}
 
@@ -89,6 +99,8 @@ func (a *Analyzer) AnalyzeSameDiskDuplicates(limit int) ([]*ConsolidationPlan, e
 			plans = append(plans, plan)
 		}
 	}
+
+	fmt.Printf("DEBUG: AnalyzeSameDiskDuplicates created %d plans from %d groups (%d errors)\n", len(plans), len(groups), errorCount)
 
 	// Sort plans by space savings (descending)
 	sort.Slice(plans, func(i, j int) bool {
