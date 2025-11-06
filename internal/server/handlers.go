@@ -4311,6 +4311,106 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 		plans = filteredPlans
 	}
 
+	// Calculate detailed statistics before execution (for dry run summary)
+	var totalFilesToLink, totalFilesAlreadyLinked, totalClustersNeedingLink, totalClustersAlreadyLinked int
+	hashBreakdown := map[string]int{
+		"full_hash":        0,
+		"progressive_hash": 0,
+		"quick_hash":       0,
+	}
+	var warnings []string
+
+	// Build top groups list (for preview)
+	type TopGroup struct {
+		Hash          string `json:"hash"`
+		FileSize      int64  `json:"file_size"`
+		TotalFiles    int    `json:"total_files"`
+		Savings       int64  `json:"savings"`
+		HashLevel     int    `json:"hash_level"`
+		HashLevelName string `json:"hash_level_name"`
+	}
+	topGroups := make([]TopGroup, 0)
+
+	for _, plan := range plans {
+		// Count files needing action vs already linked
+		for _, cluster := range plan.LinkClusters {
+			isAlreadyLinked := false
+			for _, linkedCluster := range plan.AlreadyLinked {
+				if cluster.Inode == linkedCluster.Inode {
+					isAlreadyLinked = true
+					break
+				}
+			}
+
+			if isAlreadyLinked {
+				totalFilesAlreadyLinked += len(cluster.Files)
+			} else {
+				totalFilesToLink += len(cluster.Files)
+			}
+		}
+
+		// Count clusters
+		totalClustersAlreadyLinked += len(plan.AlreadyLinked)
+		for _, cluster := range plan.LinkClusters {
+			needsAction := true
+			for _, linkedCluster := range plan.AlreadyLinked {
+				if cluster.Inode == linkedCluster.Inode {
+					needsAction = false
+					break
+				}
+			}
+			if needsAction {
+				totalClustersNeedingLink++
+			}
+		}
+
+		// Hash breakdown
+		hashLevel := plan.Group.HashLevel
+		if hashLevel == 6 {
+			hashBreakdown["full_hash"]++
+		} else if hashLevel == 1 {
+			hashBreakdown["quick_hash"]++
+		} else if hashLevel > 1 && hashLevel < 6 {
+			hashBreakdown["progressive_hash"]++
+		}
+
+		// Add to top groups (we'll sort and limit later)
+		hashLevelName := "Unknown"
+		if hashLevel == 6 {
+			hashLevelName = "Full Hash ✓"
+		} else if hashLevel == 1 {
+			hashLevelName = "Quick Hash ⚠️"
+		} else if hashLevel > 1 && hashLevel < 6 {
+			hashLevelName = fmt.Sprintf("Progressive %d 🔄", hashLevel)
+		}
+
+		topGroups = append(topGroups, TopGroup{
+			Hash:          plan.Group.FileHash,
+			FileSize:      plan.Group.TotalSize,
+			TotalFiles:    plan.TotalFiles,
+			Savings:       plan.SpaceSavings,
+			HashLevel:     hashLevel,
+			HashLevelName: hashLevelName,
+		})
+	}
+
+	// Sort top groups by savings (descending) and limit to top 10
+	for i := 0; i < len(topGroups); i++ {
+		for j := i + 1; j < len(topGroups); j++ {
+			if topGroups[j].Savings > topGroups[i].Savings {
+				topGroups[i], topGroups[j] = topGroups[j], topGroups[i]
+			}
+		}
+	}
+	if len(topGroups) > 10 {
+		topGroups = topGroups[:10]
+	}
+
+	// Generate warnings
+	if hashBreakdown["quick_hash"] > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d group(s) use quick hash - verification recommended before linking", hashBreakdown["quick_hash"]))
+	}
+
 	// Execute hardlink creation
 	result, err := consolidator.CreateHardlinks(plans, req.DryRun)
 	if err != nil {
@@ -4321,14 +4421,21 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	// Invalidate stats cache
 	s.statsCache.Invalidate()
 
-	// Return result
+	// Return enhanced result
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"status":           "success",
-		"dry_run":          result.DryRun,
-		"groups_processed": result.GroupsProcessed,
-		"files_linked":     result.FilesDeleted, // "Deleted" is used for linked in same-disk
-		"space_saved":      result.SpaceFreed,
-		"errors":           result.Errors,
+		"status":                     "success",
+		"dry_run":                    result.DryRun,
+		"groups_processed":           result.GroupsProcessed,
+		"files_linked":               result.FilesDeleted, // "Deleted" is used for linked in same-disk
+		"files_to_link":              totalFilesToLink,
+		"files_already_linked":       totalFilesAlreadyLinked,
+		"clusters_needing_link":      totalClustersNeedingLink,
+		"clusters_already_linked":    totalClustersAlreadyLinked,
+		"space_saved":                result.SpaceFreed,
+		"hash_breakdown":             hashBreakdown,
+		"top_groups":                 topGroups,
+		"warnings":                   warnings,
+		"errors":                     result.Errors,
 	})
 }
 
