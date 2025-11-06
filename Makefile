@@ -46,8 +46,8 @@ docker-run:
 	@docker run -d \
 		-p 8080:8080 \
 		-v $(PWD)/data:/data \
-		-v /mnt/user/data/media:/media:ro \
-		-v /mnt/user/data/downloads/torrents:/downloads:ro \
+		-v /mnt/user/data/media:/media:rw \
+		-v /mnt/user/data/downloads/torrents:/downloads:rw \
 		--name media-finder \
 		$(DOCKER_IMAGE):latest
 

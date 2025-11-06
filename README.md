@@ -34,8 +34,8 @@ services:
       - "8787:8787"
     volumes:
       - ./appdata:/appdata
-      - /mnt/user/data/media:/media:ro
-      - /mnt/user/data/downloads/torrents:/downloads:ro
+      - /mnt/user/data/media:/media:rw
+      - /mnt/user/data/downloads/torrents:/downloads:rw
     environment:
       - TZ=America/New_York
     restart: unless-stopped

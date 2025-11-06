@@ -415,7 +415,7 @@
             </button>
 
             <p class="text-xs text-gray-500 mt-3">
-                <strong>Important:</strong> Disks must be mounted in docker-compose.yml (e.g., <code class="bg-gray-700 px-1 rounded">/mnt/disk1:/disk1:ro</code>)
+                <strong>Important:</strong> Disks must be mounted in docker-compose.yml (e.g., <code class="bg-gray-700 px-1 rounded">/mnt/disk1:/disk1:rw</code>)
             </p>
         </div>
 
@@ -452,6 +452,7 @@
                                 <div data-dropdown-option data-value="blake3" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashAlgorithm "blake3"}}bg-blue-600{{end}}">BLAKE3 (Faster, experimental)</div>
                             </div>
                         </div>
+                        <p class="text-xs text-gray-500 mt-1">Algorithm for calculating file hashes. BLAKE3 is 2-3× faster with hardware acceleration (AVX2/AVX-512)</p>
                     </div>
 
                     <div>

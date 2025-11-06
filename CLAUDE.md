@@ -664,7 +664,7 @@ Currently no authentication is implemented. If exposing to internet:
 - Increase `scan_workers` (default 10, try 20-30 for fast disks)
 - Increase `scan_buffer_size` (default 100, try 500-1000)
 - Use incremental scans after initial full scan
-- Mount media as read-only (`:ro`) in Docker
+- Mount media as read-only (`:rw`) in Docker
 
 **Database**:
 

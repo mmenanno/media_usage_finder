@@ -31,6 +31,7 @@ func scanFileRow(scanner interface {
 }) (*File, error) {
 	file := &File{}
 	var modTime, lastVerified, createdAt int64
+	var scanID sql.NullInt64
 
 	err := scanner.Scan(
 		&file.ID,
@@ -39,7 +40,7 @@ func scanFileRow(scanner interface {
 		&file.Inode,
 		&file.DeviceID,
 		&modTime,
-		&file.ScanID,
+		&scanID,
 		&lastVerified,
 		&file.IsOrphaned,
 		&file.Extension,
@@ -52,6 +53,13 @@ func scanFileRow(scanner interface {
 	file.ModifiedTime = time.Unix(modTime, 0)
 	file.LastVerified = time.Unix(lastVerified, 0)
 	file.CreatedAt = time.Unix(createdAt, 0)
+
+	// Handle NULL scan_id (can occur if scans are deleted)
+	if scanID.Valid {
+		file.ScanID = scanID.Int64
+	} else {
+		file.ScanID = 0 // Default to 0 for orphaned/deleted scan references
+	}
 
 	return file, nil
 }

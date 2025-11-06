@@ -103,19 +103,6 @@
         {{end}}
     </div>
 </div>
-
-<script>
-// Handle pagination button clicks via event delegation
-document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('pagination-btn') || e.target.closest('.pagination-btn')) {
-        const btn = e.target.classList.contains('pagination-btn') ? e.target : e.target.closest('.pagination-btn');
-        const page = parseInt(btn.dataset.page, 10);
-        if (page && window.loadPageLogs) {
-            window.loadPageLogs(page);
-        }
-    }
-});
-</script>
 {{end}}
 
 {{else}}

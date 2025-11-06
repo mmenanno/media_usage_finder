@@ -121,9 +121,9 @@ scan_paths:
 # IMPORTANT: These paths must be mounted in your docker-compose.yml
 # Example docker-compose.yml volume configuration:
 #   volumes:
-#     - /mnt/disk1:/disk1:ro
-#     - /mnt/disk2:/disk2:ro
-#     - /mnt/disk3:/disk3:ro
+#     - /mnt/disk1:/disk1:rw
+#     - /mnt/disk2:/disk2:rw
+#     - /mnt/disk3:/disk3:rw
 disks:
   - name: "Disk 1"
     mount_path: "/disk1"
