@@ -45,8 +45,6 @@ func (a *Analyzer) AnalyzeCrossDiskDuplicates(limit int) ([]*ConsolidationPlan, 
 		return nil, fmt.Errorf("failed to get cross-disk duplicates: %w", err)
 	}
 
-	fmt.Printf("DEBUG: AnalyzeCrossDiskDuplicates fetched %d groups (limit=%d)\n", len(groups), limit)
-
 	var plans []*ConsolidationPlan
 	errorCount := 0
 	for i, group := range groups {
@@ -62,8 +60,6 @@ func (a *Analyzer) AnalyzeCrossDiskDuplicates(limit int) ([]*ConsolidationPlan, 
 			plans = append(plans, plan)
 		}
 	}
-
-	fmt.Printf("DEBUG: AnalyzeCrossDiskDuplicates created %d plans from %d groups (%d errors)\n", len(plans), len(groups), errorCount)
 
 	// Sort plans by space savings (descending)
 	sort.Slice(plans, func(i, j int) bool {
@@ -82,8 +78,6 @@ func (a *Analyzer) AnalyzeSameDiskDuplicates(limit int) ([]*ConsolidationPlan, e
 		return nil, fmt.Errorf("failed to get same-disk duplicates: %w", err)
 	}
 
-	fmt.Printf("DEBUG: AnalyzeSameDiskDuplicates fetched %d groups (limit=%d)\n", len(groups), limit)
-
 	var plans []*ConsolidationPlan
 	errorCount := 0
 	for i, group := range groups {
@@ -99,8 +93,6 @@ func (a *Analyzer) AnalyzeSameDiskDuplicates(limit int) ([]*ConsolidationPlan, e
 			plans = append(plans, plan)
 		}
 	}
-
-	fmt.Printf("DEBUG: AnalyzeSameDiskDuplicates created %d plans from %d groups (%d errors)\n", len(plans), len(groups), errorCount)
 
 	// Sort plans by space savings (descending)
 	sort.Slice(plans, func(i, j int) bool {
@@ -137,10 +129,12 @@ func (a *Analyzer) createConsolidationPlan(group *database.DuplicateGroup) (*Con
 			deleteFiles = append(deleteFiles, &group.Files[i])
 			spaceSavings += group.Files[i].Size
 
-			// Get disk info for delete files
-			diskInfo, err := a.diskDetector.GetDiskForFile(group.Files[i].DeviceID)
-			if err == nil {
-				deleteDisks = append(deleteDisks, diskInfo)
+			// Get disk info for delete files if detector available
+			if a.diskDetector != nil {
+				diskInfo, err := a.diskDetector.GetDiskForFile(group.Files[i].DeviceID)
+				if err == nil {
+					deleteDisks = append(deleteDisks, diskInfo)
+				}
 			}
 		}
 	}
@@ -149,12 +143,21 @@ func (a *Analyzer) createConsolidationPlan(group *database.DuplicateGroup) (*Con
 	var keepDisk *disk.DiskInfo
 	keepLocations, err := a.db.GetDiskLocationsForFile(keepFile.ID)
 	if err == nil && len(keepLocations) > 0 {
-		// Try to get full disk info from detector
-		diskInfo, err := a.diskDetector.GetDiskForFile(keepFile.DeviceID)
-		if err == nil {
-			keepDisk = diskInfo
+		// Try to get full disk info from detector if available
+		if a.diskDetector != nil {
+			diskInfo, err := a.diskDetector.GetDiskForFile(keepFile.DeviceID)
+			if err == nil {
+				keepDisk = diskInfo
+			} else {
+				// Create minimal disk info from location data
+				keepDisk = &disk.DiskInfo{
+					Name:        keepLocations[0].DiskName,
+					DeviceID:    keepLocations[0].DiskDeviceID,
+					UsedPercent: 50.0, // Unknown
+				}
+			}
 		} else {
-			// Create minimal disk info from location data
+			// No disk detector - use location data only
 			keepDisk = &disk.DiskInfo{
 				Name:        keepLocations[0].DiskName,
 				DeviceID:    keepLocations[0].DiskDeviceID,
@@ -162,10 +165,19 @@ func (a *Analyzer) createConsolidationPlan(group *database.DuplicateGroup) (*Con
 			}
 		}
 	} else {
-		// Fallback to disk detector only
-		keepDisk, err = a.diskDetector.GetDiskForFile(keepFile.DeviceID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get disk info for keep file: %w", err)
+		// Fallback to disk detector only if available
+		if a.diskDetector != nil {
+			keepDisk, err = a.diskDetector.GetDiskForFile(keepFile.DeviceID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get disk info for keep file: %w", err)
+			}
+		} else {
+			// No disk detector and no location data - create minimal info
+			keepDisk = &disk.DiskInfo{
+				Name:        fmt.Sprintf("Device %d", keepFile.DeviceID),
+				DeviceID:    keepFile.DeviceID,
+				UsedPercent: 50.0, // Unknown
+			}
 		}
 	}
 
@@ -231,12 +243,21 @@ func (a *Analyzer) createHardlinkPlan(group *database.DuplicateGroup) (*Consolid
 	var keepDisk *disk.DiskInfo
 	keepLocations, err := a.db.GetDiskLocationsForFile(keepFile.ID)
 	if err == nil && len(keepLocations) > 0 {
-		// Try to get full disk info from detector
-		diskInfo, err := a.diskDetector.GetDiskForFile(keepFile.DeviceID)
-		if err == nil {
-			keepDisk = diskInfo
+		// Try to get full disk info from detector if available
+		if a.diskDetector != nil {
+			diskInfo, err := a.diskDetector.GetDiskForFile(keepFile.DeviceID)
+			if err == nil {
+				keepDisk = diskInfo
+			} else {
+				// Create minimal disk info from location data
+				keepDisk = &disk.DiskInfo{
+					Name:        keepLocations[0].DiskName,
+					DeviceID:    keepLocations[0].DiskDeviceID,
+					UsedPercent: 50.0, // Unknown
+				}
+			}
 		} else {
-			// Create minimal disk info from location data
+			// No disk detector - use location data only
 			keepDisk = &disk.DiskInfo{
 				Name:        keepLocations[0].DiskName,
 				DeviceID:    keepLocations[0].DiskDeviceID,
@@ -244,10 +265,19 @@ func (a *Analyzer) createHardlinkPlan(group *database.DuplicateGroup) (*Consolid
 			}
 		}
 	} else {
-		// Fallback to disk detector only
-		keepDisk, err = a.diskDetector.GetDiskForFile(keepFile.DeviceID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get disk info for keep file: %w", err)
+		// Fallback to disk detector only if available
+		if a.diskDetector != nil {
+			keepDisk, err = a.diskDetector.GetDiskForFile(keepFile.DeviceID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get disk info for keep file: %w", err)
+			}
+		} else {
+			// No disk detector and no location data - create minimal info
+			keepDisk = &disk.DiskInfo{
+				Name:        fmt.Sprintf("Device %d", keepFile.DeviceID),
+				DeviceID:    keepFile.DeviceID,
+				UsedPercent: 50.0, // Unknown
+			}
 		}
 	}
 
@@ -333,27 +363,38 @@ func (a *Analyzer) enrichFilesWithDiskInfo(files []database.DuplicateFile) error
 			// Use the first location's disk name
 			files[i].DiskName = locations[0].DiskName
 
-			// Try to get disk usage from disk detector
-			diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
-			if err == nil {
-				files[i].DiskUsedPercent = diskInfo.UsedPercent
+			// Try to get disk usage from disk detector if available
+			if a.diskDetector != nil {
+				diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
+				if err == nil {
+					files[i].DiskUsedPercent = diskInfo.UsedPercent
+				} else {
+					// Can't get usage, but we have the disk name - use 50% as default
+					files[i].DiskUsedPercent = 50.0
+				}
 			} else {
-				// Can't get usage, but we have the disk name - use 50% as default
+				// No disk detector available - use default
 				files[i].DiskUsedPercent = 50.0
 			}
 		} else {
 			// Fallback to old behavior if no disk location found
-			diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
-			if err != nil {
-				// Log warning but don't fail - use defaults
-				fmt.Printf("Warning: could not get disk info for device %d: %v\n", files[i].DeviceID, err)
-				files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
-				files[i].DiskUsedPercent = 50.0 // Unknown, assume middle
-				continue
-			}
+			if a.diskDetector != nil {
+				diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
+				if err != nil {
+					// Log warning but don't fail - use defaults
+					fmt.Printf("Warning: could not get disk info for device %d: %v\n", files[i].DeviceID, err)
+					files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
+					files[i].DiskUsedPercent = 50.0 // Unknown, assume middle
+					continue
+				}
 
-			files[i].DiskName = diskInfo.Name
-			files[i].DiskUsedPercent = diskInfo.UsedPercent
+				files[i].DiskName = diskInfo.Name
+				files[i].DiskUsedPercent = diskInfo.UsedPercent
+			} else {
+				// No disk detector available - use defaults
+				files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
+				files[i].DiskUsedPercent = 50.0
+			}
 		}
 	}
 
@@ -369,27 +410,38 @@ func (a *Analyzer) enrichFilesWithDiskInfoFallback(files []database.DuplicateFil
 			// Use the first location's disk name
 			files[i].DiskName = locations[0].DiskName
 
-			// Try to get disk usage from disk detector
-			diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
-			if err == nil {
-				files[i].DiskUsedPercent = diskInfo.UsedPercent
+			// Try to get disk usage from disk detector if available
+			if a.diskDetector != nil {
+				diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
+				if err == nil {
+					files[i].DiskUsedPercent = diskInfo.UsedPercent
+				} else {
+					// Can't get usage, but we have the disk name - use 50% as default
+					files[i].DiskUsedPercent = 50.0
+				}
 			} else {
-				// Can't get usage, but we have the disk name - use 50% as default
+				// No disk detector available - use default
 				files[i].DiskUsedPercent = 50.0
 			}
 		} else {
 			// Fallback to old behavior if no disk location found
-			diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
-			if err != nil {
-				// Log warning but don't fail - use defaults
-				fmt.Printf("Warning: could not get disk info for device %d: %v\n", files[i].DeviceID, err)
-				files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
-				files[i].DiskUsedPercent = 50.0 // Unknown, assume middle
-				continue
-			}
+			if a.diskDetector != nil {
+				diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
+				if err != nil {
+					// Log warning but don't fail - use defaults
+					fmt.Printf("Warning: could not get disk info for device %d: %v\n", files[i].DeviceID, err)
+					files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
+					files[i].DiskUsedPercent = 50.0 // Unknown, assume middle
+					continue
+				}
 
-			files[i].DiskName = diskInfo.Name
-			files[i].DiskUsedPercent = diskInfo.UsedPercent
+				files[i].DiskName = diskInfo.Name
+				files[i].DiskUsedPercent = diskInfo.UsedPercent
+			} else {
+				// No disk detector available - use defaults
+				files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
+				files[i].DiskUsedPercent = 50.0
+			}
 		}
 	}
 

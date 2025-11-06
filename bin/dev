@@ -60,10 +60,10 @@ build() {
   fi
 }
 
-# Function to get checksum of Go source files
+# Function to get checksum of Go source files and templates
 get_go_checksum() {
-  # Watch .go files
-  find cmd internal -type f -name "*.go" -exec stat -f "%m %N" {} \; 2>/dev/null | sort | md5
+  # Watch .go files and template files (templates are embedded in Go binary)
+  find cmd internal web/templates -type f \( -name "*.go" -o -name "*.html" \) -exec stat -f "%m %N" {} \; 2>/dev/null | sort | md5
 }
 
 # Function to get checksum of Tailwind-related files

@@ -125,13 +125,16 @@ func (s *Server) LoadTemplates(pattern string) error {
 	// Parse each page template with layout.html to avoid block name collisions
 	// This ensures each page gets its own "content" block without conflicts
 	for _, page := range pages {
+		fullPath := baseDir + "/" + page
+
 		tmpl, err := template.New("").Funcs(s.templateFuncs).ParseFiles(
 			layoutPath,
-			baseDir+"/"+page,
+			fullPath,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", page, err)
 		}
+
 		s.templates[page] = tmpl
 	}
 
@@ -3338,10 +3341,10 @@ func (s *Server) renderTemplate(w http.ResponseWriter, name string, data interfa
 	}
 
 	// Inject version into template data
-	dataMap, ok := data.(map[string]interface{})
-	if ok {
+	if dataMap, ok := data.(map[string]interface{}); ok {
 		dataMap["Version"] = s.version
 	}
+	// Version is already set in DuplicatesData and other typed structs
 
 	// Execute layout.html which will call the "content" block from the specific page template
 	if err := tmpl.ExecuteTemplate(w, "layout.html", data); err != nil {
@@ -3879,18 +3882,18 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	// Check if hash scanning is enabled
 	if s.config.DuplicateDetection.Enabled == false {
 		// Show page with message that hash scanning is disabled
-		data := map[string]interface{}{
-			"Title":               "Duplicate Files",
-			"Version":             s.version,
-			"ActiveTab":           activeTab,
-			"CrossDiskGroups":     []*duplicates.ConsolidationPlan{},
-			"SameDiskGroups":      []*duplicates.ConsolidationPlan{},
-			"CrossDiskCount":      0,
-			"SameDiskCount":       0,
-			"TotalSavings":        int64(0),
-			"CrossDiskSavings":    int64(0),
-			"SameDiskSavings":     int64(0),
-			"HashScanningEnabled": false,
+		data := &DuplicatesData{
+			Title:               "Duplicate Files",
+			Version:             s.version,
+			ActiveTab:           activeTab,
+			CrossDiskGroups:     []*duplicates.ConsolidationPlan{},
+			SameDiskGroups:      []*duplicates.ConsolidationPlan{},
+			CrossDiskCount:      0,
+			SameDiskCount:       0,
+			TotalSavings:        0,
+			CrossDiskSavings:    0,
+			SameDiskSavings:     0,
+			HashScanningEnabled: false,
 		}
 
 		s.renderTemplate(w, "duplicates.html", data)
@@ -3928,46 +3931,37 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	// Count files in displayed plans
 	crossDiskFilesToDelete := 0
 	for _, plan := range crossDiskPlans {
-		crossDiskFilesToDelete += len(plan.DeleteFiles)
+		if plan != nil && plan.DeleteFiles != nil {
+			crossDiskFilesToDelete += len(plan.DeleteFiles)
+		}
 	}
 
 	sameDiskFilesToLink := 0
 	for _, plan := range sameDiskPlans {
-		sameDiskFilesToLink += len(plan.DeleteFiles)
-	}
-
-	// Prepare template data with ACTUAL totals from database
-	data := map[string]interface{}{
-		"Title":                  "Duplicate Files",
-		"Version":                s.version,
-		"ActiveTab":              activeTab,
-		"CrossDiskGroups":        crossDiskPlans,
-		"SameDiskGroups":         sameDiskPlans,
-		"CrossDiskCount":         duplicateStats.CrossDiskGroups,            // ACTUAL total from DB
-		"SameDiskCount":          duplicateStats.SameDiskGroups,             // ACTUAL total from DB
-		"TotalSavings":           duplicateStats.TotalPotentialSavings,      // ACTUAL total from DB
-		"CrossDiskSavings":       duplicateStats.CrossDiskPotentialSavings,  // ACTUAL total from DB
-		"SameDiskSavings":        duplicateStats.SameDiskPotentialSavings,   // ACTUAL total from DB
-		"CrossDiskFilesToDelete": crossDiskFilesToDelete,
-		"SameDiskFilesToLink":    sameDiskFilesToLink,
-		"HashScanningEnabled":    true,
-		"DisplayLimit":           duplicateGroupLimit, // Show user we're limiting display
-		"ShowingCrossDisk":       len(crossDiskPlans),
-		"ShowingSameDisk":        len(sameDiskPlans),
-	}
-
-	log.Printf("DEBUG: Rendering duplicates page - CrossDiskGroups: %d, SameDiskGroups: %d, ActiveTab: %s",
-		len(crossDiskPlans), len(sameDiskPlans), activeTab)
-
-	// Debug: Check what's actually in the data map
-	if plans, ok := data["SameDiskGroups"].([]*duplicates.ConsolidationPlan); ok {
-		log.Printf("DEBUG: SameDiskGroups in data map has %d plans", len(plans))
-		if len(plans) > 0 {
-			log.Printf("DEBUG: First plan: KeepFile=%v, DeleteFiles=%d, SpaceSavings=%d",
-				plans[0].KeepFile != nil, len(plans[0].DeleteFiles), plans[0].SpaceSavings)
+		if plan != nil && plan.DeleteFiles != nil {
+			sameDiskFilesToLink += len(plan.DeleteFiles)
 		}
-	} else {
-		log.Printf("DEBUG: SameDiskGroups is not the expected type: %T", data["SameDiskGroups"])
+	}
+
+	// Prepare template data with ACTUAL totals from database using typed struct
+	// Using pointer to avoid any value copy issues
+	data := &DuplicatesData{
+		Title:                  "Duplicate Files",
+		Version:                s.version,
+		ActiveTab:              activeTab,
+		CrossDiskGroups:        crossDiskPlans,
+		SameDiskGroups:         sameDiskPlans,
+		CrossDiskCount:         duplicateStats.CrossDiskGroups,
+		SameDiskCount:          duplicateStats.SameDiskGroups,
+		TotalSavings:           duplicateStats.TotalPotentialSavings,
+		CrossDiskSavings:       duplicateStats.CrossDiskPotentialSavings,
+		SameDiskSavings:        duplicateStats.SameDiskPotentialSavings,
+		CrossDiskFilesToDelete: crossDiskFilesToDelete,
+		SameDiskFilesToLink:    sameDiskFilesToLink,
+		HashScanningEnabled:    true,
+		DisplayLimit:           duplicateGroupLimit,
+		ShowingCrossDisk:       len(crossDiskPlans),
+		ShowingSameDisk:        len(sameDiskPlans),
 	}
 
 	// Render template

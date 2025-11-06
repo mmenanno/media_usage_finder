@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/mmenanno/media-usage-finder/internal/database"
 	"github.com/mmenanno/media-usage-finder/internal/disk"
+	"github.com/mmenanno/media-usage-finder/internal/duplicates"
 	"github.com/mmenanno/media-usage-finder/internal/stats"
 )
 
@@ -177,4 +178,24 @@ type AdvancedData struct {
 	Stats   interface{}
 	Title   string
 	Version string // Application version
+}
+
+// DuplicatesData represents data for the duplicates page template
+type DuplicatesData struct {
+	Title                  string
+	Version                string
+	ActiveTab              string
+	CrossDiskGroups        []*duplicates.ConsolidationPlan
+	SameDiskGroups         []*duplicates.ConsolidationPlan
+	CrossDiskCount         int64
+	SameDiskCount          int64
+	TotalSavings           int64
+	CrossDiskSavings       int64
+	SameDiskSavings        int64
+	CrossDiskFilesToDelete int
+	SameDiskFilesToLink    int
+	HashScanningEnabled    bool
+	DisplayLimit           int
+	ShowingCrossDisk       int
+	ShowingSameDisk        int
 }
