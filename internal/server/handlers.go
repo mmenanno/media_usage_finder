@@ -3693,6 +3693,10 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 			}
 			return result
 		},
+		"hashLevelName": func(level int) string {
+			// Convert hash level to display name
+			return scanner.GetLevelName(level)
+		},
 	}
 }
 
@@ -4008,6 +4012,52 @@ func (s *Server) HandleVerifyDuplicates(w http.ResponseWriter, r *http.Request) 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "success",
 		"message": "Duplicate verification started",
+	})
+}
+
+// HandleVerifyDuplicatesProgressive progressively verifies duplicates by upgrading hash levels
+func (s *Server) HandleVerifyDuplicatesProgressive(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.hashScanner == nil {
+		http.Error(w, "Hash scanner not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	// Start progressive verification in background
+	go func() {
+		ctx := context.Background()
+		if err := s.hashScanner.VerifyDuplicatesProgressive(ctx); err != nil {
+			log.Printf("Progressive verification error: %v", err)
+		}
+	}()
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": "Progressive verification started",
+	})
+}
+
+// HandleGetHashLevelStats returns statistics about duplicates at each hash level
+func (s *Server) HandleGetHashLevelStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	stats, err := s.db.GetHashLevelStats()
+	if err != nil {
+		log.Printf("Failed to get hash level stats: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to get hash level stats", "stats_error")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status": "success",
+		"stats":  stats,
 	})
 }
 

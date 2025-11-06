@@ -464,7 +464,7 @@
                                 aria-expanded="false"
                                 class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
                                 <span data-dropdown-text>
-                                    {{if eq .Config.DuplicateDetection.HashMode "full"}}Full File Hashing{{else if eq .Config.DuplicateDetection.HashMode "quick_auto"}}Quick Hash (Auto Verify){{else}}Quick Hash (Manual Verify){{end}}
+                                    {{if eq .Config.DuplicateDetection.HashMode "full"}}Full File Hashing{{else if eq .Config.DuplicateDetection.HashMode "progressive"}}Progressive Hashing{{else if eq .Config.DuplicateDetection.HashMode "quick_auto"}}Quick Hash (Auto Verify){{else}}Quick Hash (Manual Verify){{end}}
                                 </span>
                                 <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -483,11 +483,72 @@
                                     <div class="font-medium">Quick Hash (Auto Verify)</div>
                                     <div class="text-xs text-gray-400">Hash first+last 1MB, auto full-hash any quick duplicates</div>
                                 </div>
+                                <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "progressive"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Progressive Hashing</div>
+                                    <div class="text-xs text-gray-400">Start at 1MB, incrementally upgrade duplicates (1MB→10MB→100MB→1GB→10GB→Full)</div>
+                                </div>
                             </div>
                         </div>
                         <p class="text-xs text-gray-500 mt-1">
                             <strong>Quick hashing</strong> reads only the first and last 1MB of each file for fast duplicate detection,
                             then optionally full-hashes files with matching quick hashes to confirm they are true duplicates.
+                            <strong>Progressive hashing</strong> starts with 1MB and only upgrades files that remain duplicates at each level.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Hash Order Strategy</label>
+                        <div class="relative" data-custom-dropdown>
+                            <input type="hidden" name="hash_order" value="{{.Config.DuplicateDetection.HashOrder}}" data-dropdown-input>
+                            <button
+                                type="button"
+                                data-dropdown-button
+                                aria-expanded="false"
+                                class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                                <span data-dropdown-text>
+                                    {{if eq .Config.DuplicateDetection.HashOrder "smallest_first"}}Smallest Files First{{else if eq .Config.DuplicateDetection.HashOrder "largest_first"}}Largest Files First{{else if eq .Config.DuplicateDetection.HashOrder "random"}}Random Order{{else if eq .Config.DuplicateDetection.HashOrder "by_disk"}}Group by Disk{{else if eq .Config.DuplicateDetection.HashOrder "by_duplicate_probability"}}By Duplicate Probability{{else if eq .Config.DuplicateDetection.HashOrder "by_modification_time_newest"}}Newest Files First{{else if eq .Config.DuplicateDetection.HashOrder "by_modification_time_oldest"}}Oldest Files First{{else}}Database Order{{end}}
+                                </span>
+                                <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-y-auto">
+                                <div data-dropdown-option data-value="smallest_first" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "smallest_first"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Smallest Files First</div>
+                                    <div class="text-xs text-gray-400">Fast initial progress (default, recommended)</div>
+                                </div>
+                                <div data-dropdown-option data-value="largest_first" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "largest_first"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Largest Files First</div>
+                                    <div class="text-xs text-gray-400">Prioritize space savings potential</div>
+                                </div>
+                                <div data-dropdown-option data-value="random" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "random"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Random Order</div>
+                                    <div class="text-xs text-gray-400">Avoid disk seek patterns</div>
+                                </div>
+                                <div data-dropdown-option data-value="by_disk" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_disk"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Group by Disk</div>
+                                    <div class="text-xs text-gray-400">Process one disk at a time</div>
+                                </div>
+                                <div data-dropdown-option data-value="by_duplicate_probability" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_duplicate_probability"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">By Duplicate Probability</div>
+                                    <div class="text-xs text-gray-400">Group same-size files together</div>
+                                </div>
+                                <div data-dropdown-option data-value="by_modification_time_newest" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_modification_time_newest"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Newest Files First</div>
+                                    <div class="text-xs text-gray-400">Process recently modified files first</div>
+                                </div>
+                                <div data-dropdown-option data-value="by_modification_time_oldest" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_modification_time_oldest"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Oldest Files First</div>
+                                    <div class="text-xs text-gray-400">Process older files first</div>
+                                </div>
+                                <div data-dropdown-option data-value="db_order" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "db_order"}}bg-blue-600{{end}}">
+                                    <div class="font-medium">Database Order</div>
+                                    <div class="text-xs text-gray-400">No specific ordering</div>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Strategy for ordering files during hash calculation. <strong>Smallest first</strong> shows fast progress, <strong>largest first</strong> prioritizes space savings.
                         </p>
                     </div>
 

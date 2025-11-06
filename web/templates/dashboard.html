@@ -61,6 +61,14 @@
                     Verify Duplicates
                 </button>
                 <button
+                    hx-post="/api/hash/verify-progressive"
+                    hx-swap="none"
+                    hx-confirm="Start progressive verification? This will upgrade duplicates through increasing hash levels (1MB → 10MB → 100MB → 1GB → 10GB → Full)"
+                    class="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded transition cursor-pointer text-sm"
+                    title="Progressive verification upgrades hash levels incrementally">
+                    🔄 Progressive Verify
+                </button>
+                <button
                     hx-post="/api/hash/upgrade-all"
                     hx-swap="none"
                     class="px-3 py-2 bg-orange-600 hover:bg-orange-700 rounded transition cursor-pointer text-sm">

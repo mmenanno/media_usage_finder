@@ -190,3 +190,141 @@ func (h *FileHasher) VerifyHash(path, expectedHash string) (bool, error) {
 	}
 	return actualHash == expectedHash, nil
 }
+
+// PartialHash calculates a hash by reading the first N bytes of a file
+// Used for progressive hash verification (levels 1-5)
+// Format: hash(fileSize || first_maxBytes)
+func (h *FileHasher) PartialHash(path string, fileSize, maxBytes int64) (string, error) {
+	if fileSize == 0 {
+		return "", fmt.Errorf("cannot hash empty file")
+	}
+
+	// If maxBytes >= fileSize, use full hash instead
+	if maxBytes >= fileSize {
+		return h.FullHash(path)
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer f.Close()
+
+	// Apply sequential read hint for better performance
+	applySequentialHint(f)
+
+	hasher := h.createHasher()
+
+	// Include file size in hash (prevents different-size files from matching)
+	sizeBytes := []byte(fmt.Sprintf("%d", fileSize))
+	if _, err := hasher.Write(sizeBytes); err != nil {
+		return "", fmt.Errorf("failed to write size to hasher: %w", err)
+	}
+
+	// Read and hash first maxBytes contiguously
+	bytesToRead := maxBytes
+	buf := make([]byte, h.bufferSize) // Use configured buffer size
+	var totalRead int64
+
+	for totalRead < bytesToRead {
+		// Calculate how much to read in this iteration
+		remaining := bytesToRead - totalRead
+		readSize := int64(len(buf))
+		if remaining < readSize {
+			readSize = remaining
+		}
+
+		n, err := f.Read(buf[:readSize])
+		if n > 0 {
+			totalRead += int64(n)
+			if _, writeErr := hasher.Write(buf[:n]); writeErr != nil {
+				return "", fmt.Errorf("failed to write to hasher: %w", writeErr)
+			}
+		}
+
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to read file: %w", err)
+		}
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
+// GetChunkSizeForLevel returns the number of bytes to hash for a given level
+// Levels: 0=none, 1=1MB, 2=10MB, 3=100MB, 4=1GB, 5=10GB, 6=full
+func GetChunkSizeForLevel(level int) int64 {
+	const (
+		MB = 1024 * 1024
+		GB = MB * 1024
+	)
+
+	switch level {
+	case 0:
+		return 0
+	case 1:
+		return 1 * MB
+	case 2:
+		return 10 * MB
+	case 3:
+		return 100 * MB
+	case 4:
+		return 1 * GB
+	case 5:
+		return 10 * GB
+	case 6:
+		return 0 // Full hash (handled specially)
+	default:
+		return 1 * MB // Default to quick hash
+	}
+}
+
+// GetEffectiveLevel returns the appropriate hash level for a file
+// Don't try to hash 10GB of a 5GB file - cap at appropriate level
+func GetEffectiveLevel(fileSize int64, requestedLevel int) int {
+	// For level 6 (full hash), always use full hash
+	if requestedLevel == 6 {
+		return 6
+	}
+
+	chunkSize := GetChunkSizeForLevel(requestedLevel)
+
+	// If file is smaller than the chunk size, find the right level
+	if fileSize <= chunkSize {
+		// Find the highest level that fits the file size
+		for level := requestedLevel - 1; level >= 1; level-- {
+			if fileSize > GetChunkSizeForLevel(level) {
+				return level
+			}
+		}
+		// If file is very small, use level 1
+		return 1
+	}
+
+	return requestedLevel
+}
+
+// GetLevelName returns a human-readable name for a hash level
+// Used for UI display (e.g., "Progressive (100MB)")
+func GetLevelName(level int) string {
+	switch level {
+	case 0:
+		return "No Hash"
+	case 1:
+		return "Progressive (1MB)"
+	case 2:
+		return "Progressive (10MB)"
+	case 3:
+		return "Progressive (100MB)"
+	case 4:
+		return "Progressive (1GB)"
+	case 5:
+		return "Progressive (10GB)"
+	case 6:
+		return "Full"
+	default:
+		return fmt.Sprintf("Progressive (Level %d)", level)
+	}
+}

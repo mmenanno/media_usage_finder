@@ -21,7 +21,8 @@ type HardlinkCluster struct {
 type DuplicateGroup struct {
 	FileHash         string
 	HashAlgorithm    string
-	HashType         string // 'quick' or 'full'
+	HashType         string // 'quick' or 'full' (DEPRECATED: use HashLevel)
+	HashLevel        int    // 0=none, 1=1MB, 2=10MB, 3=100MB, 4=1GB, 5=10GB, 6=full
 	TotalCopies      int
 	UniqueDiskCount  int
 	TotalSize        int64
@@ -96,6 +97,7 @@ func (db *DB) GetSameDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 			file_hash,
 			hash_algorithm,
 			hash_type,
+			hash_level,
 			device_id,
 			COUNT(*) as copies,
 			MAX(size) as size
@@ -103,7 +105,7 @@ func (db *DB) GetSameDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 		WHERE file_hash IS NOT NULL
 		  AND hash_calculated = 1
 		  AND hash_type IS NOT NULL
-		GROUP BY file_hash, hash_algorithm, hash_type, device_id
+		GROUP BY file_hash, hash_algorithm, hash_type, hash_level, device_id
 		HAVING COUNT(*) > 1
 		ORDER BY size * (COUNT(*) - 1) DESC
 	`
@@ -123,9 +125,10 @@ func (db *DB) GetSameDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 	for rows.Next() {
 		var hash, algorithm string
 		var hashType sql.NullString
+		var hashLevel sql.NullInt64
 		var deviceID, copies, size int64
 
-		if err := rows.Scan(&hash, &algorithm, &hashType, &deviceID, &copies, &size); err != nil {
+		if err := rows.Scan(&hash, &algorithm, &hashType, &hashLevel, &deviceID, &copies, &size); err != nil {
 			return nil, fmt.Errorf("failed to scan duplicate group: %w", err)
 		}
 
@@ -149,6 +152,7 @@ func (db *DB) GetSameDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 			FileHash:         hash,
 			HashAlgorithm:    algorithm,
 			HashType:         hashType.String,
+			HashLevel:        int(hashLevel.Int64),
 			TotalCopies:      int(copies),
 			UniqueDiskCount:  1, // Same disk by definition
 			TotalSize:        size,
@@ -177,6 +181,7 @@ func (db *DB) GetCrossDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 			file_hash,
 			hash_algorithm,
 			hash_type,
+			hash_level,
 			COUNT(*) as total_copies,
 			COUNT(DISTINCT device_id) as disk_count,
 			MAX(size) as size
@@ -184,7 +189,7 @@ func (db *DB) GetCrossDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 		WHERE file_hash IS NOT NULL
 		  AND hash_calculated = 1
 		  AND hash_type IS NOT NULL
-		GROUP BY file_hash, hash_algorithm, hash_type
+		GROUP BY file_hash, hash_algorithm, hash_type, hash_level
 		HAVING COUNT(DISTINCT device_id) > 1
 		ORDER BY size * (COUNT(*) - 1) DESC
 	`
@@ -204,9 +209,10 @@ func (db *DB) GetCrossDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 	for rows.Next() {
 		var hash, algorithm string
 		var hashType sql.NullString
+		var hashLevel sql.NullInt64
 		var totalCopies, diskCount, size int64
 
-		if err := rows.Scan(&hash, &algorithm, &hashType, &totalCopies, &diskCount, &size); err != nil {
+		if err := rows.Scan(&hash, &algorithm, &hashType, &hashLevel, &totalCopies, &diskCount, &size); err != nil {
 			return nil, fmt.Errorf("failed to scan duplicate group: %w", err)
 		}
 
@@ -214,6 +220,7 @@ func (db *DB) GetCrossDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 			FileHash:        hash,
 			HashAlgorithm:   algorithm,
 			HashType:        hashType.String,
+			HashLevel:       int(hashLevel.Int64),
 			TotalCopies:     int(totalCopies),
 			UniqueDiskCount: int(diskCount),
 			TotalSize:       size,
@@ -428,23 +435,26 @@ func (db *DB) GetDuplicateGroupByHash(hash string) (*DuplicateGroup, error) {
 			file_hash,
 			hash_algorithm,
 			hash_type,
+			hash_level,
 			COUNT(*) as total_copies,
 			COUNT(DISTINCT device_id) as disk_count,
 			MAX(size) as size
 		FROM files
 		WHERE file_hash = ?
 		  AND hash_calculated = 1
-		GROUP BY file_hash, hash_algorithm, hash_type
+		GROUP BY file_hash, hash_algorithm, hash_type, hash_level
 	`
 
 	var group DuplicateGroup
 	var hashType sql.NullString
+	var hashLevel sql.NullInt64
 	var totalCopies, diskCount, size int64
 
 	err := db.conn.QueryRow(query, hash).Scan(
 		&group.FileHash,
 		&group.HashAlgorithm,
 		&hashType,
+		&hashLevel,
 		&totalCopies,
 		&diskCount,
 		&size,
@@ -457,6 +467,7 @@ func (db *DB) GetDuplicateGroupByHash(hash string) (*DuplicateGroup, error) {
 	}
 
 	group.HashType = hashType.String
+	group.HashLevel = int(hashLevel.Int64)
 	group.TotalCopies = int(totalCopies)
 	group.UniqueDiskCount = int(diskCount)
 	group.TotalSize = size

@@ -101,13 +101,15 @@ type DiskConfig struct {
 
 // DuplicateDetectionConfig contains configuration for file hashing and duplicate detection
 type DuplicateDetectionConfig struct {
-	Enabled        bool   `yaml:"enabled"`            // Enable duplicate detection features
-	HashAlgorithm  string `yaml:"hash_algorithm"`     // Hash algorithm to use ("sha256" or "blake3")
-	HashMode       string `yaml:"hash_mode"`          // Hash mode: "full", "quick_manual", or "quick_auto"
-	HashWorkers    int    `yaml:"hash_workers"`       // Number of parallel hash workers
-	HashBufferSize string `yaml:"hash_buffer_size"`   // Buffer size for file reads (e.g., "4MB", "8MB")
-	MinFileSize    int64  `yaml:"min_file_size"`      // Only hash files larger than this (bytes)
-	MaxHashRateMB  int    `yaml:"max_hash_rate_mbps"` // Rate limit for hashing (MB/s, 0 = unlimited)
+	Enabled               bool   `yaml:"enabled"`                  // Enable duplicate detection features
+	HashAlgorithm         string `yaml:"hash_algorithm"`           // Hash algorithm to use ("sha256" or "blake3")
+	HashMode              string `yaml:"hash_mode"`                // Hash mode: "full", "quick_manual", "quick_auto", or "progressive"
+	HashWorkers           int    `yaml:"hash_workers"`             // Number of parallel hash workers
+	HashBufferSize        string `yaml:"hash_buffer_size"`         // Buffer size for file reads (e.g., "4MB", "8MB")
+	MinFileSize           int64  `yaml:"min_file_size"`            // Only hash files larger than this (bytes)
+	MaxHashRateMB         int    `yaml:"max_hash_rate_mbps"`       // Rate limit for hashing (MB/s, 0 = unlimited)
+	EnableProgressiveHash bool   `yaml:"enable_progressive_hash"`  // Enable progressive hash verification (incremental levels)
+	HashOrder             string `yaml:"hash_order"`               // Order strategy: "smallest_first", "largest_first", "random", "by_disk", "by_duplicate_probability", "by_modification_time_newest", "by_modification_time_oldest", "db_order"
 }
 
 // DuplicateConsolidationConfig contains configuration for duplicate file consolidation
@@ -156,13 +158,15 @@ func Default() *Config {
 		ScanPaths: []string{"/media", "/downloads"},
 		Disks: []DiskConfig{},
 		DuplicateDetection: DuplicateDetectionConfig{
-			Enabled:        true,
-			HashAlgorithm:  "sha256",
-			HashMode:       "quick_manual", // Default to quick hash with manual verification
-			HashWorkers:    4,
-			HashBufferSize: "4MB", // 4MB buffer for file reads
-			MinFileSize:    10485760, // 10MB
-			MaxHashRateMB:  200,
+			Enabled:               true,
+			HashAlgorithm:         "sha256",
+			HashMode:              "quick_manual",   // Default to quick hash with manual verification
+			HashWorkers:           4,
+			HashBufferSize:        "4MB",            // 4MB buffer for file reads
+			MinFileSize:           10485760,         // 10MB
+			MaxHashRateMB:         200,
+			EnableProgressiveHash: false,            // Progressive mode opt-in
+			HashOrder:             "smallest_first", // Hash smaller files first for fast initial progress
 		},
 		DuplicateConsolidation: DuplicateConsolidationConfig{
 			Enabled:              true,

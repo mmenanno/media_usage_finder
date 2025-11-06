@@ -79,6 +79,7 @@
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
                                     <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">All Hashes</div>
                                     <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Full Hash Only ✓</div>
+                                    <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Progressive Hash Only 🔄</div>
                                     <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Quick Hash Only ⚠️</div>
                                 </div>
                             </div>
@@ -144,14 +145,30 @@
                                             <h3 class="text-lg font-semibold text-gray-100">
                                                 {{$plan.Group.TotalSize | formatBytes}} × {{$plan.Group.TotalCopies}} copies
                                             </h3>
-                                            {{if eq $plan.Group.HashType "quick"}}
-                                            <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
-                                                ⚠️ Quick Hash
-                                            </span>
-                                            {{else if eq $plan.Group.HashType "full"}}
-                                            <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
-                                                ✓ Full Hash
-                                            </span>
+                                            {{if gt $plan.Group.HashLevel 0}}
+                                                {{if eq $plan.Group.HashLevel 6}}
+                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
+                                                    ✓ Full Hash
+                                                </span>
+                                                {{else if eq $plan.Group.HashLevel 1}}
+                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
+                                                    ⚠️ Quick Hash
+                                                </span>
+                                                {{else}}
+                                                <span class="px-2 py-1 text-xs rounded bg-blue-600 text-blue-100" title="Progressive hash - level {{$plan.Group.HashLevel}}">
+                                                    🔄 {{hashLevelName $plan.Group.HashLevel}}
+                                                </span>
+                                                {{end}}
+                                            {{else}}
+                                                {{if eq $plan.Group.HashType "quick"}}
+                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
+                                                    ⚠️ Quick Hash
+                                                </span>
+                                                {{else if eq $plan.Group.HashType "full"}}
+                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
+                                                    ✓ Full Hash
+                                                </span>
+                                                {{end}}
                                             {{end}}
                                         </div>
                                         <div class="text-sm text-gray-400 mt-1 font-mono truncate">
@@ -280,6 +297,7 @@
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
                                     <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">All Hashes</div>
                                     <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Full Hash Only ✓</div>
+                                    <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Progressive Hash Only 🔄</div>
                                     <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Quick Hash Only ⚠️</div>
                                 </div>
                             </div>
@@ -345,14 +363,30 @@
                                             <h3 class="text-lg font-semibold text-gray-100">
                                                 {{$plan.Group.TotalSize | formatBytes}} × {{$plan.TotalFiles}} files in {{$plan.ActualCopies}} cluster(s)
                                             </h3>
-                                            {{if eq $plan.Group.HashType "quick"}}
-                                            <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100">
-                                                ⚠️ Quick Hash
-                                            </span>
-                                            {{else if eq $plan.Group.HashType "full"}}
-                                            <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100">
-                                                ✓ Full Hash
-                                            </span>
+                                            {{if gt $plan.Group.HashLevel 0}}
+                                                {{if eq $plan.Group.HashLevel 6}}
+                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
+                                                    ✓ Full Hash
+                                                </span>
+                                                {{else if eq $plan.Group.HashLevel 1}}
+                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
+                                                    ⚠️ Quick Hash
+                                                </span>
+                                                {{else}}
+                                                <span class="px-2 py-1 text-xs rounded bg-blue-600 text-blue-100" title="Progressive hash - level {{$plan.Group.HashLevel}}">
+                                                    🔄 {{hashLevelName $plan.Group.HashLevel}}
+                                                </span>
+                                                {{end}}
+                                            {{else}}
+                                                {{if eq $plan.Group.HashType "quick"}}
+                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
+                                                    ⚠️ Quick Hash
+                                                </span>
+                                                {{else if eq $plan.Group.HashType "full"}}
+                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
+                                                    ✓ Full Hash
+                                                </span>
+                                                {{end}}
                                             {{end}}
                                         </div>
                                         {{if gt (len $plan.AlreadyLinked) 0}}

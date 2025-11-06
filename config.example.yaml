@@ -146,6 +146,28 @@ duplicate_detection:
   # Options: "sha256" (default, widely supported) or "blake3" (faster, requires additional implementation)
   hash_algorithm: "sha256"
 
+  # Hash mode determines hashing strategy
+  # Options:
+  #   - "quick_manual": Hash first+last 1MB only, manually verify duplicates (recommended, fast screening)
+  #   - "quick_auto": Hash first+last 1MB, auto full-hash any quick duplicates (balanced)
+  #   - "progressive": Start at 1MB, incrementally upgrade duplicates (1MB→10MB→100MB→1GB→10GB→Full)
+  #   - "full": Hash entire file content (slowest, most accurate, use for critical data)
+  # Default: "quick_manual"
+  hash_mode: "quick_manual"
+
+  # Hash ordering strategy - determines which files to hash first
+  # Options:
+  #   - "smallest_first": Process smallest files first (fast initial progress, recommended)
+  #   - "largest_first": Process largest files first (prioritize space savings potential)
+  #   - "random": Random order (avoid disk seek patterns)
+  #   - "by_disk": Group files by disk (process one disk at a time)
+  #   - "by_duplicate_probability": Group same-size files together (find duplicates faster)
+  #   - "by_modification_time_newest": Process recently modified files first
+  #   - "by_modification_time_oldest": Process older files first
+  #   - "db_order": No specific ordering (database insertion order)
+  # Default: "smallest_first"
+  hash_order: "smallest_first"
+
   # Number of parallel hash calculation workers
   # - Default: 4 (good balance for most systems)
   # - Increase to 8-12 for fast NVMe storage

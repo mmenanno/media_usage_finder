@@ -239,6 +239,26 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 6.5: Add hash_level column for progressive hashing
+	// Check if hash_level column exists
+	var hasHashLevel int
+	err = db.conn.QueryRow(`
+		SELECT COUNT(*)
+		FROM pragma_table_info('files')
+		WHERE name='hash_level'
+	`).Scan(&hasHashLevel)
+	if err != nil {
+		return fmt.Errorf("failed to check for hash_level column: %w", err)
+	}
+
+	// If hash_level column doesn't exist, add it and populate from hash_type
+	if hasHashLevel == 0 {
+		_, err = db.conn.Exec(migrateAddHashLevel)
+		if err != nil {
+			return fmt.Errorf("failed to add hash_level column: %w", err)
+		}
+	}
+
 	// Migration 7: Update scans table CHECK constraint to include 'disk_location'
 	// Test if migration is needed by trying to insert a test record with scan_type='disk_location'
 	needsScanTypeMigration := false

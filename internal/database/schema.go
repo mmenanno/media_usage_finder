@@ -310,6 +310,31 @@ CREATE INDEX IF NOT EXISTS idx_files_duplicate_detection ON files(hash_calculate
 CREATE INDEX IF NOT EXISTS idx_files_quick_hash ON files(hash_type) WHERE hash_type = 'quick';
 `
 
+// Migration to add hash_level column for progressive hashing
+const migrateAddHashLevel = `
+-- Add hash_level column to files table
+-- Levels: 0=no hash, 1=1MB quick, 2=10MB, 3=100MB, 4=1GB, 5=10GB, 6=full
+ALTER TABLE files ADD COLUMN hash_level INTEGER DEFAULT 0;
+
+-- Populate hash_level from existing hash_type values
+-- quick = level 1, full = level 6
+UPDATE files
+SET hash_level = CASE
+    WHEN hash_type = 'quick' THEN 1
+    WHEN hash_type = 'full' THEN 6
+    ELSE 0
+END
+WHERE hash_calculated = 1 AND file_hash IS NOT NULL;
+
+-- Create index for hash level queries (progressive verification)
+CREATE INDEX IF NOT EXISTS idx_files_hash_level ON files(hash_level, file_hash)
+  WHERE hash_calculated = 1 AND file_hash IS NOT NULL;
+
+-- Create composite index for finding duplicates at specific level
+CREATE INDEX IF NOT EXISTS idx_files_level_duplicates ON files(hash_level, file_hash, size)
+  WHERE hash_calculated = 1 AND file_hash IS NOT NULL;
+`
+
 // Migration to add 'disk_location' to scans table CHECK constraint
 const migrateAddDiskLocationToScanType = `
 -- Drop scans_new if it exists from a previous failed migration

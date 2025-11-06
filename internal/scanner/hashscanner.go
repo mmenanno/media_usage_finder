@@ -77,8 +77,12 @@ func (hs *HashScanner) Start(ctx context.Context, minSize, maxSize int64) error 
 		log.Printf("Warning: failed to update scan phase: %v", err)
 	}
 
-	// Get files that need hashing
-	files, err := hs.db.GetFilesNeedingHash(minSize, maxSize)
+	// Get files that need hashing (use configured order strategy)
+	hashOrder := hs.config.HashOrder
+	if hashOrder == "" {
+		hashOrder = "smallest_first" // Default
+	}
+	files, err := hs.db.GetFilesNeedingHash(minSize, maxSize, hashOrder)
 	if err != nil {
 		hs.progress.AddError(fmt.Sprintf("Failed to get files: %v", err))
 		hs.progress.Stop()
@@ -224,6 +228,214 @@ func (hs *HashScanner) UpgradeAllQuickHashes(ctx context.Context) error {
 
 	// Process files for upgrading (blocks until complete)
 	hs.verifyFiles(ctx, files, scan.ID)
+
+	return nil
+}
+
+// VerifyDuplicatesProgressive progressively verifies duplicates by upgrading hash levels
+// Starts at level 1 and progressively upgrades to higher levels only for files that remain duplicates
+func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context) error {
+	// Create scan record first
+	scan, err := hs.db.CreateScan("hash_scan")
+	if err != nil {
+		return fmt.Errorf("failed to create scan: %w", err)
+	}
+
+	// Initialize progress tracker
+	hs.progress = NewProgress(scan.ID, hs.db)
+	hs.progress.SetPhase("Preparing Progressive Verification")
+	hs.progress.Log("Starting progressive duplicate verification...")
+
+	// Setup cancellation context
+	ctx, cancel := context.WithCancel(ctx)
+	hs.cancel = cancel
+	hs.scanCtx = ctx
+
+	// Process levels 2 through 6
+	for level := 2; level <= 6; level++ {
+		prevLevel := level - 1
+
+		// Update scan phase
+		levelName := GetLevelName(level)
+		phaseName := fmt.Sprintf("Upgrading to %s", levelName)
+		if err := hs.db.UpdateScanPhase(scan.ID, phaseName); err != nil {
+			log.Printf("Warning: failed to update scan phase: %v", err)
+		}
+		hs.progress.SetPhase(phaseName)
+
+		// Get files with duplicates at previous level
+		files, err := hs.db.GetFilesWithHashDuplicatesAtLevel(prevLevel)
+		if err != nil {
+			hs.progress.AddError(fmt.Sprintf("Failed to get level %d duplicates: %v", prevLevel, err))
+			hs.progress.Stop()
+			hs.db.CompleteScan(scan.ID, "failed", fmt.Sprintf("Failed to get duplicates: %v", err))
+			return fmt.Errorf("failed to get duplicates at level %d: %w", prevLevel, err)
+		}
+
+		// If no duplicates at this level, stop (optimization)
+		if len(files) == 0 {
+			hs.progress.Log(fmt.Sprintf("No duplicates found at level %d, stopping progressive verification", prevLevel))
+			break
+		}
+
+		hs.progress.SetTotalFiles(int64(len(files)))
+		hs.progress.Log(fmt.Sprintf("Found %d files with duplicates at level %d, upgrading to level %d", len(files), prevLevel, level))
+
+		// Calculate total size for this level
+		var totalSize int64
+		for _, f := range files {
+			totalSize += f.Size
+		}
+		hs.progress.TotalSize = totalSize
+
+		// Process files for this level (blocks until complete)
+		hs.progressiveVerifyFiles(ctx, files, scan.ID, level)
+
+		// Check if cancelled
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("verification cancelled")
+		default:
+		}
+
+		// Reset counters for next level
+		hs.mu.Lock()
+		hs.progress.ProcessedFiles = 0
+		hs.bytesProcessed = 0
+		hs.mu.Unlock()
+	}
+
+	// Final completion
+	hs.progress.SetPhase("Completed")
+	hs.progress.Log("Progressive verification completed")
+
+	var status string
+	var errorMsg string
+	if len(hs.progress.Errors) > 0 {
+		status = "completed_with_errors"
+		errorMsg = serializeErrors(hs.progress.Errors)
+	} else {
+		status = "completed"
+	}
+
+	if err := hs.db.CompleteScan(scan.ID, status, errorMsg); err != nil {
+		log.Printf("Warning: failed to complete scan: %v", err)
+	}
+
+	hs.progress.Stop()
+	return nil
+}
+
+// progressiveVerifyFiles processes files for progressive hash level upgrade
+func (hs *HashScanner) progressiveVerifyFiles(ctx context.Context, files []database.File, scanID int64, targetLevel int) {
+	// Create work channel
+	workChan := make(chan database.File, hs.config.HashWorkers*2)
+	var wg sync.WaitGroup
+
+	// Start workers
+	for i := 0; i < hs.config.HashWorkers; i++ {
+		wg.Add(1)
+		go hs.progressiveWorker(ctx, i+1, workChan, &wg, targetLevel)
+	}
+
+	// Send files to workers
+	go func() {
+		for _, file := range files {
+			select {
+			case <-ctx.Done():
+				close(workChan)
+				return
+			case workChan <- file:
+			}
+		}
+		close(workChan)
+	}()
+
+	// Wait for completion
+	wg.Wait()
+}
+
+// progressiveWorker processes files for progressive hash upgrade
+func (hs *HashScanner) progressiveWorker(ctx context.Context, _ int, workChan <-chan database.File, wg *sync.WaitGroup, targetLevel int) {
+	defer wg.Done()
+
+	for file := range workChan {
+		// Check for cancellation
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		// Calculate hash at target level
+		if err := hs.progressiveHashFile(ctx, file, targetLevel); err != nil {
+			hs.progress.AddError(fmt.Sprintf("Failed to hash %s: %v", file.Path, err))
+			continue
+		}
+
+		// Update counters
+		hs.mu.Lock()
+		hs.progress.ProcessedFiles++
+		hs.mu.Unlock()
+	}
+}
+
+// progressiveHashFile calculates a progressive hash at a specific level
+func (hs *HashScanner) progressiveHashFile(ctx context.Context, file database.File, targetLevel int) error {
+	// Check context before starting
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("cancelled")
+	default:
+	}
+
+	// Get effective level (may be lower if file is small)
+	effectiveLevel := GetEffectiveLevel(file.Size, targetLevel)
+
+	var hash string
+	var err error
+
+	if effectiveLevel == 6 {
+		// Use full hash for level 6
+		hs.progress.Log(fmt.Sprintf("Full hashing: %s", filepath.Base(file.Path)))
+		var lastProgress int64
+		hash, err = hs.hasher.HashWithProgress(file.Path, func(bytesRead int64) {
+			// Update processed size incrementally
+			delta := bytesRead - lastProgress
+			if delta > 0 {
+				hs.mu.Lock()
+				hs.bytesProcessed += delta
+				hs.mu.Unlock()
+				lastProgress = bytesRead
+			}
+
+			// Check for cancellation periodically
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+		})
+	} else {
+		// Use partial hash for levels 1-5
+		chunkSize := GetChunkSizeForLevel(effectiveLevel)
+		hs.progress.Log(fmt.Sprintf("Progressive hashing (Level %d): %s", effectiveLevel, filepath.Base(file.Path)))
+		hash, err = hs.hasher.PartialHash(file.Path, file.Size, chunkSize)
+
+		// Track bytes processed (approximate)
+		hs.mu.Lock()
+		hs.bytesProcessed += chunkSize
+		hs.mu.Unlock()
+	}
+
+	if err != nil {
+		return fmt.Errorf("hash calculation failed: %w", err)
+	}
+
+	// Update database with hash level
+	if err := hs.db.UpdateFileHashWithLevel(file.ID, hash, hs.hasher.GetAlgorithm(), effectiveLevel); err != nil {
+		return fmt.Errorf("failed to update database: %w", err)
+	}
 
 	return nil
 }
@@ -494,7 +706,7 @@ func (hs *HashScanner) hashFile(ctx context.Context, file database.File) error {
 
 	// Determine hash type based on config mode
 	var hash string
-	var hashType string
+	var hashLevel int
 	var err error
 
 	switch hs.config.HashMode {
@@ -502,7 +714,14 @@ func (hs *HashScanner) hashFile(ctx context.Context, file database.File) error {
 		// Use quick hash (first + last 1MB)
 		hs.progress.Log(fmt.Sprintf("Quick hashing: %s", filepath.Base(file.Path)))
 		hash, err = hs.hasher.QuickHash(file.Path, file.Size)
-		hashType = "quick"
+		hashLevel = 1 // Quick hash is level 1
+	case "progressive":
+		// Use progressive hash starting at level 1 (1MB)
+		level := GetEffectiveLevel(file.Size, 1)
+		chunkSize := GetChunkSizeForLevel(level)
+		hs.progress.Log(fmt.Sprintf("Progressive hashing (Level %d): %s", level, filepath.Base(file.Path)))
+		hash, err = hs.hasher.PartialHash(file.Path, file.Size, chunkSize)
+		hashLevel = level
 	default: // "full" or unspecified
 		// Use full hash with progress tracking
 		hs.progress.Log(fmt.Sprintf("Full hashing: %s", filepath.Base(file.Path)))
@@ -524,15 +743,15 @@ func (hs *HashScanner) hashFile(ctx context.Context, file database.File) error {
 			default:
 			}
 		})
-		hashType = "full"
+		hashLevel = 6 // Full hash is level 6
 	}
 
 	if err != nil {
 		return fmt.Errorf("hash calculation failed: %w", err)
 	}
 
-	// Update database
-	if err := hs.db.UpdateFileHash(file.ID, hash, hs.hasher.GetAlgorithm(), hashType); err != nil {
+	// Update database with hash level
+	if err := hs.db.UpdateFileHashWithLevel(file.ID, hash, hs.hasher.GetAlgorithm(), hashLevel); err != nil {
 		return fmt.Errorf("failed to update database: %w", err)
 	}
 

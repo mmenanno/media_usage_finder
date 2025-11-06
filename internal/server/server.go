@@ -54,6 +54,8 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/hash/progress-html", s.HandleHashProgressHTML)
 	mux.HandleFunc("/api/hash/clear", s.HandleClearHashes)
 	mux.HandleFunc("/api/hash/verify", s.HandleVerifyDuplicates)
+	mux.HandleFunc("/api/hash/verify-progressive", s.HandleVerifyDuplicatesProgressive)
+	mux.HandleFunc("/api/hash/level-stats", s.HandleGetHashLevelStats)
 	mux.HandleFunc("/api/hash/upgrade-all", s.HandleUpgradeAllHashes)
 	mux.HandleFunc("/api/duplicates/consolidate", s.HandleConsolidateDuplicates)
 	mux.HandleFunc("/api/duplicates/hardlink", s.HandleCreateHardlinks)

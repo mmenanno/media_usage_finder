@@ -2423,7 +2423,7 @@ func (db *DB) DeleteDiskLocationsByDisk(diskDeviceID int64) error {
 // Hash Scanning Methods
 
 // GetFilesNeedingHash returns files that need hashing (optionally filtered by size)
-func (db *DB) GetFilesNeedingHash(minSize, maxSize int64) ([]File, error) {
+func (db *DB) GetFilesNeedingHash(minSize, maxSize int64, order string) ([]File, error) {
 	query := `
 		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, extension, created_at
 		FROM files
@@ -2440,7 +2440,28 @@ func (db *DB) GetFilesNeedingHash(minSize, maxSize int64) ([]File, error) {
 		args = append(args, maxSize)
 	}
 
-	query += ` ORDER BY size ASC` // Hash smaller files first for faster initial progress
+	// Add ordering based on strategy
+	switch order {
+	case "largest_first":
+		query += ` ORDER BY size DESC`
+	case "random":
+		query += ` ORDER BY RANDOM()`
+	case "by_disk":
+		// Extract disk from path and order by it
+		// Assumes paths like /disk1/..., /disk2/..., etc.
+		query += ` ORDER BY path, size ASC`
+	case "by_duplicate_probability":
+		// Group same-size files together (likely duplicates)
+		query += ` ORDER BY size, path`
+	case "by_modification_time_newest":
+		query += ` ORDER BY modified_time DESC, size ASC`
+	case "by_modification_time_oldest":
+		query += ` ORDER BY modified_time ASC, size ASC`
+	case "db_order":
+		// No ORDER BY for maximum query speed
+	default: // "smallest_first" or empty
+		query += ` ORDER BY size ASC` // Hash smaller files first for faster initial progress
+	}
 
 	rows, err := db.conn.Query(query, args...)
 	if err != nil {
@@ -2470,6 +2491,32 @@ func (db *DB) UpdateFileHash(fileID int64, hash, algorithm, hashType string) err
 	_, err := db.conn.Exec(query, hash, algorithm, hashType, fileID)
 	if err != nil {
 		return fmt.Errorf("failed to update file hash: %w", err)
+	}
+	return nil
+}
+
+// UpdateFileHashWithLevel updates a file's hash information including the hash level
+// Used for progressive hashing to track which level of verification has been performed
+func (db *DB) UpdateFileHashWithLevel(fileID int64, hash, algorithm string, level int) error {
+	// Determine hash_type from level
+	var hashType string
+	switch level {
+	case 1:
+		hashType = "quick"
+	case 6:
+		hashType = "full"
+	default:
+		hashType = "partial"
+	}
+
+	query := `
+		UPDATE files
+		SET file_hash = ?, hash_algorithm = ?, hash_type = ?, hash_level = ?, hash_calculated = 1
+		WHERE id = ?
+	`
+	_, err := db.conn.Exec(query, hash, algorithm, hashType, level, fileID)
+	if err != nil {
+		return fmt.Errorf("failed to update file hash with level: %w", err)
 	}
 	return nil
 }
@@ -2596,6 +2643,96 @@ func (db *DB) GetQuickHashCount() (int64, error) {
 	var count int64
 	err := db.conn.QueryRow(`SELECT COUNT(*) FROM files WHERE hash_type = 'quick'`).Scan(&count)
 	return count, err
+}
+
+// GetFilesWithHashDuplicatesAtLevel returns files at a specific hash level that have duplicates
+// Used for progressive hash verification to find which files need upgrading to next level
+func (db *DB) GetFilesWithHashDuplicatesAtLevel(level int) ([]File, error) {
+	query := `
+		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
+		       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
+		FROM files f
+		WHERE f.hash_level = ?
+		  AND f.hash_calculated = 1
+		  AND f.file_hash IN (
+		      SELECT file_hash
+		      FROM files
+		      WHERE hash_level = ? AND file_hash IS NOT NULL AND hash_calculated = 1
+		      GROUP BY file_hash, size
+		      HAVING COUNT(*) > 1
+		  )
+		ORDER BY f.size DESC, f.file_hash
+	`
+
+	rows, err := db.conn.Query(query, level, level)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query files with hash duplicates at level %d: %w", level, err)
+	}
+	defer rows.Close()
+
+	var files []File
+	for rows.Next() {
+		file, err := scanFileRow(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan file row: %w", err)
+		}
+		files = append(files, *file)
+	}
+
+	return files, rows.Err()
+}
+
+// GetHashLevelDuplicateCount returns the count of files with duplicates at a specific level
+func (db *DB) GetHashLevelDuplicateCount(level int) (int64, error) {
+	query := `
+		SELECT COUNT(DISTINCT f.id)
+		FROM files f
+		WHERE f.hash_level = ?
+		  AND f.hash_calculated = 1
+		  AND f.file_hash IN (
+		      SELECT file_hash
+		      FROM files
+		      WHERE hash_level = ? AND file_hash IS NOT NULL AND hash_calculated = 1
+		      GROUP BY file_hash, size
+		      HAVING COUNT(*) > 1
+		  )
+	`
+
+	var count int64
+	err := db.conn.QueryRow(query, level, level).Scan(&count)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return count, err
+}
+
+// GetHashLevelStats returns statistics about files at each hash level
+func (db *DB) GetHashLevelStats() (map[int]int64, error) {
+	query := `
+		SELECT hash_level, COUNT(*) as count
+		FROM files
+		WHERE hash_calculated = 1 AND file_hash IS NOT NULL
+		GROUP BY hash_level
+		ORDER BY hash_level
+	`
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query hash level stats: %w", err)
+	}
+	defer rows.Close()
+
+	stats := make(map[int]int64)
+	for rows.Next() {
+		var level int
+		var count int64
+		if err := rows.Scan(&level, &count); err != nil {
+			return nil, fmt.Errorf("failed to scan hash level stats: %w", err)
+		}
+		stats[level] = count
+	}
+
+	return stats, rows.Err()
 }
 
 // LogConsolidation logs a cross-disk consolidation operation to the audit log
