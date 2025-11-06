@@ -238,12 +238,10 @@ document.addEventListener('DOMContentLoaded', function() {
         loadLogs();
     });
 
-    // Allow Enter key to apply filters
-    form.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            loadLogs();
-        }
+    // Allow Enter key to apply filters (form submission)
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadLogs();
     });
 });
 </script>
