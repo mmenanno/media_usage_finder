@@ -3623,11 +3623,11 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 			// Simple variants: border, text, bg, hover
 			return fmt.Sprintf("%s-service-%s", variant, service)
 		},
-		"add": func(a, b int64) int64 {
-			return a + b
+		"add": func(a, b interface{}) int64 {
+			return int64(toFloat64(a)) + int64(toFloat64(b))
 		},
-		"sub": func(a, b int64) int64 {
-			return a - b
+		"sub": func(a, b interface{}) int64 {
+			return int64(toFloat64(a)) - int64(toFloat64(b))
 		},
 		"mul": func(a, b interface{}) float64 {
 			return toFloat64(a) * toFloat64(b)
