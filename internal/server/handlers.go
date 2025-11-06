@@ -735,7 +735,16 @@ func (s *Server) HandleGetScanLogs(w http.ResponseWriter, r *http.Request) {
 
 	if isHTMX {
 		// Return just the logs table fragment for HTMX updates
-		s.renderTemplate(w, "logs_table.html", data)
+		tmpl, ok := s.templates["logs_table.html"]
+		if !ok {
+			http.Error(w, "logs_table template not found", http.StatusInternalServerError)
+			return
+		}
+		// Execute template directly without layout wrapper for partial update
+		if err := tmpl.Execute(w, data); err != nil {
+			log.Printf("ERROR: Failed to execute logs_table template: %v", err)
+			http.Error(w, "Failed to render logs", http.StatusInternalServerError)
+		}
 	} else {
 		// Return JSON for API requests
 		w.Header().Set("Content-Type", "application/json")
