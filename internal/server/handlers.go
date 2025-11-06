@@ -3682,14 +3682,14 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 			}
 			return result
 		},
-		"sequence": func(start, end int64) []int64 {
+		"sequence": func(start, end int) []int {
 			// Generate a sequence of integers from start to end (inclusive)
 			if start > end {
-				return []int64{}
+				return []int{}
 			}
-			result := make([]int64, end-start+1)
+			result := make([]int, end-start+1)
 			for i := range result {
-				result[i] = start + int64(i)
+				result[i] = start + i
 			}
 			return result
 		},
