@@ -265,7 +265,8 @@ func (hs *HashScanner) verifyFiles(ctx context.Context, files []database.File, s
 	default:
 		if len(hs.progress.Errors) > 0 {
 			status = "completed_with_errors"
-			errorMsg = fmt.Sprintf("Completed with %d errors", len(hs.progress.Errors))
+			// Serialize all accumulated errors to JSON
+			errorMsg = serializeErrors(hs.progress.Errors)
 		} else {
 			status = "completed"
 		}
@@ -423,7 +424,8 @@ func (hs *HashScanner) processFiles(ctx context.Context, files []database.File, 
 	default:
 		if len(hs.progress.Errors) > 0 {
 			status = "completed_with_errors"
-			errorMsg = fmt.Sprintf("Completed with %d errors", len(hs.progress.Errors))
+			// Serialize all accumulated errors to JSON
+			errorMsg = serializeErrors(hs.progress.Errors)
 		} else {
 			status = "completed"
 		}

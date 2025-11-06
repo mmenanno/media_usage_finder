@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -32,6 +33,31 @@ func NewScanner(db *database.DB, cfg *config.Config) *Scanner {
 		db:     db,
 		config: cfg,
 	}
+}
+
+// serializeErrors converts a slice of error strings to a JSON string for database storage
+// Returns empty string if there are no errors
+func serializeErrors(errors []string) string {
+	if len(errors) == 0 {
+		return ""
+	}
+
+	// Marshal to JSON
+	jsonData, err := json.Marshal(errors)
+	if err != nil {
+		// Fallback to simple concatenation if JSON marshaling fails
+		log.Printf("Warning: Failed to marshal errors to JSON: %v", err)
+		result := ""
+		for i, e := range errors {
+			if i > 0 {
+				result += "\n"
+			}
+			result += e
+		}
+		return result
+	}
+
+	return string(jsonData)
 }
 
 // SetOnScanComplete sets the callback to be called when scan completes
@@ -124,6 +150,12 @@ func (s *Scanner) Scan(ctx context.Context, incremental bool) error {
 		}
 		msg := scanErr.Error()
 		errorMsg = &msg
+	} else if s.progress != nil && len(s.progress.Errors) > 0 {
+		// Scan completed but had errors during processing
+		status = "completed_with_errors"
+		// Serialize all accumulated errors to JSON
+		serialized := serializeErrors(s.progress.Errors)
+		errorMsg = &serialized
 	}
 
 	s.progress.Stop()
@@ -213,6 +245,12 @@ func (s *Scanner) ResumeScan(ctx context.Context) error {
 		}
 		msg := scanErr.Error()
 		errorMsg = &msg
+	} else if s.progress != nil && len(s.progress.Errors) > 0 {
+		// Scan completed but had errors during processing
+		status = "completed_with_errors"
+		// Serialize all accumulated errors to JSON
+		serialized := serializeErrors(s.progress.Errors)
+		errorMsg = &serialized
 	}
 
 	s.progress.Stop()
