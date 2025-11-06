@@ -439,7 +439,7 @@ func (a *Analyzer) enrichFilesWithDiskInfo(files []database.DuplicateFile) error
 
 			// Try to get disk usage from disk detector if available
 			if a.diskDetector != nil {
-				diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
+				diskInfo, err := a.diskDetector.GetDiskForFile(locations[0].DiskDeviceID)
 				if err == nil {
 					files[i].DiskUsedPercent = diskInfo.UsedPercent
 				} else {
@@ -486,7 +486,7 @@ func (a *Analyzer) enrichFilesWithDiskInfoFallback(files []database.DuplicateFil
 
 			// Try to get disk usage from disk detector if available
 			if a.diskDetector != nil {
-				diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
+				diskInfo, err := a.diskDetector.GetDiskForFile(locations[0].DiskDeviceID)
 				if err == nil {
 					files[i].DiskUsedPercent = diskInfo.UsedPercent
 				} else {
