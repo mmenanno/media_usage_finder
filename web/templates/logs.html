@@ -129,7 +129,7 @@
             <svg class="w-12 h-12 mx-auto mb-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
             </svg>
-            <p>Click "Apply Filters" to load logs</p>
+            <p class="inline-block">Click "Apply Filters" to load logs</p>
         </div>
     </div>
 </div>
@@ -161,41 +161,40 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Load logs from URL parameters on page load
+    // Load logs from URL parameters on page load, or use defaults
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('scan_id')) {
-        // Set custom dropdown values from URL
-        const scanId = urlParams.get('scan_id') || 'all';
-        const level = urlParams.get('level') || 'all';
-        const phase = urlParams.get('phase') || 'all';
-        const search = urlParams.get('search') || '';
 
-        // Set scan dropdown
-        const scanDropdown = form.querySelector('[name="scan_id"]').closest('[data-custom-dropdown]');
-        if (scanId === 'all') {
-            setDropdownValue(scanDropdown, 'all', 'All Scans');
-        } else {
-            const scanOption = scanDropdown.querySelector(`[data-dropdown-option][data-value="${scanId}"]`);
-            if (scanOption) {
-                setDropdownValue(scanDropdown, scanId, scanOption.textContent.trim());
-            }
+    // Get filter values from URL or use defaults
+    const scanId = urlParams.get('scan_id') || 'all';
+    const level = urlParams.get('level') || 'all';
+    const phase = urlParams.get('phase') || 'all';
+    const search = urlParams.get('search') || '';
+
+    // Set scan dropdown
+    const scanDropdown = form.querySelector('[name="scan_id"]').closest('[data-custom-dropdown]');
+    if (scanId === 'all') {
+        setDropdownValue(scanDropdown, 'all', 'All Scans');
+    } else {
+        const scanOption = scanDropdown.querySelector(`[data-dropdown-option][data-value="${scanId}"]`);
+        if (scanOption) {
+            setDropdownValue(scanDropdown, scanId, scanOption.textContent.trim());
         }
-
-        // Set level dropdown
-        const levelDropdown = form.querySelector('[name="level"]').closest('[data-custom-dropdown]');
-        const levelText = level === 'all' ? 'All Levels' : level.charAt(0).toUpperCase() + level.slice(1);
-        setDropdownValue(levelDropdown, level, levelText);
-
-        // Set phase dropdown
-        const phaseDropdown = form.querySelector('[name="phase"]').closest('[data-custom-dropdown]');
-        setDropdownValue(phaseDropdown, phase, phase === 'all' ? 'All Phases' : phase);
-
-        // Set search input
-        document.getElementById('search-filter').value = search;
-
-        // Auto-load logs
-        loadLogs();
     }
+
+    // Set level dropdown
+    const levelDropdown = form.querySelector('[name="level"]').closest('[data-custom-dropdown]');
+    const levelText = level === 'all' ? 'All Levels' : level.charAt(0).toUpperCase() + level.slice(1);
+    setDropdownValue(levelDropdown, level, levelText);
+
+    // Set phase dropdown
+    const phaseDropdown = form.querySelector('[name="phase"]').closest('[data-custom-dropdown]');
+    setDropdownValue(phaseDropdown, phase, phase === 'all' ? 'All Phases' : phase);
+
+    // Set search input
+    document.getElementById('search-filter').value = search;
+
+    // Always auto-load logs on page load with current filters (defaults or URL params)
+    loadLogs();
 
     function loadLogs() {
         const formData = new FormData(form);
