@@ -7,16 +7,28 @@ import (
 	"time"
 )
 
+// HardlinkCluster represents a group of files that share the same inode (already hardlinked)
+type HardlinkCluster struct {
+	DeviceID     int64           // Device these files are on
+	Inode        int64           // Shared inode
+	Files        []DuplicateFile // Files in this cluster
+	IsLinked     bool            // true if files already share an inode (LinkCount > 1)
+	LinkCount    int             // Number of files in cluster
+	SpaceSavings int64           // Actual savings if linked to primary (0 if already linked)
+}
+
 // DuplicateGroup represents a group of files with identical hashes
 type DuplicateGroup struct {
-	FileHash        string
-	HashAlgorithm   string
-	HashType        string // 'quick' or 'full'
-	TotalCopies     int
-	UniqueDiskCount int
-	TotalSize       int64
-	WastedSpace     int64 // (copies - 1) * size
-	Files           []DuplicateFile
+	FileHash         string
+	HashAlgorithm    string
+	HashType         string // 'quick' or 'full'
+	TotalCopies      int
+	UniqueDiskCount  int
+	TotalSize        int64
+	WastedSpace      int64 // (copies - 1) * size - DEPRECATED: Use ActualSavings
+	HardlinkClusters []HardlinkCluster
+	ActualSavings    int64 // Savings accounting for existing hardlinks
+	Files            []DuplicateFile
 }
 
 // DuplicateFile represents a single file within a duplicate group
@@ -31,6 +43,48 @@ type DuplicateFile struct {
 	IsOrphaned     bool
 	ServiceUsage   []string
 	ModifiedTime   time.Time
+}
+
+// GroupFilesByInode groups files that are already hardlinked together
+// Files with the same (DeviceID, Inode) are already sharing physical disk space
+func GroupFilesByInode(files []DuplicateFile, fileSize int64) []HardlinkCluster {
+	if len(files) == 0 {
+		return nil
+	}
+
+	// Group files by (DeviceID, Inode)
+	clusterMap := make(map[string]*HardlinkCluster)
+
+	for i := range files {
+		key := fmt.Sprintf("%d:%d", files[i].DeviceID, files[i].Inode)
+
+		if cluster, exists := clusterMap[key]; exists {
+			cluster.Files = append(cluster.Files, files[i])
+			cluster.LinkCount++
+		} else {
+			clusterMap[key] = &HardlinkCluster{
+				DeviceID:     files[i].DeviceID,
+				Inode:        files[i].Inode,
+				Files:        []DuplicateFile{files[i]},
+				LinkCount:    1,
+				SpaceSavings: 0, // Will be calculated later
+			}
+		}
+	}
+
+	// Convert to slice and mark linked clusters
+	clusters := make([]HardlinkCluster, 0, len(clusterMap))
+	for _, cluster := range clusterMap {
+		cluster.IsLinked = cluster.LinkCount > 1
+		// If already linked (multiple files with same inode), no savings possible
+		// If not linked yet, potential savings = fileSize (when linked to primary)
+		if !cluster.IsLinked {
+			cluster.SpaceSavings = fileSize
+		}
+		clusters = append(clusters, *cluster)
+	}
+
+	return clusters
 }
 
 // GetSameDiskDuplicates finds files with the same hash on the same disk
@@ -75,22 +129,34 @@ func (db *DB) GetSameDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 			return nil, fmt.Errorf("failed to scan duplicate group: %w", err)
 		}
 
-		group := &DuplicateGroup{
-			FileHash:        hash,
-			HashAlgorithm:   algorithm,
-			HashType:        hashType.String,
-			TotalCopies:     int(copies),
-			UniqueDiskCount: 1, // Same disk by definition
-			TotalSize:       size,
-			WastedSpace:     (copies - 1) * size,
-		}
-
-		// Get files in this group
+		// Get files in this group first
 		files, err := db.getFilesForDuplicateGroup(hash, &deviceID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get files for group: %w", err)
 		}
-		group.Files = files
+
+		// Group files by inode to detect existing hardlinks
+		clusters := GroupFilesByInode(files, size)
+
+		// Calculate actual savings: only count unique inodes
+		// If we have N clusters, we can link them all to one primary, saving (N-1) * size
+		actualSavings := int64(0)
+		if len(clusters) > 1 {
+			actualSavings = int64(len(clusters)-1) * size
+		}
+
+		group := &DuplicateGroup{
+			FileHash:         hash,
+			HashAlgorithm:    algorithm,
+			HashType:         hashType.String,
+			TotalCopies:      int(copies),
+			UniqueDiskCount:  1, // Same disk by definition
+			TotalSize:        size,
+			WastedSpace:      (copies - 1) * size, // Keep for backwards compat, but deprecated
+			Files:            files,
+			HardlinkClusters: clusters,
+			ActualSavings:    actualSavings,
+		}
 
 		groups = append(groups, group)
 	}
@@ -281,7 +347,7 @@ func (db *DB) GetDuplicateStats() (*DuplicateStats, error) {
 		return nil, fmt.Errorf("failed to count cross-disk groups: %w", err)
 	}
 
-	// Count same-disk duplicate groups
+	// Count same-disk duplicate groups (only groups with multiple unique inodes)
 	err = db.conn.QueryRow(`
 		SELECT COUNT(*)
 		FROM (
@@ -291,7 +357,7 @@ func (db *DB) GetDuplicateStats() (*DuplicateStats, error) {
 			  AND hash_calculated = 1
 			  AND hash_type IS NOT NULL
 			GROUP BY file_hash, device_id
-			HAVING COUNT(*) > 1
+			HAVING COUNT(DISTINCT inode) > 1
 		)
 	`).Scan(&stats.SameDiskGroups)
 	if err != nil && err != sql.ErrNoRows {
@@ -315,17 +381,20 @@ func (db *DB) GetDuplicateStats() (*DuplicateStats, error) {
 		return nil, fmt.Errorf("failed to calculate cross-disk savings: %w", err)
 	}
 
-	// Calculate potential same-disk savings
+	// Calculate potential same-disk savings (accounting for existing hardlinks)
+	// We need to count unique inodes per hash group, not total files
 	err = db.conn.QueryRow(`
-		SELECT COALESCE(SUM(size * (copies - 1)), 0)
+		SELECT COALESCE(SUM(size * (unique_inodes - 1)), 0)
 		FROM (
-			SELECT file_hash, device_id, COUNT(*) as copies, MAX(size) as size
+			SELECT file_hash, device_id,
+			       COUNT(DISTINCT inode) as unique_inodes,
+			       MAX(size) as size
 			FROM files
 			WHERE file_hash IS NOT NULL
 			  AND hash_calculated = 1
 			  AND hash_type IS NOT NULL
 			GROUP BY file_hash, device_id
-			HAVING COUNT(*) > 1
+			HAVING COUNT(DISTINCT inode) > 1
 		)
 	`).Scan(&stats.SameDiskPotentialSavings)
 	if err != nil {

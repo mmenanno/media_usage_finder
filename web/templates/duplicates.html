@@ -343,7 +343,7 @@
                                     <div class="flex-1">
                                         <div class="flex items-center space-x-3">
                                             <h3 class="text-lg font-semibold text-gray-100">
-                                                {{$plan.Group.TotalSize | formatBytes}} × {{$plan.Group.TotalCopies}} copies
+                                                {{$plan.Group.TotalSize | formatBytes}} × {{$plan.TotalFiles}} files in {{$plan.ActualCopies}} cluster(s)
                                             </h3>
                                             {{if eq $plan.Group.HashType "quick"}}
                                             <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100">
@@ -355,6 +355,12 @@
                                             </span>
                                             {{end}}
                                         </div>
+                                        {{if gt (len $plan.AlreadyLinked) 0}}
+                                        <div class="text-sm text-blue-400 mt-1 flex items-center space-x-1">
+                                            <span>ℹ️</span>
+                                            <span>{{len $plan.AlreadyLinked}} cluster(s) already internally linked</span>
+                                        </div>
+                                        {{end}}
                                         <div class="text-sm text-gray-400 mt-1 font-mono truncate">
                                             Hash: {{$plan.Group.FileHash}}
                                         </div>
@@ -363,54 +369,145 @@
                                         </div>
                                     </div>
                                     <div class="text-right">
-                                        <div class="text-sm text-gray-400">Potential Savings</div>
+                                        <div class="text-sm text-gray-400">Actual Savings</div>
                                         <div class="text-xl font-bold text-green-400">{{$plan.SpaceSavings | formatBytes}}</div>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- File Entries -->
-                            <div class="px-6 py-4 space-y-3">
-                                {{range $plan.Group.Files}}
-                                <div class="file-entry flex items-center justify-between p-3 rounded {{if eq .ID $plan.KeepFile.ID}}bg-blue-900 bg-opacity-20 border border-blue-700{{else}}bg-gray-700 bg-opacity-40 border border-gray-600{{end}}">
-                                    <div class="flex items-center space-x-3 flex-1 min-w-0">
-                                        {{if eq .ID $plan.KeepFile.ID}}
-                                        <div class="shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold">
-                                            ★
-                                        </div>
-                                        {{else}}
-                                        <div class="shrink-0 w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-white">
-                                            🔗
-                                        </div>
+                            <!-- File Entries Grouped by Hardlink Cluster -->
+                            <div class="px-6 py-4 space-y-4">
+                                <!-- Primary Cluster -->
+                                {{if $plan.KeepCluster}}
+                                <div class="hardlink-cluster bg-blue-900 bg-opacity-10 border border-blue-700 rounded-lg p-3">
+                                    <div class="text-xs font-semibold text-blue-400 mb-2 flex items-center space-x-2">
+                                        <span>PRIMARY CLUSTER (inode {{$plan.KeepCluster.Inode}})</span>
+                                        {{if $plan.KeepCluster.IsLinked}}
+                                        <span class="px-2 py-0.5 rounded bg-blue-600 bg-opacity-30 text-blue-300">
+                                            {{$plan.KeepCluster.LinkCount}} files already linked
+                                        </span>
                                         {{end}}
-                                        <div class="flex-1 min-w-0">
-                                            <div class="text-sm font-medium text-gray-100 truncate">{{.Path}}</div>
-                                            <div class="flex items-center space-x-4 mt-1">
-                                                {{if .ServiceUsage}}
-                                                <span class="text-xs text-gray-400">
-                                                    Used by: {{range $i, $svc := .ServiceUsage}}{{if $i}}, {{end}}{{$svc}}{{end}}
-                                                </span>
-                                                {{else if .IsOrphaned}}
-                                                <span class="px-2 py-0.5 text-xs rounded bg-gray-600 text-gray-300">
-                                                    Orphaned
-                                                </span>
-                                                {{end}}
-                                                <span class="text-xs text-gray-500">
-                                                    Modified: {{.ModifiedTime | formatTimestamp}}
-                                                </span>
+                                    </div>
+                                    {{range $plan.KeepCluster.Files}}
+                                    <div class="file-entry flex items-center justify-between p-2 rounded bg-blue-900 bg-opacity-20 mb-2">
+                                        <div class="flex items-center space-x-3 flex-1 min-w-0">
+                                            <div class="shrink-0 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                                                ★
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="text-sm font-medium text-gray-100 truncate">{{.Path}}</div>
+                                                <div class="flex items-center space-x-3 mt-1">
+                                                    {{if .ServiceUsage}}
+                                                    <span class="text-xs text-gray-400">
+                                                        Used by: {{range $i, $svc := .ServiceUsage}}{{if $i}}, {{end}}{{$svc}}{{end}}
+                                                    </span>
+                                                    {{else if .IsOrphaned}}
+                                                    <span class="px-2 py-0.5 text-xs rounded bg-gray-600 text-gray-300">Orphaned</span>
+                                                    {{end}}
+                                                    <span class="text-xs text-gray-500">Modified: {{.ModifiedTime | formatTimestamp}}</span>
+                                                </div>
                                             </div>
                                         </div>
+                                        <div class="shrink-0 ml-4 text-right">
+                                            <div class="text-sm font-medium text-blue-400">PRIMARY</div>
+                                            {{if eq .ID $plan.KeepFile.ID}}
+                                            <div class="text-xs text-gray-400">{{$plan.ReasonToKeep}}</div>
+                                            {{else}}
+                                            <div class="text-xs text-gray-400">Already linked</div>
+                                            {{end}}
+                                        </div>
                                     </div>
-                                    <div class="shrink-0 ml-4 text-right">
-                                        {{if eq .ID $plan.KeepFile.ID}}
-                                        <div class="text-sm font-medium text-blue-400">PRIMARY</div>
-                                        <div class="text-xs text-gray-400">{{$plan.ReasonToKeep}}</div>
-                                        {{else}}
-                                        <div class="text-sm font-medium text-gray-400">LINK TO PRIMARY</div>
-                                        <div class="text-xs text-gray-400">Save {{.Size | formatBytes}}</div>
+                                    {{end}}
+                                </div>
+                                {{end}}
+
+                                <!-- Already Linked Clusters (non-primary) -->
+                                {{range $cluster := $plan.AlreadyLinked}}
+                                    {{if ne $cluster.Inode $plan.KeepCluster.Inode}}
+                                    <div class="hardlink-cluster bg-gray-700 bg-opacity-30 border border-gray-600 rounded-lg p-3">
+                                        <div class="text-xs font-semibold text-gray-400 mb-2 flex items-center space-x-2">
+                                            <span>LINKED CLUSTER (inode {{$cluster.Inode}})</span>
+                                            <span class="px-2 py-0.5 rounded bg-gray-600 text-gray-300">
+                                                {{$cluster.LinkCount}} files linked together
+                                            </span>
+                                            <span class="text-gray-500">→ Will link all to primary</span>
+                                        </div>
+                                        {{range $cluster.Files}}
+                                        <div class="file-entry flex items-center justify-between p-2 rounded bg-gray-700 bg-opacity-40 mb-2">
+                                            <div class="flex items-center space-x-3 flex-1 min-w-0">
+                                                <div class="shrink-0 w-6 h-6 rounded-full bg-green-600 flex items-center justify-center text-white text-xs">
+                                                    🔗✓
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="text-sm font-medium text-gray-100 truncate">{{.Path}}</div>
+                                                    <div class="flex items-center space-x-3 mt-1">
+                                                        {{if .ServiceUsage}}
+                                                        <span class="text-xs text-gray-400">
+                                                            Used by: {{range $i, $svc := .ServiceUsage}}{{if $i}}, {{end}}{{$svc}}{{end}}
+                                                        </span>
+                                                        {{else if .IsOrphaned}}
+                                                        <span class="px-2 py-0.5 text-xs rounded bg-gray-600 text-gray-300">Orphaned</span>
+                                                        {{end}}
+                                                        <span class="text-xs text-gray-500">Modified: {{.ModifiedTime | formatTimestamp}}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="shrink-0 ml-4 text-right">
+                                                <div class="text-sm font-medium text-gray-400">LINK TO PRIMARY</div>
+                                                <div class="text-xs text-green-400">Save {{$plan.Group.TotalSize | formatBytes}}</div>
+                                            </div>
+                                        </div>
                                         {{end}}
                                     </div>
-                                </div>
+                                    {{end}}
+                                {{end}}
+
+                                <!-- Unlinked Clusters -->
+                                {{range $cluster := $plan.LinkClusters}}
+                                    {{$isAlreadyLinked := false}}
+                                    {{range $linked := $plan.AlreadyLinked}}
+                                        {{if eq $linked.Inode $cluster.Inode}}
+                                            {{$isAlreadyLinked = true}}
+                                        {{end}}
+                                    {{end}}
+                                    {{if not $isAlreadyLinked}}
+                                    <div class="hardlink-cluster bg-gray-700 bg-opacity-30 border border-gray-600 rounded-lg p-3">
+                                        <div class="text-xs font-semibold text-gray-400 mb-2 flex items-center space-x-2">
+                                            <span>UNLINKED FILES{{if gt $cluster.LinkCount 1}} (inode {{$cluster.Inode}}){{end}}</span>
+                                            {{if gt $cluster.LinkCount 1}}
+                                            <span class="px-2 py-0.5 rounded bg-gray-600 text-gray-300">
+                                                {{$cluster.LinkCount}} files need linking
+                                            </span>
+                                            {{end}}
+                                        </div>
+                                        {{range $cluster.Files}}
+                                        <div class="file-entry flex items-center justify-between p-2 rounded bg-gray-700 bg-opacity-40 mb-2">
+                                            <div class="flex items-center space-x-3 flex-1 min-w-0">
+                                                <div class="shrink-0 w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center text-white text-xs">
+                                                    🔗
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="text-sm font-medium text-gray-100 truncate">{{.Path}}</div>
+                                                    <div class="flex items-center space-x-3 mt-1">
+                                                        {{if .ServiceUsage}}
+                                                        <span class="text-xs text-gray-400">
+                                                            Used by: {{range $i, $svc := .ServiceUsage}}{{if $i}}, {{end}}{{$svc}}{{end}}
+                                                        </span>
+                                                        {{else if .IsOrphaned}}
+                                                        <span class="px-2 py-0.5 text-xs rounded bg-gray-600 text-gray-300">Orphaned</span>
+                                                        {{end}}
+                                                        <span class="text-xs text-gray-500">Modified: {{.ModifiedTime | formatTimestamp}}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="shrink-0 ml-4 text-right">
+                                                <div class="text-sm font-medium text-gray-400">LINK TO PRIMARY</div>
+                                                <div class="text-xs text-gray-400">Save {{$plan.Group.TotalSize | formatBytes}}</div>
+                                            </div>
+                                        </div>
+                                        {{end}}
+                                    </div>
+                                    {{end}}
                                 {{end}}
                             </div>
                         </div>

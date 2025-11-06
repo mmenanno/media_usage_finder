@@ -162,11 +162,40 @@ func (c *Consolidator) processHardlinkGroup(plan *ConsolidationPlan, dryRun bool
 	if err := syscall.Stat(plan.KeepFile.Path, &primaryStat); err != nil {
 		return fmt.Errorf("failed to stat primary file: %w", err)
 	}
+	primaryInode := primaryStat.Ino
+
+	// Log already-linked clusters if present
+	if len(plan.AlreadyLinked) > 0 {
+		for _, cluster := range plan.AlreadyLinked {
+			if uint64(cluster.Inode) != primaryInode {
+				log.Printf("INFO: Cluster with inode %d is already internally linked (%d files) but separate from primary inode %d",
+					cluster.Inode, cluster.LinkCount, primaryInode)
+			}
+		}
+	}
 
 	for _, dupFile := range plan.DeleteFiles {
+		// Check if file already has the same inode as primary (already hardlinked)
+		var dupStat syscall.Stat_t
+		if err := syscall.Stat(dupFile.Path, &dupStat); err != nil {
+			log.Printf("WARNING: Failed to stat %s, skipping: %v", dupFile.Path, err)
+			continue
+		}
+
+		if dupStat.Ino == primaryInode {
+			// File is already hardlinked to primary - skip it
+			if dryRun {
+				log.Printf("[DRY-RUN] Skipping %s - already hardlinked to primary (inode %d, 0 bytes savings)",
+					dupFile.Path, int64(primaryInode))
+			} else {
+				log.Printf("INFO: Skipping %s - already hardlinked to primary (inode %d)", dupFile.Path, int64(primaryInode))
+			}
+			continue
+		}
+
 		if dryRun {
-			log.Printf("[DRY-RUN] Would hardlink: %s -> %s (save %d bytes)",
-				dupFile.Path, plan.KeepFile.Path, dupFile.Size)
+			log.Printf("[DRY-RUN] Would hardlink: %s -> %s (save %d bytes, inode %d -> %d)",
+				dupFile.Path, plan.KeepFile.Path, dupFile.Size, int64(dupStat.Ino), int64(primaryInode))
 			continue
 		}
 
@@ -197,8 +226,9 @@ func (c *Consolidator) processHardlinkGroup(plan *ConsolidationPlan, dryRun bool
 			continue
 		}
 
-		if newStat.Ino != primaryStat.Ino {
-			log.Printf("ERROR: Hardlink verification failed for %s (inode mismatch)", dupFile.Path)
+		if newStat.Ino != primaryInode {
+			log.Printf("ERROR: Hardlink verification failed for %s (inode mismatch: expected %d, got %d)",
+				dupFile.Path, primaryInode, newStat.Ino)
 			continue
 		}
 
@@ -207,7 +237,8 @@ func (c *Consolidator) processHardlinkGroup(plan *ConsolidationPlan, dryRun bool
 			log.Printf("WARNING: Failed to log hardlink creation for %s: %v", dupFile.Path, err)
 		}
 
-		log.Printf("Hardlinked: %s -> %s (saved %d bytes)", dupFile.Path, plan.KeepFile.Path, dupFile.Size)
+		log.Printf("Hardlinked: %s -> %s (saved %d bytes, inode %d -> %d)",
+			dupFile.Path, plan.KeepFile.Path, dupFile.Size, int64(dupStat.Ino), int64(primaryInode))
 	}
 
 	return nil

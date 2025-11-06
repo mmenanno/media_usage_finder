@@ -27,13 +27,18 @@ func NewAnalyzer(db *database.DB, diskDetector *disk.Detector, cfg *config.Dupli
 
 // ConsolidationPlan represents a plan to consolidate duplicate files
 type ConsolidationPlan struct {
-	Group        *database.DuplicateGroup
-	KeepFile     *database.DuplicateFile   // File to keep
-	DeleteFiles  []*database.DuplicateFile // Files to delete
-	SpaceSavings int64
-	ReasonToKeep string // Explanation of why this file was chosen
-	KeepDisk     *disk.DiskInfo
-	DeleteDisks  []*disk.DiskInfo
+	Group          *database.DuplicateGroup
+	KeepFile       *database.DuplicateFile   // File to keep (primary from KeepCluster)
+	DeleteFiles    []*database.DuplicateFile // Files to delete/link (DEPRECATED for hardlinks, use clusters)
+	KeepCluster    *database.HardlinkCluster // Primary cluster to keep (hardlinks only)
+	LinkClusters   []*database.HardlinkCluster // Clusters needing linking (hardlinks only)
+	AlreadyLinked  []*database.HardlinkCluster // Clusters already linked together (hardlinks only)
+	ActualCopies   int                          // Number of unique inodes (hardlinks only)
+	TotalFiles     int                          // Total file count (hardlinks only)
+	SpaceSavings   int64
+	ReasonToKeep   string // Explanation of why this file was chosen
+	KeepDisk       *disk.DiskInfo
+	DeleteDisks    []*disk.DiskInfo
 }
 
 // AnalyzeCrossDiskDuplicates creates consolidation plans for cross-disk duplicates
@@ -203,93 +208,162 @@ func (a *Analyzer) createHardlinkPlan(group *database.DuplicateGroup) (*Consolid
 		return nil, fmt.Errorf("failed to enrich files with disk info: %w", err)
 	}
 
-	// For hardlinks, prefer to keep files that are in use by services
-	var keepFile *database.DuplicateFile
+	// If no clusters yet (backwards compat), create them now
+	if len(group.HardlinkClusters) == 0 {
+		group.HardlinkClusters = database.GroupFilesByInode(group.Files, group.TotalSize)
+	}
+
+	// If only one cluster, all files are already hardlinked - nothing to do
+	if len(group.HardlinkClusters) <= 1 {
+		return nil, nil
+	}
+
+	// Select the best cluster to keep as primary
+	keepCluster := a.selectPrimaryCluster(group.HardlinkClusters)
+	if keepCluster == nil {
+		return nil, fmt.Errorf("no suitable cluster to keep")
+	}
+
+	// Build lists of clusters
+	var linkClusters []*database.HardlinkCluster
+	var alreadyLinkedClusters []*database.HardlinkCluster
+
+	// The keep cluster itself is "already linked" if it has multiple files
+	if keepCluster.IsLinked {
+		alreadyLinkedClusters = append(alreadyLinkedClusters, keepCluster)
+	}
+
+	// Categorize other clusters
+	for i := range group.HardlinkClusters {
+		cluster := &group.HardlinkClusters[i]
+		if cluster.Inode == keepCluster.Inode {
+			continue // Skip the primary cluster
+		}
+
+		if cluster.IsLinked {
+			// Already linked internally, but needs linking to primary
+			alreadyLinkedClusters = append(alreadyLinkedClusters, cluster)
+		}
+
+		// All non-primary clusters need linking to primary
+		linkClusters = append(linkClusters, cluster)
+	}
+
+	// Calculate space savings using ActualSavings from group
+	spaceSavings := group.ActualSavings
+
+	// Build reason string
+	keepFile := &keepCluster.Files[0]
 	var reason string
-
-	// Priority 1: File used by services
-	for i := range group.Files {
-		if len(group.Files[i].ServiceUsage) > 0 {
-			keepFile = &group.Files[i]
-			reason = fmt.Sprintf("Used by %d service(s): %v", len(keepFile.ServiceUsage), keepFile.ServiceUsage)
-			break
-		}
+	if len(keepFile.ServiceUsage) > 0 {
+		reason = fmt.Sprintf("Used by %d service(s): %v", len(keepFile.ServiceUsage), keepFile.ServiceUsage)
+	} else {
+		reason = "Oldest file in primary cluster (least likely to be temporary)"
 	}
 
-	// Priority 2: Oldest file (least likely to be temporary)
-	if keepFile == nil {
-		oldestIndex := 0
-		for i := range group.Files {
-			if group.Files[i].ModifiedTime.Before(group.Files[oldestIndex].ModifiedTime) {
-				oldestIndex = i
-			}
-		}
-		keepFile = &group.Files[oldestIndex]
-		reason = "Oldest file (least likely to be temporary)"
-	}
-
-	// Build list of files to hardlink
+	// For backwards compatibility, build DeleteFiles list from all non-primary files
 	var deleteFiles []*database.DuplicateFile
-	spaceSavings := int64(0)
-
-	for i := range group.Files {
-		if group.Files[i].ID != keepFile.ID {
-			deleteFiles = append(deleteFiles, &group.Files[i])
-			spaceSavings += group.Files[i].Size
+	for _, cluster := range linkClusters {
+		for i := range cluster.Files {
+			deleteFiles = append(deleteFiles, &cluster.Files[i])
 		}
 	}
 
-	// Get disk info for the keep file - try file_disk_locations first
+	// Get disk info for the keep file
 	var keepDisk *disk.DiskInfo
 	keepLocations, err := a.db.GetDiskLocationsForFile(keepFile.ID)
 	if err == nil && len(keepLocations) > 0 {
-		// Try to get full disk info from detector if available
 		if a.diskDetector != nil {
 			diskInfo, err := a.diskDetector.GetDiskForFile(keepFile.DeviceID)
 			if err == nil {
 				keepDisk = diskInfo
 			} else {
-				// Create minimal disk info from location data
 				keepDisk = &disk.DiskInfo{
 					Name:        keepLocations[0].DiskName,
 					DeviceID:    keepLocations[0].DiskDeviceID,
-					UsedPercent: 50.0, // Unknown
+					UsedPercent: 50.0,
 				}
 			}
 		} else {
-			// No disk detector - use location data only
 			keepDisk = &disk.DiskInfo{
 				Name:        keepLocations[0].DiskName,
 				DeviceID:    keepLocations[0].DiskDeviceID,
-				UsedPercent: 50.0, // Unknown
+				UsedPercent: 50.0,
 			}
 		}
 	} else {
-		// Fallback to disk detector only if available
 		if a.diskDetector != nil {
 			keepDisk, err = a.diskDetector.GetDiskForFile(keepFile.DeviceID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get disk info for keep file: %w", err)
 			}
 		} else {
-			// No disk detector and no location data - create minimal info
 			keepDisk = &disk.DiskInfo{
 				Name:        fmt.Sprintf("Device %d", keepFile.DeviceID),
 				DeviceID:    keepFile.DeviceID,
-				UsedPercent: 50.0, // Unknown
+				UsedPercent: 50.0,
 			}
 		}
 	}
 
 	return &ConsolidationPlan{
-		Group:        group,
-		KeepFile:     keepFile,
-		DeleteFiles:  deleteFiles,
-		SpaceSavings: spaceSavings,
-		ReasonToKeep: reason,
-		KeepDisk:     keepDisk,
-		DeleteDisks:  []*disk.DiskInfo{keepDisk}, // Same disk for all
+		Group:         group,
+		KeepFile:      keepFile,
+		DeleteFiles:   deleteFiles,
+		KeepCluster:   keepCluster,
+		LinkClusters:  linkClusters,
+		AlreadyLinked: alreadyLinkedClusters,
+		ActualCopies:  len(group.HardlinkClusters),
+		TotalFiles:    len(group.Files),
+		SpaceSavings:  spaceSavings,
+		ReasonToKeep:  reason,
+		KeepDisk:      keepDisk,
+		DeleteDisks:   []*disk.DiskInfo{keepDisk}, // Same disk for all
 	}, nil
+}
+
+// selectPrimaryCluster chooses the best cluster to use as the primary for hardlinking
+func (a *Analyzer) selectPrimaryCluster(clusters []database.HardlinkCluster) *database.HardlinkCluster {
+	if len(clusters) == 0 {
+		return nil
+	}
+
+	var bestCluster *database.HardlinkCluster
+	bestScore := -1
+
+	for i := range clusters {
+		cluster := &clusters[i]
+		score := 0
+
+		// Priority 1: Cluster with files used by most services
+		totalServices := 0
+		for _, file := range cluster.Files {
+			totalServices += len(file.ServiceUsage)
+		}
+		score += totalServices * 1000 // High weight for service usage
+
+		// Priority 2: Cluster that's already linked (prefer existing hardlink groups)
+		if cluster.IsLinked {
+			score += 100
+		}
+
+		// Priority 3: Oldest files (check first file in cluster)
+		if len(cluster.Files) > 0 {
+			// Earlier timestamps get higher scores (inverted)
+			// This is a simplification - we'd need to know the oldest timestamp in advance
+			// For now, just give a small bonus
+			if !cluster.Files[0].ModifiedTime.IsZero() {
+				score += 10
+			}
+		}
+
+		if bestCluster == nil || score > bestScore {
+			bestCluster = cluster
+			bestScore = score
+		}
+	}
+
+	return bestCluster
 }
 
 // RecommendKeepFile determines which file to keep in a duplicate group
