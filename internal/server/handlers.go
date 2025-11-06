@@ -3870,10 +3870,10 @@ func (s *Server) HandleUpgradeAllHashes(w http.ResponseWriter, r *http.Request) 
 
 // HandleDuplicates renders the duplicates page showing cross-disk and same-disk duplicates
 func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
-	// Get active tab from query parameter (default to cross-disk)
+	// Get active tab from query parameter (default to same-disk)
 	activeTab := r.URL.Query().Get("tab")
 	if activeTab == "" {
-		activeTab = "cross-disk"
+		activeTab = "same-disk"
 	}
 
 	// Check if hash scanning is enabled
