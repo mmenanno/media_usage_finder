@@ -136,7 +136,7 @@
                 <!-- Duplicate Groups -->
                 <div id="cross-disk-groups" class="space-y-4">
                     {{range $plan := .CrossDiskGroups}}
-                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{$plan.SpaceSavings}}" data-hash-type="{{$plan.Group.HashType}}" data-copies="{{$plan.Group.TotalCopies}}" data-file-size="{{$plan.Group.TotalSize}}">
+                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{$plan.SpaceSavings}}" data-hash-type="{{if gt $plan.Group.HashLevel 0}}{{if eq $plan.Group.HashLevel 6}}full{{else if eq $plan.Group.HashLevel 1}}quick{{else}}progressive{{end}}{{else}}{{$plan.Group.HashType}}{{end}}" data-copies="{{$plan.Group.TotalCopies}}" data-file-size="{{$plan.Group.TotalSize}}">
                             <!-- Group Header -->
                             <div class="bg-gray-800 px-6 py-4 border-b border-gray-700">
                                 <div class="flex justify-between items-start">
@@ -354,7 +354,7 @@
                 <!-- Duplicate Groups -->
                 <div id="same-disk-groups" class="space-y-4">
                     {{range $plan := .SameDiskGroups}}
-                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{$plan.SpaceSavings}}" data-hash-type="{{$plan.Group.HashType}}" data-copies="{{$plan.Group.TotalCopies}}" data-file-size="{{$plan.Group.TotalSize}}">
+                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{$plan.SpaceSavings}}" data-hash-type="{{if gt $plan.Group.HashLevel 0}}{{if eq $plan.Group.HashLevel 6}}full{{else if eq $plan.Group.HashLevel 1}}quick{{else}}progressive{{end}}{{else}}{{$plan.Group.HashType}}{{end}}" data-copies="{{$plan.Group.TotalCopies}}" data-file-size="{{$plan.Group.TotalSize}}">
                             <!-- Group Header -->
                             <div class="bg-gray-800 px-6 py-4 border-b border-gray-700">
                                 <div class="flex justify-between items-start">
