@@ -758,6 +758,14 @@ func (s *Server) HandleGetScanLogs(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "logs_table template not found", http.StatusInternalServerError)
 			return
 		}
+		// Debug: Verify data structure before template execution
+		log.Printf("DEBUG: Template data - Logs type: %T, len: %d, nil: %v, Total: %v",
+			data["Logs"], len(logs), logs == nil, data["Total"])
+		if len(logs) > 0 {
+			log.Printf("DEBUG: First log - ID: %d, ScanID: %d, Level: %s",
+				logs[0].ID, logs[0].ScanID, logs[0].Level)
+		}
+
 		// Execute template directly without layout wrapper for partial update
 		if err := tmpl.Execute(w, data); err != nil {
 			log.Printf("ERROR: Failed to execute logs_table template: %v", err)
