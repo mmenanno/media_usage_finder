@@ -23,7 +23,7 @@
             {{range .Logs}}
             <tr class="hover:bg-gray-750 transition">
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                    {{formatTimestamp .Timestamp.Unix}}
+                    {{formatTimestamp .Timestamp}}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
                     <a href="/logs?scan_id={{.ScanID}}" class="text-blue-400 hover:text-blue-300 hover:underline">
