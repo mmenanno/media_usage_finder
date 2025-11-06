@@ -702,14 +702,25 @@ async function previewConsolidation(type) {
         return;
     }
 
+    // Show loading toast
+    showToast('Analyzing duplicates...', 'info', {duration: 0});
+
     // Run dry-run consolidation
     fetch('/api/duplicates/consolidate', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({dry_run: true})
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(async data => {
+        // Dismiss loading toast
+        showToast('Analysis complete!', 'success', {duration: 2000});
+
         if (data.status === 'success') {
             let message = `DRY RUN COMPLETE\n\n`;
             message += `Groups processed: ${data.groups_processed}\n`;
@@ -745,6 +756,9 @@ async function executeConsolidation() {
         return;
     }
 
+    // Show loading toast
+    showToast('Deleting duplicate files...', 'info', {duration: 0});
+
     fetch('/api/duplicates/consolidate', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -753,6 +767,9 @@ async function executeConsolidation() {
     .then(response => response.json())
     .then(async data => {
         if (data.status === 'success') {
+            // Dismiss loading, show success
+            showToast('Files consolidated successfully!', 'success', {duration: 3000});
+
             let message = `CONSOLIDATION COMPLETE\n\n`;
             message += `Groups processed: ${data.groups_processed}\n`;
             message += `Files deleted: ${data.files_deleted}\n`;
@@ -783,14 +800,27 @@ async function previewHardlinks() {
         return;
     }
 
+    // Show loading toast
+    showToast('Analyzing hardlinks...', 'info', {duration: 0}); // Duration 0 = stays until dismissed
+
     // Run dry-run hardlink
     fetch('/api/duplicates/hardlink', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({dry_run: true})
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(async data => {
+        console.log('Received data:', data);
+        // Dismiss loading toast
+        showToast('Analysis complete!', 'success', {duration: 2000});
+
         if (data.status === 'success') {
             let message = `DRY RUN COMPLETE\n\n`;
             message += `Groups processed: ${data.groups_processed}\n`;
@@ -803,15 +833,18 @@ async function previewHardlinks() {
 
             message += '\n\nProceed with actual hardlink creation?';
 
+            console.log('Showing confirmation dialog with message:', message);
             const proceed = await confirmDialog(message, 'Dry Run Results');
             if (proceed) {
                 executeHardlinks();
             }
         } else {
+            console.error('Preview failed, data:', data);
             showToast('Preview failed: ' + (data.message || 'Unknown error'), 'error');
         }
     })
     .catch(error => {
+        console.error('Error in previewHardlinks:', error);
         showToast('Error: ' + error.message, 'error');
     });
 }
@@ -826,6 +859,9 @@ async function executeHardlinks() {
         return;
     }
 
+    // Show loading toast
+    showToast('Creating hardlinks...', 'info', {duration: 0});
+
     fetch('/api/duplicates/hardlink', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -834,6 +870,9 @@ async function executeHardlinks() {
     .then(response => response.json())
     .then(async data => {
         if (data.status === 'success') {
+            // Dismiss loading, show success
+            showToast('Hardlinks created successfully!', 'success', {duration: 3000});
+
             let message = `HARDLINK CREATION COMPLETE\n\n`;
             message += `Groups processed: ${data.groups_processed}\n`;
             message += `Files hardlinked: ${data.files_linked}\n`;
