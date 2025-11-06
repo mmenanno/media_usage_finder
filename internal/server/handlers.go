@@ -3956,6 +3956,20 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		"ShowingSameDisk":        len(sameDiskPlans),
 	}
 
+	log.Printf("DEBUG: Rendering duplicates page - CrossDiskGroups: %d, SameDiskGroups: %d, ActiveTab: %s",
+		len(crossDiskPlans), len(sameDiskPlans), activeTab)
+
+	// Debug: Check what's actually in the data map
+	if plans, ok := data["SameDiskGroups"].([]*duplicates.ConsolidationPlan); ok {
+		log.Printf("DEBUG: SameDiskGroups in data map has %d plans", len(plans))
+		if len(plans) > 0 {
+			log.Printf("DEBUG: First plan: KeepFile=%v, DeleteFiles=%d, SpaceSavings=%d",
+				plans[0].KeepFile != nil, len(plans[0].DeleteFiles), plans[0].SpaceSavings)
+		}
+	} else {
+		log.Printf("DEBUG: SameDiskGroups is not the expected type: %T", data["SameDiskGroups"])
+	}
+
 	// Render template
 	s.renderTemplate(w, "duplicates.html", data)
 }
