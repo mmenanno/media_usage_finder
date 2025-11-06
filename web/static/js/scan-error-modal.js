@@ -19,12 +19,12 @@ class ScanErrorModal {
             const button = event.target.closest('[data-action="show-error-details"]');
             if (button) {
                 const scanId = button.dataset.scanId;
-                const errorData = button.dataset.errors;
+                const errorDataBase64 = button.dataset.errorsBase64;
                 const scanType = button.dataset.scanType;
                 const timestamp = button.dataset.timestamp;
 
-                if (scanId && errorData) {
-                    this.show(scanId, errorData, scanType, timestamp);
+                if (scanId && errorDataBase64) {
+                    this.show(scanId, errorDataBase64, scanType, timestamp);
                 }
             }
         });
@@ -37,8 +37,18 @@ class ScanErrorModal {
         });
     }
 
-    show(scanId, errorDataJson, scanType, timestamp) {
+    show(scanId, errorDataBase64, scanType, timestamp) {
         try {
+            // Decode base64 data
+            let errorDataJson;
+            try {
+                errorDataJson = atob(errorDataBase64);
+            } catch (decodeError) {
+                console.error('Failed to decode base64 error data:', decodeError);
+                window.showToast('Failed to decode error data', 'error');
+                return;
+            }
+
             // Parse error data from JSON
             let errors = [];
             try {

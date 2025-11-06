@@ -125,7 +125,7 @@
                                     <button
                                         data-action="show-error-details"
                                         data-scan-id="{{.ID}}"
-                                        data-errors="{{.Errors}}"
+                                        data-errors-base64="{{base64Encode .Errors}}"
                                         data-scan-type="{{.ScanType}}"
                                         data-timestamp="{{.StartedAt.Unix}}"
                                         class="self-start inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-900/40 hover:bg-red-900/60 border border-red-700/50 rounded text-xs text-red-300 hover:text-red-200 transition-colors cursor-pointer">

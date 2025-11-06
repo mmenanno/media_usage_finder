@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -3380,6 +3381,10 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 		"formatDuration": stats.FormatDuration,
 		"formatTimestamp": func(t time.Time) string {
 			return t.Format("2006-01-02 15:04:05")
+		},
+		"base64Encode": func(data string) string {
+			// Encode data to base64 for safe embedding in HTML attributes
+			return base64.StdEncoding.EncodeToString([]byte(data))
 		},
 		"formatServiceName": func(service string) string {
 			// Map internal service names to proper display names
