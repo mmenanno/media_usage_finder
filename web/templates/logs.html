@@ -234,7 +234,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset search input
         form.reset();
 
-        container.innerHTML = '<div class="p-8 text-center text-gray-400"><p>Click "Apply Filters" to load logs</p></div>';
+        // Automatically load logs with cleared filters
+        loadLogs();
     });
 
     // Allow Enter key to apply filters
