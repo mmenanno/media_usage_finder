@@ -119,7 +119,7 @@ func (hs *HashScanner) Resume(ctx context.Context) error {
 }
 
 // VerifyDuplicates performs full hashing on files with quick-hash duplicates
-func (hs *HashScanner) VerifyDuplicates(ctx context.Context) error {
+func (hs *HashScanner) VerifyDuplicates(ctx context.Context, minSize int64, maxSize int64) error {
 	// Check if verification is already running
 	currentScan, err := hs.db.GetCurrentScan()
 	if err != nil {
@@ -151,7 +151,7 @@ func (hs *HashScanner) VerifyDuplicates(ctx context.Context) error {
 	}
 
 	// Get files with quick hashes that have duplicates
-	files, err := hs.db.GetFilesWithQuickHashDuplicates()
+	files, err := hs.db.GetFilesWithQuickHashDuplicates(minSize, maxSize)
 	if err != nil {
 		hs.progress.AddError(fmt.Sprintf("Failed to get files: %v", err))
 		hs.progress.Stop()
@@ -176,7 +176,7 @@ func (hs *HashScanner) VerifyDuplicates(ctx context.Context) error {
 }
 
 // UpgradeAllQuickHashes performs full hashing on ALL files with quick hashes
-func (hs *HashScanner) UpgradeAllQuickHashes(ctx context.Context) error {
+func (hs *HashScanner) UpgradeAllQuickHashes(ctx context.Context, minSize int64, maxSize int64) error {
 	// Check if upgrade is already running
 	currentScan, err := hs.db.GetCurrentScan()
 	if err != nil {
@@ -208,7 +208,7 @@ func (hs *HashScanner) UpgradeAllQuickHashes(ctx context.Context) error {
 	}
 
 	// Get all files with quick hashes
-	files, err := hs.db.GetFilesWithQuickHashes()
+	files, err := hs.db.GetFilesWithQuickHashes(minSize, maxSize)
 	if err != nil {
 		hs.progress.AddError(fmt.Sprintf("Failed to get files: %v", err))
 		hs.progress.Stop()
@@ -234,7 +234,7 @@ func (hs *HashScanner) UpgradeAllQuickHashes(ctx context.Context) error {
 
 // VerifyDuplicatesProgressive progressively verifies duplicates by upgrading hash levels
 // Starts at level 1 and progressively upgrades to higher levels only for files that remain duplicates
-func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context) error {
+func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context, minSize int64, maxSize int64) error {
 	// Create scan record first
 	scan, err := hs.db.CreateScan("hash_scan")
 	if err != nil {
@@ -264,7 +264,7 @@ func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context) error {
 		hs.progress.SetPhase(phaseName)
 
 		// Get files with duplicates at previous level
-		files, err := hs.db.GetFilesWithHashDuplicatesAtLevel(prevLevel)
+		files, err := hs.db.GetFilesWithHashDuplicatesAtLevel(prevLevel, minSize, maxSize)
 		if err != nil {
 			hs.progress.AddError(fmt.Sprintf("Failed to get level %d duplicates: %v", prevLevel, err))
 			hs.progress.Stop()

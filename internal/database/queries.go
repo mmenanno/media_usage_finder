@@ -2567,7 +2567,7 @@ func (db *DB) ClearAllHashes() error {
 // GetFilesWithQuickHashDuplicates returns files that have quick-hash duplicates
 // These are files where 2+ files share the same quick hash (same size + quick hash match)
 // Used for verification workflow: find potential duplicates, then full-hash them
-func (db *DB) GetFilesWithQuickHashDuplicates() ([]File, error) {
+func (db *DB) GetFilesWithQuickHashDuplicates(minSize int64, maxSize int64) ([]File, error) {
 	query := `
 		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
 		       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
@@ -2580,10 +2580,22 @@ func (db *DB) GetFilesWithQuickHashDuplicates() ([]File, error) {
 		      GROUP BY file_hash, size
 		      HAVING COUNT(*) > 1
 		  )
-		ORDER BY f.size DESC, f.file_hash
 	`
+	args := []interface{}{}
 
-	rows, err := db.conn.Query(query)
+	if minSize > 0 {
+		query += ` AND f.size >= ?`
+		args = append(args, minSize)
+	}
+
+	if maxSize > 0 {
+		query += ` AND f.size <= ?`
+		args = append(args, maxSize)
+	}
+
+	query += ` ORDER BY f.size DESC, f.file_hash`
+
+	rows, err := db.conn.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query files with quick hash duplicates: %w", err)
 	}
@@ -2625,16 +2637,28 @@ func (db *DB) GetQuickHashDuplicateCount() (int64, error) {
 }
 
 // GetFilesWithQuickHashes returns all files that have quick hashes (for upgrading to full)
-func (db *DB) GetFilesWithQuickHashes() ([]File, error) {
+func (db *DB) GetFilesWithQuickHashes(minSize int64, maxSize int64) ([]File, error) {
 	query := `
 		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
 		       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
 		FROM files f
 		WHERE f.hash_type = 'quick'
-		ORDER BY f.size DESC
 	`
+	args := []interface{}{}
 
-	rows, err := db.conn.Query(query)
+	if minSize > 0 {
+		query += ` AND f.size >= ?`
+		args = append(args, minSize)
+	}
+
+	if maxSize > 0 {
+		query += ` AND f.size <= ?`
+		args = append(args, maxSize)
+	}
+
+	query += ` ORDER BY f.size DESC`
+
+	rows, err := db.conn.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query files with quick hashes: %w", err)
 	}
@@ -2661,7 +2685,7 @@ func (db *DB) GetQuickHashCount() (int64, error) {
 
 // GetFilesWithHashDuplicatesAtLevel returns files at a specific hash level that have duplicates
 // Used for progressive hash verification to find which files need upgrading to next level
-func (db *DB) GetFilesWithHashDuplicatesAtLevel(level int) ([]File, error) {
+func (db *DB) GetFilesWithHashDuplicatesAtLevel(level int, minSize int64, maxSize int64) ([]File, error) {
 	query := `
 		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time,
 		       f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
@@ -2675,10 +2699,22 @@ func (db *DB) GetFilesWithHashDuplicatesAtLevel(level int) ([]File, error) {
 		      GROUP BY file_hash, size
 		      HAVING COUNT(*) > 1
 		  )
-		ORDER BY f.size DESC, f.file_hash
 	`
+	args := []interface{}{level, level}
 
-	rows, err := db.conn.Query(query, level, level)
+	if minSize > 0 {
+		query += ` AND f.size >= ?`
+		args = append(args, minSize)
+	}
+
+	if maxSize > 0 {
+		query += ` AND f.size <= ?`
+		args = append(args, maxSize)
+	}
+
+	query += ` ORDER BY f.size DESC, f.file_hash`
+
+	rows, err := db.conn.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query files with hash duplicates at level %d: %w", level, err)
 	}

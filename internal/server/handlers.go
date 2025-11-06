@@ -4008,7 +4008,9 @@ func (s *Server) HandleVerifyDuplicates(w http.ResponseWriter, r *http.Request) 
 	// Start verification in background
 	go func() {
 		ctx := context.Background()
-		if err := s.hashScanner.VerifyDuplicates(ctx); err != nil {
+		minSize := s.config.DuplicateDetection.MinFileSize
+		maxSize := s.config.DuplicateDetection.MaxFileSize
+		if err := s.hashScanner.VerifyDuplicates(ctx, minSize, maxSize); err != nil {
 			log.Printf("Verification error: %v", err)
 		}
 	}()
@@ -4034,7 +4036,9 @@ func (s *Server) HandleVerifyDuplicatesProgressive(w http.ResponseWriter, r *htt
 	// Start progressive verification in background
 	go func() {
 		ctx := context.Background()
-		if err := s.hashScanner.VerifyDuplicatesProgressive(ctx); err != nil {
+		minSize := s.config.DuplicateDetection.MinFileSize
+		maxSize := s.config.DuplicateDetection.MaxFileSize
+		if err := s.hashScanner.VerifyDuplicatesProgressive(ctx, minSize, maxSize); err != nil {
 			log.Printf("Progressive verification error: %v", err)
 		}
 	}()
@@ -4080,7 +4084,9 @@ func (s *Server) HandleUpgradeAllHashes(w http.ResponseWriter, r *http.Request) 
 	// Start upgrade in background
 	go func() {
 		ctx := context.Background()
-		if err := s.hashScanner.UpgradeAllQuickHashes(ctx); err != nil {
+		minSize := s.config.DuplicateDetection.MinFileSize
+		maxSize := s.config.DuplicateDetection.MaxFileSize
+		if err := s.hashScanner.UpgradeAllQuickHashes(ctx, minSize, maxSize); err != nil {
 			log.Printf("Hash upgrade error: %v", err)
 		}
 	}()
