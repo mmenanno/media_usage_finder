@@ -70,7 +70,7 @@
     <div class="flex gap-2">
         {{if gt .Page 1}}
         <button onclick="loadPageLogs({{sub .Page 1}})"
-                class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+                class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition cursor-pointer">
             Previous
         </button>
         {{end}}
@@ -81,21 +81,23 @@
         {{range $page := (sequence 1 $totalPages)}}
             {{if or (le $page 3) (and (ge $page (sub $currentPage 1)) (le $page (add $currentPage 1))) (ge $page (sub $totalPages 2))}}
                 {{if eq $page $currentPage}}
-                <button class="px-3 py-1 bg-blue-600 text-white rounded">{{$page}}</button>
+                <button class="px-3 py-1 bg-blue-600 text-white rounded cursor-default">{{$page}}</button>
                 {{else}}
                 <button onclick="loadPageLogs({{$page}})"
-                        class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+                        class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition cursor-pointer">
                     {{$page}}
                 </button>
                 {{end}}
-            {{else if or (eq $page 4) (eq $page (sub $totalPages 3))}}
+            {{else if and (eq $page 4) (gt $currentPage 5)}}
+                <span class="px-2 py-1 text-gray-500">...</span>
+            {{else if and (eq $page (sub $totalPages 3)) (lt $currentPage (sub $totalPages 4))}}
                 <span class="px-2 py-1 text-gray-500">...</span>
             {{end}}
         {{end}}
 
         {{if lt .Page .TotalPages}}
         <button onclick="loadPageLogs({{add .Page 1}})"
-                class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+                class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition cursor-pointer">
             Next
         </button>
         {{end}}
