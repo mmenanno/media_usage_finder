@@ -291,7 +291,7 @@ func (hs *HashScanner) verifyFiles(ctx context.Context, files []database.File, s
 }
 
 // verifyWorker processes files for full hash verification
-func (hs *HashScanner) verifyWorker(ctx context.Context, workerID int, workChan <-chan database.File, wg *sync.WaitGroup, scanID int64) {
+func (hs *HashScanner) verifyWorker(ctx context.Context, _ int, workChan <-chan database.File, wg *sync.WaitGroup, scanID int64) {
 	defer wg.Done()
 
 	for {
@@ -450,7 +450,7 @@ func (hs *HashScanner) processFiles(ctx context.Context, files []database.File, 
 }
 
 // worker processes files from the work channel
-func (hs *HashScanner) worker(ctx context.Context, workerID int, workChan <-chan database.File, wg *sync.WaitGroup, scanID int64) {
+func (hs *HashScanner) worker(ctx context.Context, _ int, workChan <-chan database.File, wg *sync.WaitGroup, scanID int64) {
 	defer wg.Done()
 
 	for {
@@ -540,7 +540,7 @@ func (hs *HashScanner) hashFile(ctx context.Context, file database.File) error {
 }
 
 // applyRateLimit applies rate limiting to avoid saturating disk I/O
-func (hs *HashScanner) applyRateLimit(fileSize int64) {
+func (hs *HashScanner) applyRateLimit(_ int64) {
 	if hs.config.MaxHashRateMB <= 0 {
 		return // Rate limiting disabled
 	}

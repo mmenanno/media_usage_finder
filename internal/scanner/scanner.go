@@ -1051,7 +1051,7 @@ func (s *Scanner) UpdateSingleService(serviceName string) error {
 	default:
 		errMsg := fmt.Sprintf("unknown service: %s", serviceName)
 		s.db.UpdateScanStatus(scan.ID, "failed", errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("unknown service: %s", serviceName)
 	}
 
 	if updateErr != nil {
