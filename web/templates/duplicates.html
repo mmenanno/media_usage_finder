@@ -408,10 +408,10 @@
                                             <div class="text-xl font-bold text-green-400">{{$plan.SpaceSavings | formatBytes}}</div>
                                         </div>
                                         <div class="flex space-x-2">
-                                            <button onclick="previewSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded font-medium transition-colors" title="Preview hardlinks for this group only">
+                                            <button onclick="previewSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded font-medium transition-colors cursor-pointer" title="Preview hardlinks for this group only">
                                                 Preview
                                             </button>
-                                            <button onclick="linkSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors" title="Create hardlinks for this group">
+                                            <button onclick="linkSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors cursor-pointer" title="Create hardlinks for this group">
                                                 Link Group
                                             </button>
                                         </div>
@@ -573,10 +573,10 @@
 <div id="dryRunSummaryModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
     <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         <!-- Background overlay -->
-        <div class="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-75" onclick="closeDryRunSummary()"></div>
+        <div class="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-75 z-0" onclick="closeDryRunSummary()"></div>
 
         <!-- Modal panel -->
-        <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full" onclick="event.stopPropagation()">
+        <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full relative z-10">
             <!-- Header -->
             <div class="bg-gray-750 px-6 py-4 border-b border-gray-700">
                 <div class="flex items-center justify-between">
@@ -865,8 +865,8 @@ async function previewConsolidation(type) {
         return;
     }
 
-    // Show loading toast with long duration
-    showToast('Analyzing duplicates...', 'info', {duration: 30000}); // 30 seconds
+    // Show loading toast
+    showToast('Analyzing duplicates...', 'info', {duration: 5000}); // 5 seconds
 
     // Run dry-run consolidation
     fetch('/api/duplicates/consolidate', {
@@ -1049,8 +1049,8 @@ async function previewHardlinks() {
         return;
     }
 
-    // Show loading toast with long duration
-    showToast('Analyzing hardlinks...', 'info', {duration: 30000}); // 30 seconds - long enough for analysis
+    // Show loading toast
+    showToast('Analyzing hardlinks...', 'info', {duration: 5000}); // 5 seconds
 
     // Run dry-run hardlink
     fetch('/api/duplicates/hardlink', {
@@ -1130,8 +1130,8 @@ async function executeHardlinks() {
 
 // Single group preview
 async function previewSingleGroup(groupHash) {
-    // Show loading toast with long duration
-    showToast('Analyzing group...', 'info', {duration: 30000}); // 30 seconds - long enough for analysis
+    // Show loading toast
+    showToast('Analyzing group...', 'info', {duration: 5000}); // 5 seconds
 
     // Run dry-run hardlink for single group
     fetch('/api/duplicates/hardlink', {
