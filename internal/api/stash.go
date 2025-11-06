@@ -157,11 +157,6 @@ type graphQLError struct {
 	Path    []interface{} `json:"path,omitempty"`
 }
 
-type graphQLResponse struct {
-	Data   json.RawMessage `json:"data"`
-	Errors []graphQLError  `json:"errors"`
-}
-
 func (s *StashClient) getFilesPage(ctx context.Context, page, perPage int) ([]StashFile, int, error) {
 	query := `
 		query FindScenes($filter: FindFilterType) {

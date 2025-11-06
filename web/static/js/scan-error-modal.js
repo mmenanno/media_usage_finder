@@ -79,7 +79,7 @@ class ScanErrorModal {
                 <div class="p-3 bg-red-950/30 border border-red-800/50 rounded-md hover:bg-red-950/50 transition">
                     <div class="flex items-start gap-2">
                         <span class="text-red-400 text-xs font-mono mt-0.5">#${index + 1}</span>
-                        <pre class="flex-1 text-sm text-red-200 whitespace-pre-wrap font-mono break-words">${this.escapeHtml(error)}</pre>
+                        <pre class="flex-1 text-sm text-red-200 whitespace-pre-wrap font-mono wrap-break-word">${this.escapeHtml(error)}</pre>
                     </div>
                 </div>
               `).join('')

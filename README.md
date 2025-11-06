@@ -207,11 +207,13 @@ After configuring disks, run a disk scan to populate file locations:
 **Via Web UI:** Click "Scan Disk Locations" on the Dashboard
 
 **Via CLI:**
+
 ```bash
 docker exec MediaUsageFinder /app/media-finder disk-scan
 ```
 
 This scan:
+
 - Walks each disk mount path individually
 - Records file locations with disk-specific device IDs
 - Maps files to their physical disk locations

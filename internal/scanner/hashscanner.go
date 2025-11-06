@@ -327,7 +327,7 @@ func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context) error {
 }
 
 // progressiveVerifyFiles processes files for progressive hash level upgrade
-func (hs *HashScanner) progressiveVerifyFiles(ctx context.Context, files []database.File, scanID int64, targetLevel int) {
+func (hs *HashScanner) progressiveVerifyFiles(ctx context.Context, files []database.File, _ int64, targetLevel int) {
 	// Create work channel
 	workChan := make(chan database.File, hs.config.HashWorkers*2)
 	var wg sync.WaitGroup
