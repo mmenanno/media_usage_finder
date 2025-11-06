@@ -570,15 +570,15 @@
 </div>
 
 <!-- Detailed Dry Run Summary Modal -->
-<div id="dryRunSummaryModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+<div id="dryRunSummaryModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50">
+    <div class="flex items-center justify-center min-h-screen px-4 py-8">
         <!-- Background overlay -->
-        <div class="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-75 z-0" onclick="closeDryRunSummary()"></div>
+        <div class="fixed inset-0 transition-opacity z-0" onclick="closeDryRunSummary()"></div>
 
         <!-- Modal panel -->
-        <div class="inline-block align-bottom bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full relative z-10">
+        <div class="bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:max-w-5xl w-full relative z-10 max-h-[90vh] flex flex-col">
             <!-- Header -->
-            <div class="bg-gray-750 px-6 py-4 border-b border-gray-700">
+            <div class="bg-gray-750 px-6 py-4 border-b border-gray-700 shrink-0">
                 <div class="flex items-center justify-between">
                     <h3 class="text-2xl font-bold text-gray-100 flex items-center space-x-3">
                         <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -586,7 +586,7 @@
                         </svg>
                         <span>Hardlink Preview Results</span>
                     </h3>
-                    <button onclick="closeDryRunSummary()" class="text-gray-400 hover:text-gray-200">
+                    <button onclick="closeDryRunSummary()" class="text-gray-400 hover:text-gray-200 cursor-pointer">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -595,7 +595,7 @@
             </div>
 
             <!-- Content - Scrollable -->
-            <div class="max-h-96 overflow-y-auto bg-gray-800 px-6 py-4 space-y-6">
+            <div class="overflow-y-auto bg-gray-800 px-6 py-4 space-y-6 flex-1">
                 <!-- Summary Statistics -->
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div class="bg-gray-750 rounded-lg p-4 border border-gray-700">
@@ -618,15 +618,20 @@
 
                 <!-- Cluster Details -->
                 <div class="bg-gray-750 rounded-lg p-4 border border-gray-700">
-                    <h4 class="text-lg font-semibold text-gray-100 mb-3">Cluster Details</h4>
-                    <div class="grid grid-cols-2 gap-4 text-sm">
-                        <div class="flex justify-between">
-                            <span class="text-gray-400">Clusters needing linking:</span>
-                            <span id="summary-clusters-needing" class="font-semibold text-gray-100">-</span>
+                    <h4 class="text-lg font-semibold text-gray-100 mb-3 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                        <span>Cluster Details</span>
+                    </h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-700 bg-opacity-50 rounded-lg p-3 border border-gray-600">
+                            <div class="text-xs text-gray-400 mb-1">Clusters Needing Linking</div>
+                            <div id="summary-clusters-needing" class="text-2xl font-bold text-yellow-400">-</div>
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-gray-400">Clusters already linked:</span>
-                            <span id="summary-clusters-linked" class="font-semibold text-green-400">-</span>
+                        <div class="bg-gray-700 bg-opacity-50 rounded-lg p-3 border border-gray-600">
+                            <div class="text-xs text-gray-400 mb-1">Clusters Already Linked</div>
+                            <div id="summary-clusters-linked" class="text-2xl font-bold text-green-400">-</div>
                         </div>
                     </div>
                 </div>
@@ -663,23 +668,42 @@
 
                 <!-- Top Groups -->
                 <div class="bg-gray-750 rounded-lg p-4 border border-gray-700">
-                    <h4 class="text-lg font-semibold text-gray-100 mb-3">Top Groups by Savings</h4>
+                    <h4 class="text-lg font-semibold text-gray-100 mb-3 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                        </svg>
+                        <span>Top Groups by Savings</span>
+                    </h4>
                     <div id="summary-top-groups" class="space-y-2 text-sm">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Files to be Linked -->
+                <div id="summary-files-container" class="hidden bg-gray-750 rounded-lg p-4 border border-gray-700">
+                    <h4 class="text-lg font-semibold text-gray-100 mb-3 flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span>Files to be Linked</span>
+                        <span id="summary-files-count" class="text-sm text-gray-400">(0 files)</span>
+                    </h4>
+                    <div id="summary-files-list" class="max-h-60 overflow-y-auto space-y-1 text-sm">
                         <!-- Will be populated by JavaScript -->
                     </div>
                 </div>
             </div>
 
             <!-- Footer with action buttons -->
-            <div class="bg-gray-750 px-6 py-4 border-t border-gray-700 flex justify-between items-center">
+            <div class="bg-gray-750 px-6 py-4 border-t border-gray-700 flex justify-between items-center shrink-0">
                 <div class="text-sm text-gray-400">
                     This is a preview. No changes have been made yet.
                 </div>
                 <div class="flex space-x-3">
-                    <button onclick="closeDryRunSummary()" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors">
+                    <button onclick="closeDryRunSummary()" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors cursor-pointer">
                         Cancel
                     </button>
-                    <button id="confirmHardlinkBtn" onclick="confirmAndExecuteHardlinks()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors">
+                    <button id="confirmHardlinkBtn" onclick="confirmAndExecuteHardlinks()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors cursor-pointer">
                         Proceed with Hardlink Creation
                     </button>
                 </div>
@@ -1023,6 +1047,39 @@ function showDryRunSummary(data) {
         });
     } else {
         topGroupsContainer.innerHTML = '<div class="text-center text-gray-400 py-4">No groups to display</div>';
+    }
+
+    // Populate files list
+    const filesContainer = document.getElementById('summary-files-container');
+    const filesList = document.getElementById('summary-files-list');
+    const filesCount = document.getElementById('summary-files-count');
+
+    if (data.files_list && data.files_list.length > 0) {
+        filesContainer.classList.remove('hidden');
+        filesCount.textContent = `(${data.files_list.length} file${data.files_list.length !== 1 ? 's' : ''})`;
+        filesList.innerHTML = '';
+
+        data.files_list.forEach(file => {
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'p-2 bg-gray-800 border border-gray-700 rounded hover:bg-gray-750 transition-colors';
+
+            // Truncate path for display (show last 60 chars with ellipsis)
+            let displayPath = file.path;
+            if (displayPath.length > 60) {
+                displayPath = '...' + displayPath.substring(displayPath.length - 57);
+            }
+
+            fileDiv.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-300 font-mono text-xs flex-1 truncate" title="${file.path}">${displayPath}</span>
+                    <span class="text-gray-500 text-xs ml-3 shrink-0">${formatBytes(file.size)}</span>
+                </div>
+            `;
+            filesList.appendChild(fileDiv);
+        });
+    } else {
+        // Hide files section if no files
+        filesContainer.classList.add('hidden');
     }
 
     // Show modal

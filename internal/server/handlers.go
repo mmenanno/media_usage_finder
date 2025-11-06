@@ -4331,6 +4331,14 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	}
 	topGroups := make([]TopGroup, 0)
 
+	// Build list of files to be linked (for preview)
+	type FileToLink struct {
+		Path     string `json:"path"`
+		Size     int64  `json:"size"`
+		GroupHash string `json:"group_hash"`
+	}
+	filesToLink := make([]FileToLink, 0)
+
 	for _, plan := range plans {
 		// Count files needing action vs already linked
 		for _, cluster := range plan.LinkClusters {
@@ -4346,6 +4354,16 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 				totalFilesAlreadyLinked += len(cluster.Files)
 			} else {
 				totalFilesToLink += len(cluster.Files)
+				// Add files to the list (excluding the keeper file which is first in cluster)
+				for i, file := range cluster.Files {
+					if i > 0 { // Skip first file (keeper)
+						filesToLink = append(filesToLink, FileToLink{
+							Path:     file.Path,
+							Size:     file.Size,
+							GroupHash: plan.Group.FileHash,
+						})
+					}
+				}
 			}
 		}
 
@@ -4436,6 +4454,7 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 		"top_groups":                 topGroups,
 		"warnings":                   warnings,
 		"errors":                     result.Errors,
+		"files_list":                 filesToLink,
 	})
 }
 
