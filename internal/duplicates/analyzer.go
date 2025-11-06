@@ -451,24 +451,11 @@ func (a *Analyzer) enrichFilesWithDiskInfo(files []database.DuplicateFile) error
 				files[i].DiskUsedPercent = 50.0
 			}
 		} else {
-			// Fallback to old behavior if no disk location found
-			if a.diskDetector != nil {
-				diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
-				if err != nil {
-					// Log warning but don't fail - use defaults
-					fmt.Printf("Warning: could not get disk info for device %d: %v\n", files[i].DeviceID, err)
-					files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
-					files[i].DiskUsedPercent = 50.0 // Unknown, assume middle
-					continue
-				}
-
-				files[i].DiskName = diskInfo.Name
-				files[i].DiskUsedPercent = diskInfo.UsedPercent
-			} else {
-				// No disk detector available - use defaults
-				files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
-				files[i].DiskUsedPercent = 50.0
-			}
+			// No disk location found - use defaults
+			// Don't attempt to look up FUSE device IDs (e.g., mergerfs device 143)
+			// as they don't correspond to physical disks in the detector
+			files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
+			files[i].DiskUsedPercent = 50.0
 		}
 	}
 
@@ -498,24 +485,11 @@ func (a *Analyzer) enrichFilesWithDiskInfoFallback(files []database.DuplicateFil
 				files[i].DiskUsedPercent = 50.0
 			}
 		} else {
-			// Fallback to old behavior if no disk location found
-			if a.diskDetector != nil {
-				diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
-				if err != nil {
-					// Log warning but don't fail - use defaults
-					fmt.Printf("Warning: could not get disk info for device %d: %v\n", files[i].DeviceID, err)
-					files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
-					files[i].DiskUsedPercent = 50.0 // Unknown, assume middle
-					continue
-				}
-
-				files[i].DiskName = diskInfo.Name
-				files[i].DiskUsedPercent = diskInfo.UsedPercent
-			} else {
-				// No disk detector available - use defaults
-				files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
-				files[i].DiskUsedPercent = 50.0
-			}
+			// No disk location found - use defaults
+			// Don't attempt to look up FUSE device IDs (e.g., mergerfs device 143)
+			// as they don't correspond to physical disks in the detector
+			files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
+			files[i].DiskUsedPercent = 50.0
 		}
 	}
 
