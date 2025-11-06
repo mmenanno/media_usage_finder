@@ -218,6 +218,28 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Global function for pagination (called from dynamically loaded content)
+    window.loadPageLogs = function(page) {
+        const formData = new FormData(form);
+        const params = new URLSearchParams(formData);
+        params.set('page', page);
+
+        container.innerHTML = '<div class="p-8 text-center text-gray-400"><div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div><p class="mt-4">Loading logs...</p></div>';
+
+        fetch('/api/logs?' + params.toString(), {
+            headers: {
+                'HX-Request': 'true'
+            }
+        })
+        .then(response => response.text())
+        .then(html => {
+            container.innerHTML = html;
+        })
+        .catch(error => {
+            container.innerHTML = '<div class="p-8 text-center text-red-400">Error loading logs: ' + error.message + '</div>';
+        });
+    };
+
     applyBtn.addEventListener('click', loadLogs);
     refreshBtn.addEventListener('click', loadLogs);
 
@@ -239,7 +261,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Allow Enter key to apply filters - listen on search input since form has no submit button
-    document.getElementById('search-filter').addEventListener('keypress', function(e) {
+    const searchInput = document.getElementById('search-filter');
+    searchInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
             loadLogs();

@@ -103,31 +103,6 @@
         {{end}}
     </div>
 </div>
-
-<script>
-function loadPageLogs(page) {
-    const form = document.getElementById('filter-form');
-    const formData = new FormData(form);
-    const params = new URLSearchParams(formData);
-    params.set('page', page);
-
-    const container = document.getElementById('logs-container');
-    container.innerHTML = '<div class="p-8 text-center text-gray-400"><div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div><p class="mt-4">Loading logs...</p></div>';
-
-    fetch('/api/logs?' + params.toString(), {
-        headers: {
-            'HX-Request': 'true'
-        }
-    })
-    .then(response => response.text())
-    .then(html => {
-        container.innerHTML = html;
-    })
-    .catch(error => {
-        container.innerHTML = '<div class="p-8 text-center text-red-400">Error loading logs: ' + error.message + '</div>';
-    });
-}
-</script>
 {{end}}
 
 {{else}}
