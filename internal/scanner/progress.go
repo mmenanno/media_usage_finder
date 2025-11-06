@@ -2,10 +2,13 @@ package scanner
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/mmenanno/media-usage-finder/internal/constants"
+	"github.com/mmenanno/media-usage-finder/internal/database"
 )
 
 // Progress tracks the progress of a scan
@@ -28,6 +31,10 @@ type Progress struct {
 	CurrentService int // Which service is being updated (1-based)
 	TotalServices  int // Total number of configured services
 
+	// Persistent logging
+	scanID int64
+	db     *database.DB
+
 	// Log streaming
 	logChan      chan string
 	logListeners []chan string
@@ -35,13 +42,15 @@ type Progress struct {
 }
 
 // NewProgress creates a new progress tracker
-func NewProgress() *Progress {
+func NewProgress(scanID int64, db *database.DB) *Progress {
 	p := &Progress{
 		StartTime:    time.Now(),
 		IsRunning:    true,
 		Errors:       make([]string, 0, constants.ErrorSliceCapacity),
 		logChan:      make(chan string, constants.LogChannelBuffer),
 		logListeners: make([]chan string, 0),
+		scanID:       scanID,
+		db:           db,
 	}
 
 	// Start log broadcaster
@@ -93,10 +102,22 @@ func (p *Progress) broadcastLogs() {
 func (p *Progress) Log(message string) {
 	p.mu.RLock()
 	running := p.IsRunning
+	scanID := p.scanID
+	db := p.db
+	currentPhase := p.CurrentPhase
 	p.mu.RUnlock()
 
 	if !running {
 		return // Don't write to closed channel
+	}
+
+	// Persist to database if configured
+	if db != nil && scanID > 0 {
+		level := p.detectLogLevel(message)
+		if err := db.CreateScanLog(scanID, level, currentPhase, message); err != nil {
+			// Log to stderr but don't crash the scan
+			fmt.Fprintf(os.Stderr, "Failed to persist scan log: %v\n", err)
+		}
 	}
 
 	// Additional safety: use select with default to prevent blocking
@@ -112,6 +133,21 @@ func (p *Progress) Log(message string) {
 	default:
 		// Drop message if channel is full
 	}
+}
+
+// detectLogLevel detects the log level from a message
+func (p *Progress) detectLogLevel(message string) string {
+	msgLower := strings.ToLower(message)
+	if strings.HasPrefix(msgLower, "error:") {
+		return "error"
+	}
+	if strings.HasPrefix(msgLower, "warning:") {
+		return "warning"
+	}
+	if strings.HasPrefix(msgLower, "debug:") {
+		return "debug"
+	}
+	return "info"
 }
 
 // Subscribe returns a channel that receives log messages

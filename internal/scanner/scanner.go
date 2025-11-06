@@ -119,7 +119,7 @@ func (s *Scanner) Scan(ctx context.Context, incremental bool) error {
 	}
 
 	// Initialize progress tracker
-	s.progress = NewProgress()
+	s.progress = NewProgress(scan.ID, s.db)
 	s.progress.SetPhase("Initializing")
 
 	// Setup graceful shutdown
@@ -210,7 +210,7 @@ func (s *Scanner) ResumeScan(ctx context.Context) error {
 	}
 
 	// Initialize progress tracker
-	s.progress = NewProgress()
+	s.progress = NewProgress(scan.ID, s.db)
 	s.progress.SetPhase("Initializing")
 	s.progress.Log(fmt.Sprintf("Resuming scan #%d from where it left off", interruptedScan.ID))
 
@@ -948,7 +948,7 @@ func (s *Scanner) UpdateAllServices() error {
 	}
 
 	// Create temporary progress for logging
-	tempProgress := NewProgress()
+	tempProgress := NewProgress(scan.ID, s.db)
 	tempProgress.SetPhase("Updating all services")
 	originalProgress := s.progress
 	s.progress = tempProgress
@@ -1025,7 +1025,7 @@ func (s *Scanner) UpdateSingleService(serviceName string) error {
 	}
 
 	// Create temporary progress for logging
-	tempProgress := NewProgress()
+	tempProgress := NewProgress(scan.ID, s.db)
 	tempProgress.SetPhase(fmt.Sprintf("Updating %s", serviceName))
 	originalProgress := s.progress
 	s.progress = tempProgress
@@ -1080,8 +1080,8 @@ func (s *Scanner) UpdateSingleService(serviceName string) error {
 // RecalculateOrphanedStatus manually recalculates which files are orphaned
 // This can be called independently without updating services
 func (s *Scanner) RecalculateOrphanedStatus() error {
-	// Create temporary progress for logging
-	tempProgress := NewProgress()
+	// Create temporary progress for logging (no persistent logs for this lightweight operation)
+	tempProgress := NewProgress(0, nil)
 	tempProgress.SetPhase("Recalculating orphaned status")
 	originalProgress := s.progress
 	s.progress = tempProgress
@@ -1125,7 +1125,7 @@ func (s *Scanner) ScanDiskLocations(detector *disk.Detector) error {
 	}
 
 	// Initialize progress tracker
-	s.diskScanProgress = NewProgress()
+	s.diskScanProgress = NewProgress(scan.ID, s.db)
 	s.diskScanProgress.SetPhase("Initializing")
 	s.diskScanProgress.Log("Starting disk location scan...")
 

@@ -1,0 +1,140 @@
+{{if .Logs}}
+<!-- Logs Summary -->
+<div class="px-6 py-4 border-b border-gray-700">
+    <p class="text-sm text-gray-400">
+        Showing {{len .Logs}} of {{.Total}} logs
+        {{if gt .TotalPages 1}} (Page {{.Page}} of {{.TotalPages}}){{end}}
+    </p>
+</div>
+
+<!-- Logs Table -->
+<div class="overflow-x-auto">
+    <table class="w-full">
+        <thead class="bg-gray-750 border-b border-gray-700">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-40">Timestamp</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-24">Scan ID</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-20">Level</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-32">Phase</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Message</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+            {{range .Logs}}
+            <tr class="hover:bg-gray-750 transition">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                    {{formatTimestamp .Timestamp.Unix}}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    <a href="/logs?scan_id={{.ScanID}}" class="text-blue-400 hover:text-blue-300 hover:underline">
+                        #{{.ScanID}}
+                    </a>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    {{if eq .Level "error"}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-red-900/30 text-red-400 border border-red-800">
+                        ERROR
+                    </span>
+                    {{else if eq .Level "warning"}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-amber-900/30 text-amber-400 border border-amber-800">
+                        WARNING
+                    </span>
+                    {{else if eq .Level "debug"}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-purple-900/30 text-purple-400 border border-purple-800">
+                        DEBUG
+                    </span>
+                    {{else}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-blue-900/30 text-blue-400 border border-blue-800">
+                        INFO
+                    </span>
+                    {{end}}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                    {{if .Phase}}{{.Phase}}{{else}}-{{end}}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-300">
+                    <div class="max-w-3xl break-words">{{.Message}}</div>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{{if gt .TotalPages 1}}
+<div class="px-6 py-4 border-t border-gray-700 flex items-center justify-between">
+    <div class="text-sm text-gray-400">
+        Page {{.Page}} of {{.TotalPages}}
+    </div>
+    <div class="flex gap-2">
+        {{if gt .Page 1}}
+        <button onclick="loadPageLogs({{sub .Page 1}})"
+                class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+            Previous
+        </button>
+        {{end}}
+
+        <!-- Page numbers -->
+        {{$currentPage := .Page}}
+        {{$totalPages := .TotalPages}}
+        {{range $page := (sequence 1 $totalPages)}}
+            {{if or (le $page 3) (and (ge $page (sub $currentPage 1)) (le $page (add $currentPage 1))) (ge $page (sub $totalPages 2))}}
+                {{if eq $page $currentPage}}
+                <button class="px-3 py-1 bg-blue-600 text-white rounded">{{$page}}</button>
+                {{else}}
+                <button onclick="loadPageLogs({{$page}})"
+                        class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+                    {{$page}}
+                </button>
+                {{end}}
+            {{else if or (eq $page 4) (eq $page (sub $totalPages 3))}}
+                <span class="px-2 py-1 text-gray-500">...</span>
+            {{end}}
+        {{end}}
+
+        {{if lt .Page .TotalPages}}
+        <button onclick="loadPageLogs({{add .Page 1}})"
+                class="px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+            Next
+        </button>
+        {{end}}
+    </div>
+</div>
+
+<script>
+function loadPageLogs(page) {
+    const form = document.getElementById('filter-form');
+    const formData = new FormData(form);
+    const params = new URLSearchParams(formData);
+    params.set('page', page);
+
+    const container = document.getElementById('logs-container');
+    container.innerHTML = '<div class="p-8 text-center text-gray-400"><div class="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto"></div><p class="mt-4">Loading logs...</p></div>';
+
+    fetch('/api/logs?' + params.toString(), {
+        headers: {
+            'HX-Request': 'true'
+        }
+    })
+    .then(response => response.text())
+    .then(html => {
+        container.innerHTML = html;
+    })
+    .catch(error => {
+        container.innerHTML = '<div class="p-8 text-center text-red-400">Error loading logs: ' + error.message + '</div>';
+    });
+}
+</script>
+{{end}}
+
+{{else}}
+<!-- No Logs Found -->
+<div class="p-12 text-center text-gray-400">
+    <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+    </svg>
+    <p class="text-xl font-semibold mb-2">No logs found</p>
+    <p>Try adjusting your filters or run a scan to generate logs</p>
+</div>
+{{end}}

@@ -17,8 +17,9 @@ type Config struct {
 	ScanBufferSize    int           `yaml:"scan_buffer_size"`
 	DiskScanWorkers   int           `yaml:"disk_scan_workers"` // Workers for disk location scanning
 	APITimeout        time.Duration `yaml:"api_timeout"`
-	CORSAllowedOrigin string        `yaml:"cors_allowed_origin"`
-	StatsCacheTTL     time.Duration `yaml:"stats_cache_ttl"`
+	CORSAllowedOrigin    string        `yaml:"cors_allowed_origin"`
+	StatsCacheTTL        time.Duration `yaml:"stats_cache_ttl"`
+	ScanLogRetentionDays int           `yaml:"scan_log_retention_days"`
 
 	// Database connection pool settings
 	DBMaxOpenConns    int           `yaml:"db_max_open_conns"`
@@ -119,15 +120,16 @@ type DuplicateConsolidationConfig struct {
 // Default returns a default configuration
 func Default() *Config {
 	return &Config{
-		DatabasePath:      "/appdata/data/media-finder.db",
-		ScanWorkers:       10,
-		ScanBufferSize:    100,
-		APITimeout:        30 * time.Second,
-		CORSAllowedOrigin: "http://localhost:8787",
-		StatsCacheTTL:     30 * time.Second,
-		DBMaxOpenConns:    25,
-		DBMaxIdleConns:    5,
-		DBConnMaxLifetime: 5 * time.Minute,
+		DatabasePath:         "/appdata/data/media-finder.db",
+		ScanWorkers:          10,
+		ScanBufferSize:       100,
+		APITimeout:           30 * time.Second,
+		CORSAllowedOrigin:    "http://localhost:8787",
+		StatsCacheTTL:        30 * time.Second,
+		ScanLogRetentionDays: 30,
+		DBMaxOpenConns:       25,
+		DBMaxIdleConns:       5,
+		DBConnMaxLifetime:    5 * time.Minute,
 		LocalPathMappings: []PathMapping{
 			{Service: "/media", Local: "/mnt/user/data/media"},
 			{Service: "/downloads", Local: "/mnt/user/data/downloads/torrents"},

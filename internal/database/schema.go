@@ -105,6 +105,23 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
 
+-- Scan logs table for persistent logging of scan activity
+CREATE TABLE IF NOT EXISTS scan_logs (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	scan_id INTEGER NOT NULL,
+	timestamp INTEGER NOT NULL,
+	level TEXT NOT NULL CHECK(level IN ('info', 'warning', 'error', 'debug')),
+	phase TEXT,
+	message TEXT NOT NULL,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (scan_id) REFERENCES scans(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_scan_logs_scan_id ON scan_logs(scan_id);
+CREATE INDEX IF NOT EXISTS idx_scan_logs_timestamp ON scan_logs(timestamp);
+CREATE INDEX IF NOT EXISTS idx_scan_logs_level ON scan_logs(level);
+CREATE INDEX IF NOT EXISTS idx_scan_logs_scan_timestamp ON scan_logs(scan_id, timestamp);
+
 -- File disk locations table for tracking files on specific disks (Unraid support)
 -- This table maps canonical FUSE paths (files.path) to disk-specific paths
 -- Enables cross-disk duplicate detection while maintaining service path matching

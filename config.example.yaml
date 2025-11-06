@@ -39,6 +39,13 @@ cors_allowed_origin: "http://localhost:8080"  # Set to "*" for development
 # - Decrease to 10s for smaller databases if you need real-time stats
 stats_cache_ttl: 30s
 
+# Scan Log Retention: How long to keep scan logs in the database
+# - Default: 30 (keep logs for 30 days)
+# - Set to 0 to keep logs indefinitely
+# - Set to -1 to disable persistent logging entirely
+# - Older logs are automatically cleaned up during scheduled maintenance
+scan_log_retention_days: 30
+
 # Database Connection Pool Settings
 # - Defaults are optimized for SQLite with WAL mode
 # - max_open_conns: Maximum concurrent database connections

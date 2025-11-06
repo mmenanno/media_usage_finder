@@ -54,7 +54,7 @@ func (hs *HashScanner) Start(ctx context.Context, minSize, maxSize int64) error 
 	}
 
 	// Initialize progress tracker
-	hs.progress = NewProgress()
+	hs.progress = NewProgress(scan.ID, hs.db)
 	hs.progress.SetPhase("Initializing")
 	hs.progress.Log("Starting hash calculation...")
 
@@ -97,7 +97,8 @@ func (hs *HashScanner) Start(ctx context.Context, minSize, maxSize int64) error 
 func (hs *HashScanner) Resume(ctx context.Context) error {
 	// For hash scanning, we just start fresh by checking which files still need hashing
 	// The database already tracks which files have been hashed
-	hs.progress = NewProgress()
+	// Note: A proper scan will be created in Start(), so we use 0/nil here temporarily
+	hs.progress = NewProgress(0, nil)
 	hs.progress.SetPhase("Resuming")
 	hs.progress.Log("Resuming hash calculation...")
 
@@ -122,7 +123,7 @@ func (hs *HashScanner) VerifyDuplicates(ctx context.Context) error {
 	}
 
 	// Initialize progress tracker
-	hs.progress = NewProgress()
+	hs.progress = NewProgress(scan.ID, hs.db)
 	hs.progress.SetPhase("Finding Duplicates")
 	hs.progress.Log("Finding files with quick-hash duplicates to verify...")
 
@@ -179,7 +180,7 @@ func (hs *HashScanner) UpgradeAllQuickHashes(ctx context.Context) error {
 	}
 
 	// Initialize progress tracker
-	hs.progress = NewProgress()
+	hs.progress = NewProgress(scan.ID, hs.db)
 	hs.progress.SetPhase("Finding Quick Hashes")
 	hs.progress.Log("Finding all files with quick hashes to upgrade...")
 

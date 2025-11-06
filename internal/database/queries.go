@@ -98,6 +98,29 @@ type FileDiskLocation struct {
 	CreatedAt    time.Time
 }
 
+// ScanLog represents a log entry for a scan operation
+type ScanLog struct {
+	ID        int64
+	ScanID    int64
+	Timestamp time.Time
+	Level     string
+	Phase     *string
+	Message   string
+	CreatedAt time.Time
+}
+
+// LogFilters defines filters for querying scan logs
+type LogFilters struct {
+	ScanID     *int64
+	Level      string
+	Phase      string
+	SearchText string
+	StartTime  *time.Time
+	EndTime    *time.Time
+	Limit      int
+	Offset     int
+}
+
 // UpsertFile inserts or updates a file record
 func (db *DB) UpsertFile(file *File) error {
 	query := `
@@ -699,6 +722,185 @@ func (db *DB) GetScanFileCount(scanID int64) (int, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+// CreateScanLog creates a new scan log entry
+func (db *DB) CreateScanLog(scanID int64, level, phase, message string) error {
+	query := `
+		INSERT INTO scan_logs (scan_id, timestamp, level, phase, message)
+		VALUES (?, ?, ?, ?, ?)
+	`
+
+	timestamp := time.Now().Unix()
+	var phasePtr *string
+	if phase != "" {
+		phasePtr = &phase
+	}
+
+	_, err := db.conn.Exec(query, scanID, timestamp, level, phasePtr, message)
+	return err
+}
+
+// GetScanLogs retrieves scan logs with filtering and pagination
+func (db *DB) GetScanLogs(filters LogFilters) ([]*ScanLog, error) {
+	query := `
+		SELECT id, scan_id, timestamp, level, phase, message, created_at
+		FROM scan_logs
+		WHERE 1=1
+	`
+	args := []interface{}{}
+
+	// Apply filters
+	if filters.ScanID != nil {
+		query += " AND scan_id = ?"
+		args = append(args, *filters.ScanID)
+	}
+
+	if filters.Level != "" && filters.Level != "all" {
+		query += " AND level = ?"
+		args = append(args, filters.Level)
+	}
+
+	if filters.Phase != "" && filters.Phase != "all" {
+		query += " AND phase = ?"
+		args = append(args, filters.Phase)
+	}
+
+	if filters.SearchText != "" {
+		query += " AND message LIKE ?"
+		args = append(args, "%"+filters.SearchText+"%")
+	}
+
+	if filters.StartTime != nil {
+		query += " AND timestamp >= ?"
+		args = append(args, filters.StartTime.Unix())
+	}
+
+	if filters.EndTime != nil {
+		query += " AND timestamp <= ?"
+		args = append(args, filters.EndTime.Unix())
+	}
+
+	// Order by timestamp descending (newest first)
+	query += " ORDER BY timestamp DESC"
+
+	// Apply pagination
+	if filters.Limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, filters.Limit)
+	}
+
+	if filters.Offset > 0 {
+		query += " OFFSET ?"
+		args = append(args, filters.Offset)
+	}
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []*ScanLog
+	for rows.Next() {
+		var log ScanLog
+		var timestampUnix int64
+		var createdAtUnix int64
+
+		err := rows.Scan(
+			&log.ID,
+			&log.ScanID,
+			&timestampUnix,
+			&log.Level,
+			&log.Phase,
+			&log.Message,
+			&createdAtUnix,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		log.Timestamp = time.Unix(timestampUnix, 0)
+		log.CreatedAt = time.Unix(createdAtUnix, 0)
+		logs = append(logs, &log)
+	}
+
+	return logs, rows.Err()
+}
+
+// GetScanLogCount returns the total count of logs matching the filters
+func (db *DB) GetScanLogCount(filters LogFilters) (int, error) {
+	query := `
+		SELECT COUNT(*)
+		FROM scan_logs
+		WHERE 1=1
+	`
+	args := []interface{}{}
+
+	// Apply same filters as GetScanLogs (without pagination)
+	if filters.ScanID != nil {
+		query += " AND scan_id = ?"
+		args = append(args, *filters.ScanID)
+	}
+
+	if filters.Level != "" && filters.Level != "all" {
+		query += " AND level = ?"
+		args = append(args, filters.Level)
+	}
+
+	if filters.Phase != "" && filters.Phase != "all" {
+		query += " AND phase = ?"
+		args = append(args, filters.Phase)
+	}
+
+	if filters.SearchText != "" {
+		query += " AND message LIKE ?"
+		args = append(args, "%"+filters.SearchText+"%")
+	}
+
+	if filters.StartTime != nil {
+		query += " AND timestamp >= ?"
+		args = append(args, filters.StartTime.Unix())
+	}
+
+	if filters.EndTime != nil {
+		query += " AND timestamp <= ?"
+		args = append(args, filters.EndTime.Unix())
+	}
+
+	var count int
+	err := db.conn.QueryRow(query, args...).Scan(&count)
+	return count, err
+}
+
+// DeleteOldScanLogs deletes scan logs older than the specified number of days
+// Returns the number of logs deleted. If retentionDays is 0, no logs are deleted.
+// If retentionDays is -1, logging is disabled and all logs are deleted.
+func (db *DB) DeleteOldScanLogs(retentionDays int) (int64, error) {
+	if retentionDays == 0 {
+		// Keep logs indefinitely
+		return 0, nil
+	}
+
+	var query string
+	var args []interface{}
+
+	if retentionDays == -1 {
+		// Delete all logs (logging disabled)
+		query = "DELETE FROM scan_logs"
+	} else {
+		// Delete logs older than retention period
+		cutoffTime := time.Now().AddDate(0, 0, -retentionDays).Unix()
+		query = "DELETE FROM scan_logs WHERE created_at < ?"
+		args = append(args, cutoffTime)
+	}
+
+	result, err := db.conn.Exec(query, args...)
+	if err != nil {
+		return 0, err
+	}
+
+	return result.RowsAffected()
 }
 
 // UpsertUsage inserts or updates a usage record

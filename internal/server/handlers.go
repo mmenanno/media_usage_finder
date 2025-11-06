@@ -115,6 +115,7 @@ func (s *Server) LoadTemplates(pattern string) error {
 		"duplicates.html",
 		"hardlinks.html",
 		"scans.html",
+		"logs.html",
 		"stats.html",
 		"config.html",
 		"advanced.html",
@@ -141,6 +142,7 @@ func (s *Server) LoadTemplates(pattern string) error {
 	// Load partial templates (used for HTMX responses)
 	partials := []string{
 		"partials/validation-errors.html",
+		"logs_table.html",
 	}
 
 	for _, partial := range partials {
@@ -630,6 +632,115 @@ func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderTemplate(w, "scans.html", data)
+}
+
+// HandleScanLogsPage serves the scan logs page
+func (s *Server) HandleScanLogsPage(w http.ResponseWriter, r *http.Request) {
+	// Get all scans for the filter dropdown
+	scans, _, err := s.db.ListScans(100, 0) // Get recent 100 scans
+	if err != nil {
+		log.Printf("ERROR: Failed to list scans: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to retrieve scans", "database_error")
+		return
+	}
+
+	data := map[string]interface{}{
+		"Title":   "Scan Logs",
+		"Version": s.version,
+		"Scans":   scans,
+	}
+
+	s.renderTemplate(w, "logs.html", data)
+}
+
+// HandleGetScanLogs serves the scan logs API endpoint with filtering and pagination
+func (s *Server) HandleGetScanLogs(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters for filtering
+	filters := database.LogFilters{
+		Level:      r.URL.Query().Get("level"),
+		Phase:      r.URL.Query().Get("phase"),
+		SearchText: r.URL.Query().Get("search"),
+		Limit:      100, // Default limit
+		Offset:     0,
+	}
+
+	// Parse scan_id filter
+	if scanIDStr := r.URL.Query().Get("scan_id"); scanIDStr != "" && scanIDStr != "all" {
+		scanID, err := strconv.ParseInt(scanIDStr, 10, 64)
+		if err == nil {
+			filters.ScanID = &scanID
+		}
+	}
+
+	// Parse pagination
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		page, _ := strconv.Atoi(pageStr)
+		if page > 0 {
+			filters.Offset = (page - 1) * filters.Limit
+		}
+	}
+
+	// Parse limit
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		limit, _ := strconv.Atoi(limitStr)
+		if limit > 0 && limit <= 1000 {
+			filters.Limit = limit
+		}
+	}
+
+	// Parse date range filters
+	if startTimeStr := r.URL.Query().Get("start_time"); startTimeStr != "" {
+		if startTime, err := time.Parse(time.RFC3339, startTimeStr); err == nil {
+			filters.StartTime = &startTime
+		}
+	}
+
+	if endTimeStr := r.URL.Query().Get("end_time"); endTimeStr != "" {
+		if endTime, err := time.Parse(time.RFC3339, endTimeStr); err == nil {
+			filters.EndTime = &endTime
+		}
+	}
+
+	// Get logs with filters
+	logs, err := s.db.GetScanLogs(filters)
+	if err != nil {
+		log.Printf("ERROR: Failed to get scan logs: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to retrieve logs", "database_error")
+		return
+	}
+
+	// Get total count for pagination
+	total, err := s.db.GetScanLogCount(filters)
+	if err != nil {
+		log.Printf("ERROR: Failed to get log count: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to count logs", "database_error")
+		return
+	}
+
+	// Calculate pagination info
+	currentPage := (filters.Offset / filters.Limit) + 1
+	totalPages := (total + filters.Limit - 1) / filters.Limit
+
+	// Check if this is an HTMX request
+	isHTMX := r.Header.Get("HX-Request") == "true"
+
+	data := map[string]interface{}{
+		"Logs":        logs,
+		"Total":       total,
+		"Page":        currentPage,
+		"TotalPages":  totalPages,
+		"Filters":     filters,
+		"IsHTMX":      isHTMX,
+	}
+
+	if isHTMX {
+		// Return just the logs table fragment for HTMX updates
+		s.renderTemplate(w, "logs_table.html", data)
+	} else {
+		// Return JSON for API requests
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(data)
+	}
 }
 
 // HandleHealth serves the health check endpoint with detailed status
@@ -1392,6 +1503,12 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	if workers := r.FormValue("scan_workers"); workers != "" {
 		if w, err := strconv.Atoi(workers); err == nil && w > 0 && w <= 100 {
 			s.config.ScanWorkers = w
+		}
+	}
+
+	if retentionDays := r.FormValue("scan_log_retention_days"); retentionDays != "" {
+		if days, err := strconv.Atoi(retentionDays); err == nil && days >= -1 {
+			s.config.ScanLogRetentionDays = days
 		}
 	}
 
@@ -3524,6 +3641,17 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 					result += ","
 				}
 				result += string(digit)
+			}
+			return result
+		},
+		"sequence": func(start, end int64) []int64 {
+			// Generate a sequence of integers from start to end (inclusive)
+			if start > end {
+				return []int64{}
+			}
+			result := make([]int64, end-start+1)
+			for i := range result {
+				result[i] = start + int64(i)
 			}
 			return result
 		},
