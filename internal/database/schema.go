@@ -285,6 +285,10 @@ CREATE INDEX IF NOT EXISTS idx_files_needs_hash ON files(hash_calculated, size) 
 -- Create composite index for cross-disk duplicate detection (hash + device_id)
 CREATE INDEX IF NOT EXISTS idx_files_hash_device ON files(file_hash, device_id) WHERE file_hash IS NOT NULL;
 
+-- Create optimized index for duplicate detection queries (includes hash_calculated filter)
+CREATE INDEX IF NOT EXISTS idx_files_duplicate_detection ON files(hash_calculated, file_hash, device_id)
+  WHERE hash_calculated = 1 AND file_hash IS NOT NULL;
+
 -- Create index for finding files with quick hashes (for verification)
 CREATE INDEX IF NOT EXISTS idx_files_quick_hash ON files(hash_type) WHERE hash_type = 'quick';
 `

@@ -35,7 +35,8 @@ type DuplicateFile struct {
 
 // GetSameDiskDuplicates finds files with the same hash on the same disk
 // These are candidates for hardlinking to save space
-func (db *DB) GetSameDiskDuplicates() ([]*DuplicateGroup, error) {
+// If limit is 0 or negative, returns all results
+func (db *DB) GetSameDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 	query := `
 		SELECT
 			file_hash,
@@ -52,6 +53,11 @@ func (db *DB) GetSameDiskDuplicates() ([]*DuplicateGroup, error) {
 		HAVING COUNT(*) > 1
 		ORDER BY size * (COUNT(*) - 1) DESC
 	`
+
+	// Add limit if specified
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
 
 	rows, err := db.conn.Query(query)
 	if err != nil {
@@ -98,7 +104,8 @@ func (db *DB) GetSameDiskDuplicates() ([]*DuplicateGroup, error) {
 
 // GetCrossDiskDuplicates finds files with the same hash across different disks
 // These are candidates for consolidation to the least full disk
-func (db *DB) GetCrossDiskDuplicates() ([]*DuplicateGroup, error) {
+// If limit is 0 or negative, returns all results
+func (db *DB) GetCrossDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 	query := `
 		SELECT
 			file_hash,
@@ -115,6 +122,11 @@ func (db *DB) GetCrossDiskDuplicates() ([]*DuplicateGroup, error) {
 		HAVING COUNT(DISTINCT device_id) > 1
 		ORDER BY size * (COUNT(*) - 1) DESC
 	`
+
+	// Add limit if specified
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", limit)
+	}
 
 	rows, err := db.conn.Query(query)
 	if err != nil {

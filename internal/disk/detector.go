@@ -156,9 +156,28 @@ func (d *Detector) GetAllDisks() []*DiskInfo {
 }
 
 // RefreshDiskSpace updates space information for all disks
+// Uses 5-minute cache to avoid expensive I/O on every request
 func (d *Detector) RefreshDiskSpace() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+
+	// Check if cache is still fresh (5 minutes)
+	const cacheTTL = 5 * time.Minute
+	now := time.Now()
+	needsRefresh := false
+
+	// Check if any disk needs refresh
+	for _, diskInfo := range d.diskMap {
+		if now.Sub(diskInfo.LastUpdated) > cacheTTL {
+			needsRefresh = true
+			break
+		}
+	}
+
+	// Return early if cache is still fresh
+	if !needsRefresh && len(d.diskMap) > 0 {
+		return nil
+	}
 
 	// Check if Unraid stats are available
 	var unraidReader *UnraidStatsReader

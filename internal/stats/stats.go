@@ -25,6 +25,16 @@ type Stats struct {
 	MultiServiceUsage       []ServiceUsageCount
 	LargestOrphanedPath     string // Path of largest orphaned file
 	LargestOrphanedSize     int64  // Size of largest orphaned file
+	DuplicateStats          *DuplicateStatsInfo // Duplicate file statistics (cached)
+}
+
+// DuplicateStatsInfo contains statistics about duplicate files
+type DuplicateStatsInfo struct {
+	CrossDiskGroups           int64
+	SameDiskGroups            int64
+	CrossDiskPotentialSavings int64
+	SameDiskPotentialSavings  int64
+	TotalPotentialSavings     int64
 }
 
 // ServiceStats contains statistics for a specific service
@@ -99,6 +109,11 @@ func (c *Calculator) Calculate() (*Stats, error) {
 	// Find largest orphaned file
 	if err := c.calculateLargestOrphaned(stats); err != nil {
 		return nil, fmt.Errorf("failed to calculate largest orphaned: %w", err)
+	}
+
+	// Calculate duplicate file statistics
+	if err := c.calculateDuplicateStats(stats); err != nil {
+		return nil, fmt.Errorf("failed to calculate duplicate stats: %w", err)
 	}
 
 	return stats, nil
@@ -322,6 +337,25 @@ func (c *Calculator) calculateLargestOrphaned(stats *Stats) error {
 	}
 
 	// It's okay if there are no orphaned files
+	return nil
+}
+
+func (c *Calculator) calculateDuplicateStats(stats *Stats) error {
+	// Get duplicate stats from database
+	dupStats, err := c.db.GetDuplicateStats()
+	if err != nil {
+		return err
+	}
+
+	// Convert database.DuplicateStats to stats.DuplicateStatsInfo
+	stats.DuplicateStats = &DuplicateStatsInfo{
+		CrossDiskGroups:           dupStats.CrossDiskGroups,
+		SameDiskGroups:            dupStats.SameDiskGroups,
+		CrossDiskPotentialSavings: dupStats.CrossDiskPotentialSavings,
+		SameDiskPotentialSavings:  dupStats.SameDiskPotentialSavings,
+		TotalPotentialSavings:     dupStats.TotalPotentialSavings,
+	}
+
 	return nil
 }
 

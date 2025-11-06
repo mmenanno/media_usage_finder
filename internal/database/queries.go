@@ -1706,73 +1706,60 @@ type DatabaseStats struct {
 }
 
 // GetDatabaseStats retrieves comprehensive database statistics
+// Uses a single CTE query for better performance
 func (db *DB) GetDatabaseStats() (*DatabaseStats, error) {
 	stats := &DatabaseStats{}
 
-	// File counts
-	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM files`).Scan(&stats.FileCount); err != nil {
-		return nil, err
-	}
-	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM files WHERE is_orphaned = 1`).Scan(&stats.OrphanedCount); err != nil {
-		return nil, err
-	}
-
-	// Usage count
-	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM usage`).Scan(&stats.UsageCount); err != nil {
-		return nil, err
-	}
-
-	// Scan count
-	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM scans`).Scan(&stats.ScanCount); err != nil {
-		return nil, err
-	}
-
-	// Audit log count
-	if err := db.conn.QueryRow(`SELECT COUNT(*) FROM audit_log`).Scan(&stats.AuditLogCount); err != nil {
-		return nil, err
-	}
-
-	// Hardlink groups
-	if err := db.conn.QueryRow(`
-		SELECT COUNT(DISTINCT device_id || '-' || inode)
-		FROM files
-		WHERE (device_id, inode) IN (
-			SELECT device_id, inode
+	// Combined query using CTE for most stats
+	query := `
+		WITH file_stats AS (
+			SELECT
+				COUNT(*) as file_count,
+				COALESCE(SUM(CASE WHEN is_orphaned = 1 THEN 1 ELSE 0 END), 0) as orphaned_count,
+				COALESCE(SUM(size), 0) as total_size,
+				COALESCE(SUM(CASE WHEN is_orphaned = 1 THEN size ELSE 0 END), 0) as orphaned_size
 			FROM files
-			GROUP BY device_id, inode
-			HAVING COUNT(*) > 1
+		),
+		hardlink_stats AS (
+			SELECT
+				COUNT(*) as hardlink_groups,
+				COALESCE(SUM((cnt - 1) * size), 0) as hardlink_savings
+			FROM (
+				SELECT device_id, inode, size, COUNT(*) as cnt
+				FROM files
+				GROUP BY device_id, inode
+				HAVING COUNT(*) > 1
+			)
+		),
+		table_counts AS (
+			SELECT
+				(SELECT COUNT(*) FROM usage) as usage_count,
+				(SELECT COUNT(*) FROM scans) as scan_count,
+				(SELECT COUNT(*) FROM audit_log) as audit_log_count
 		)
-	`).Scan(&stats.HardlinkGroups); err != nil {
-		return nil, err
-	}
+		SELECT
+			f.file_count, f.orphaned_count, f.total_size, f.orphaned_size,
+			h.hardlink_groups, h.hardlink_savings,
+			t.usage_count, t.scan_count, t.audit_log_count
+		FROM file_stats f, hardlink_stats h, table_counts t
+	`
 
-	// Total size
-	if err := db.conn.QueryRow(`SELECT COALESCE(SUM(size), 0) FROM files`).Scan(&stats.TotalSize); err != nil {
-		return nil, err
-	}
-
-	// Orphaned size
-	if err := db.conn.QueryRow(`SELECT COALESCE(SUM(size), 0) FROM files WHERE is_orphaned = 1`).Scan(&stats.OrphanedSize); err != nil {
-		return nil, err
-	}
-
-	// Hardlink savings
-	var totalSizeWithDupes int64
-	err := db.conn.QueryRow(`
-		SELECT COALESCE(SUM(size * (cnt - 1)), 0)
-		FROM (
-			SELECT size, COUNT(*) as cnt
-			FROM files
-			GROUP BY device_id, inode
-			HAVING COUNT(*) > 1
-		)
-	`).Scan(&totalSizeWithDupes)
+	err := db.conn.QueryRow(query).Scan(
+		&stats.FileCount,
+		&stats.OrphanedCount,
+		&stats.TotalSize,
+		&stats.OrphanedSize,
+		&stats.HardlinkGroups,
+		&stats.HardlinkSavings,
+		&stats.UsageCount,
+		&stats.ScanCount,
+		&stats.AuditLogCount,
+	)
 	if err != nil {
 		return nil, err
 	}
-	stats.HardlinkSavings = totalSizeWithDupes
 
-	// Database size (page_count * page_size / 1024 for KB)
+	// Database size (requires separate PRAGMA queries)
 	var pageCount, pageSize int64
 	if err := db.conn.QueryRow(`PRAGMA page_count`).Scan(&pageCount); err != nil {
 		return nil, err
@@ -2117,8 +2104,8 @@ func (db *DB) GetDiskLocationsForFile(fileID int64) ([]*FileDiskLocation, error)
 	return locations, rows.Err()
 }
 
-// GetDiskLocationsByFileIDs batch loads disk locations for multiple files
-// Returns a map of file_id -> []*FileDiskLocation
+// GetDiskLocationsByFileIDs returns disk locations for multiple files in a single query
+// Returns a map of fileID -> []*FileDiskLocation for efficient batch loading
 func (db *DB) GetDiskLocationsByFileIDs(fileIDs []int64) (map[int64][]*FileDiskLocation, error) {
 	if len(fileIDs) == 0 {
 		return make(map[int64][]*FileDiskLocation), nil
@@ -2145,8 +2132,8 @@ func (db *DB) GetDiskLocationsByFileIDs(fileIDs []int64) (map[int64][]*FileDiskL
 	}
 	defer rows.Close()
 
-	// Group by file_id
-	result := make(map[int64][]*FileDiskLocation)
+	// Group locations by file_id
+	locationsByFileID := make(map[int64][]*FileDiskLocation)
 	for rows.Next() {
 		loc := &FileDiskLocation{}
 		var modTime, lastVerified, createdAt int64
@@ -2171,10 +2158,10 @@ func (db *DB) GetDiskLocationsByFileIDs(fileIDs []int64) (map[int64][]*FileDiskL
 		loc.LastVerified = time.Unix(lastVerified, 0)
 		loc.CreatedAt = time.Unix(createdAt, 0)
 
-		result[loc.FileID] = append(result[loc.FileID], loc)
+		locationsByFileID[loc.FileID] = append(locationsByFileID[loc.FileID], loc)
 	}
 
-	return result, rows.Err()
+	return locationsByFileID, rows.Err()
 }
 
 // GetFilesWithMultipleDiskLocations returns files that exist on multiple disks (cross-disk duplicates)

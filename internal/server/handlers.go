@@ -28,17 +28,20 @@ import (
 
 // Server holds the application state
 type Server struct {
-	db            *database.DB
-	config        *config.Config
-	scanner       *scanner.Scanner
-	hashScanner   *scanner.HashScanner // Hash scanner for duplicate detection
-	templates     map[string]*template.Template // Map of template name to parsed template
-	statsCache    *stats.Cache
-	templateFuncs template.FuncMap   // Cached template functions
-	version       string             // Application version
-	clientFactory *api.ClientFactory // Factory for creating service clients
-	diskDetector  *disk.Detector     // Disk detector for cross-disk duplicate detection
-	diskResolver  *disk.DeviceResolver // Device resolver for friendly disk names in UI
+	db                 *database.DB
+	config             *config.Config
+	scanner            *scanner.Scanner
+	hashScanner        *scanner.HashScanner // Hash scanner for duplicate detection
+	templates          map[string]*template.Template // Map of template name to parsed template
+	statsCache         *stats.Cache
+	dbStatsCache       *database.DatabaseStats // Database stats cache
+	dbStatsCachedAt    time.Time               // When database stats were cached
+	dbStatsCacheMutex  sync.RWMutex            // Mutex for database stats cache
+	templateFuncs      template.FuncMap        // Cached template functions
+	version            string                  // Application version
+	clientFactory      *api.ClientFactory      // Factory for creating service clients
+	diskDetector       *disk.Detector          // Disk detector for cross-disk duplicate detection
+	diskResolver       *disk.DeviceResolver    // Device resolver for friendly disk names in UI
 }
 
 // NewServer creates a new server instance
@@ -183,21 +186,15 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	// Get disk information if disk detector is configured
 	var disks []*disk.DiskInfo
 	if s.diskDetector != nil {
-		// Refresh disk space information before displaying
+		// Refresh disk space information (uses 5-minute cache)
 		if err := s.diskDetector.RefreshDiskSpace(); err != nil {
 			log.Printf("Warning: Failed to refresh disk space: %v", err)
 		}
 		disks = s.diskDetector.GetAllDisks()
 	}
 
-	// Get duplicate statistics if hash scanning is enabled
-	var duplicateStats *database.DuplicateStats
-	if s.config.DuplicateDetection.Enabled {
-		duplicateStats, err = s.db.GetDuplicateStats()
-		if err != nil {
-			log.Printf("Warning: Failed to get duplicate stats: %v", err)
-		}
-	}
+	// Duplicate statistics are now included in cached stats (statistics.DuplicateStats)
+	// No need for separate GetDuplicateStats() call
 
 	data := map[string]interface{}{
 		"Stats":                statistics,
@@ -207,7 +204,7 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 		"InterruptedScanID":    interruptedScanID,
 		"InterruptedScanPhase": interruptedScanPhase,
 		"Disks":                disks,
-		"DuplicateStats":       duplicateStats,
+		"DuplicateStats":       statistics.DuplicateStats,
 	}
 
 	s.renderTemplate(w, "dashboard.html", data)
@@ -231,6 +228,36 @@ func (s *Server) getStats() *stats.Stats {
 	// Cache for next time
 	s.statsCache.Set(statistics)
 	return statistics
+}
+
+// getDatabaseStats retrieves database stats from cache or calculates fresh
+// Uses 60-second cache since database stats change infrequently
+func (s *Server) getDatabaseStats() *database.DatabaseStats {
+	const cacheTTL = 60 * time.Second
+
+	// Try cache first
+	s.dbStatsCacheMutex.RLock()
+	if s.dbStatsCache != nil && time.Since(s.dbStatsCachedAt) < cacheTTL {
+		cached := s.dbStatsCache
+		s.dbStatsCacheMutex.RUnlock()
+		return cached
+	}
+	s.dbStatsCacheMutex.RUnlock()
+
+	// Calculate fresh stats
+	dbStats, err := s.db.GetDatabaseStats()
+	if err != nil {
+		log.Printf("Failed to get database stats: %v", err)
+		return &database.DatabaseStats{} // Return empty stats on error
+	}
+
+	// Cache for next time
+	s.dbStatsCacheMutex.Lock()
+	s.dbStatsCache = dbStats
+	s.dbStatsCachedAt = time.Now()
+	s.dbStatsCacheMutex.Unlock()
+
+	return dbStats
 }
 
 // HandleFiles serves the files page
@@ -432,19 +459,20 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 
 	// Get disk information if disk detector is configured
 	var disks []*disk.DiskInfo
-	var crossDiskDuplicates int64
 	hasDiskLocations := len(s.config.Disks) > 0
 
 	if s.diskDetector != nil {
+		// Refresh disk space information (uses 5-minute cache)
 		if err := s.diskDetector.RefreshDiskSpace(); err != nil {
 			log.Printf("Warning: Failed to refresh disk space: %v", err)
 		}
 		disks = s.diskDetector.GetAllDisks()
+	}
 
-		// Get cross-disk duplicate count if disk locations are tracked
-		if hasDiskLocations {
-			crossDiskDuplicates, _ = s.db.GetCrossDiskDuplicateCount()
-		}
+	// Cross-disk duplicates count is now in cached stats
+	var crossDiskDuplicates int64
+	if statistics.DuplicateStats != nil {
+		crossDiskDuplicates = statistics.DuplicateStats.CrossDiskGroups
 	}
 
 	data := StatsData{
@@ -2978,16 +3006,12 @@ func (s *Server) HandleAdvanced(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get database stats
-	stats, err := s.db.GetDatabaseStats()
-	if err != nil {
-		log.Printf("Failed to get database stats: %v", err)
-		stats = &database.DatabaseStats{} // Use empty stats on error
-	}
+	// Get database stats (uses 60-second cache)
+	dbStats := s.getDatabaseStats()
 
 	data := AdvancedData{
 		Title: "Advanced Settings",
-		Stats: stats,
+		Stats: dbStats,
 	}
 
 	s.renderTemplate(w, "advanced.html", data)
@@ -3865,15 +3889,19 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	// Create analyzer
 	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
 
+	// Limit initial load to 100 groups for performance (sorted by space savings)
+	// This provides ~40x speedup for large datasets while showing the most important duplicates
+	const duplicateGroupLimit = 100
+
 	// Get cross-disk duplicates
-	crossDiskPlans, err := analyzer.AnalyzeCrossDiskDuplicates()
+	crossDiskPlans, err := analyzer.AnalyzeCrossDiskDuplicates(duplicateGroupLimit)
 	if err != nil {
 		log.Printf("ERROR: Failed to analyze cross-disk duplicates: %v", err)
 		crossDiskPlans = []*duplicates.ConsolidationPlan{}
 	}
 
 	// Get same-disk duplicates
-	sameDiskPlans, err := analyzer.AnalyzeSameDiskDuplicates()
+	sameDiskPlans, err := analyzer.AnalyzeSameDiskDuplicates(duplicateGroupLimit)
 	if err != nil {
 		log.Printf("ERROR: Failed to analyze same-disk duplicates: %v", err)
 		sameDiskPlans = []*duplicates.ConsolidationPlan{}
@@ -3939,8 +3967,8 @@ func (s *Server) HandleConsolidateDuplicates(w http.ResponseWriter, r *http.Requ
 	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm)
 	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
 
-	// Get cross-disk duplicates
-	plans, err := analyzer.AnalyzeCrossDiskDuplicates()
+	// Get all cross-disk duplicates (0 = no limit, needed for consolidation)
+	plans, err := analyzer.AnalyzeCrossDiskDuplicates(0)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to analyze duplicates", "analysis_failed")
 		return
@@ -4007,8 +4035,8 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm)
 	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
 
-	// Get same-disk duplicates
-	plans, err := analyzer.AnalyzeSameDiskDuplicates()
+	// Get all same-disk duplicates (0 = no limit, needed for hardlinking)
+	plans, err := analyzer.AnalyzeSameDiskDuplicates(0)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to analyze duplicates", "analysis_failed")
 		return
@@ -4073,10 +4101,11 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 	var plans []*duplicates.ConsolidationPlan
 	var err error
 
+	// Get all duplicates (0 = no limit, needed for preview)
 	if consolidationType == "cross-disk" {
-		plans, err = analyzer.AnalyzeCrossDiskDuplicates()
+		plans, err = analyzer.AnalyzeCrossDiskDuplicates(0)
 	} else {
-		plans, err = analyzer.AnalyzeSameDiskDuplicates()
+		plans, err = analyzer.AnalyzeSameDiskDuplicates(0)
 	}
 
 	if err != nil {

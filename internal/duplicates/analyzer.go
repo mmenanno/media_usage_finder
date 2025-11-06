@@ -37,9 +37,10 @@ type ConsolidationPlan struct {
 }
 
 // AnalyzeCrossDiskDuplicates creates consolidation plans for cross-disk duplicates
-func (a *Analyzer) AnalyzeCrossDiskDuplicates() ([]*ConsolidationPlan, error) {
-	// Get all cross-disk duplicate groups
-	groups, err := a.db.GetCrossDiskDuplicates()
+// limit parameter controls how many groups to analyze (0 = all groups)
+func (a *Analyzer) AnalyzeCrossDiskDuplicates(limit int) ([]*ConsolidationPlan, error) {
+	// Get cross-disk duplicate groups with optional limit
+	groups, err := a.db.GetCrossDiskDuplicates(limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cross-disk duplicates: %w", err)
 	}
@@ -67,9 +68,10 @@ func (a *Analyzer) AnalyzeCrossDiskDuplicates() ([]*ConsolidationPlan, error) {
 }
 
 // AnalyzeSameDiskDuplicates creates plans for same-disk duplicates (hardlink candidates)
-func (a *Analyzer) AnalyzeSameDiskDuplicates() ([]*ConsolidationPlan, error) {
-	// Get all same-disk duplicate groups
-	groups, err := a.db.GetSameDiskDuplicates()
+// limit parameter controls how many groups to analyze (0 = all groups)
+func (a *Analyzer) AnalyzeSameDiskDuplicates(limit int) ([]*ConsolidationPlan, error) {
+	// Get same-disk duplicate groups with optional limit
+	groups, err := a.db.GetSameDiskDuplicates(limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get same-disk duplicates: %w", err)
 	}
@@ -291,7 +293,63 @@ func (a *Analyzer) recommendByLeastFullDisk(files []database.DuplicateFile) (*da
 }
 
 // enrichFilesWithDiskInfo adds disk information to files
+// Uses batch loading to avoid N+1 query problem
 func (a *Analyzer) enrichFilesWithDiskInfo(files []database.DuplicateFile) error {
+	if len(files) == 0 {
+		return nil
+	}
+
+	// Collect all file IDs for batch loading
+	fileIDs := make([]int64, len(files))
+	for i := range files {
+		fileIDs[i] = files[i].ID
+	}
+
+	// Batch load all disk locations in a single query
+	locationsByFileID, err := a.db.GetDiskLocationsByFileIDs(fileIDs)
+	if err != nil {
+		// If batch loading fails, fall back to individual queries
+		fmt.Printf("Warning: batch loading disk locations failed, falling back to individual queries: %v\n", err)
+		return a.enrichFilesWithDiskInfoFallback(files)
+	}
+
+	// Enrich each file with its disk information
+	for i := range files {
+		locations := locationsByFileID[files[i].ID]
+
+		if len(locations) > 0 {
+			// Use the first location's disk name
+			files[i].DiskName = locations[0].DiskName
+
+			// Try to get disk usage from disk detector
+			diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
+			if err == nil {
+				files[i].DiskUsedPercent = diskInfo.UsedPercent
+			} else {
+				// Can't get usage, but we have the disk name - use 50% as default
+				files[i].DiskUsedPercent = 50.0
+			}
+		} else {
+			// Fallback to old behavior if no disk location found
+			diskInfo, err := a.diskDetector.GetDiskForFile(files[i].DeviceID)
+			if err != nil {
+				// Log warning but don't fail - use defaults
+				fmt.Printf("Warning: could not get disk info for device %d: %v\n", files[i].DeviceID, err)
+				files[i].DiskName = fmt.Sprintf("Device %d", files[i].DeviceID)
+				files[i].DiskUsedPercent = 50.0 // Unknown, assume middle
+				continue
+			}
+
+			files[i].DiskName = diskInfo.Name
+			files[i].DiskUsedPercent = diskInfo.UsedPercent
+		}
+	}
+
+	return nil
+}
+
+// enrichFilesWithDiskInfoFallback is the original N+1 implementation used as fallback
+func (a *Analyzer) enrichFilesWithDiskInfoFallback(files []database.DuplicateFile) error {
 	for i := range files {
 		// First, try to get disk info from file_disk_locations table
 		locations, err := a.db.GetDiskLocationsForFile(files[i].ID)
