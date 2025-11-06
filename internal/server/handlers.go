@@ -3305,6 +3305,12 @@ func (s *Server) renderTemplate(w http.ResponseWriter, name string, data interfa
 		return
 	}
 
+	// Inject version into template data
+	dataMap, ok := data.(map[string]interface{})
+	if ok {
+		dataMap["Version"] = s.version
+	}
+
 	// Execute layout.html which will call the "content" block from the specific page template
 	if err := tmpl.ExecuteTemplate(w, "layout.html", data); err != nil {
 		log.Printf("ERROR: Failed to execute template %s: %v", name, err)
@@ -3688,7 +3694,7 @@ func (s *Server) HandleHashProgressHTML(w http.ResponseWriter, r *http.Request) 
 			<button
 				hx-post="/api/hash/cancel"
 				hx-swap="none"
-				class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm">
+				class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm cursor-pointer">
 				Cancel
 			</button>
 		</div>
