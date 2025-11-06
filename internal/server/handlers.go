@@ -3895,6 +3895,13 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get actual totals from database (not limited)
+	duplicateStats, err := s.db.GetDuplicateStats()
+	if err != nil {
+		log.Printf("ERROR: Failed to get duplicate stats: %v", err)
+		duplicateStats = &database.DuplicateStats{}
+	}
+
 	// Create analyzer
 	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
 
@@ -3902,26 +3909,21 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	// This provides ~40x speedup for large datasets while showing the most important duplicates
 	const duplicateGroupLimit = 100
 
-	// Get cross-disk duplicates
+	// Get cross-disk duplicates (limited for display)
 	crossDiskPlans, err := analyzer.AnalyzeCrossDiskDuplicates(duplicateGroupLimit)
 	if err != nil {
 		log.Printf("ERROR: Failed to analyze cross-disk duplicates: %v", err)
 		crossDiskPlans = []*duplicates.ConsolidationPlan{}
 	}
 
-	// Get same-disk duplicates
+	// Get same-disk duplicates (limited for display)
 	sameDiskPlans, err := analyzer.AnalyzeSameDiskDuplicates(duplicateGroupLimit)
 	if err != nil {
 		log.Printf("ERROR: Failed to analyze same-disk duplicates: %v", err)
 		sameDiskPlans = []*duplicates.ConsolidationPlan{}
 	}
 
-	// Calculate totals
-	crossDiskSavings := duplicates.CalculateTotalSavings(crossDiskPlans)
-	sameDiskSavings := duplicates.CalculateTotalSavings(sameDiskPlans)
-	totalSavings := crossDiskSavings + sameDiskSavings
-
-	// Count files to delete/link
+	// Count files in displayed plans
 	crossDiskFilesToDelete := 0
 	for _, plan := range crossDiskPlans {
 		crossDiskFilesToDelete += len(plan.DeleteFiles)
@@ -3932,20 +3934,23 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		sameDiskFilesToLink += len(plan.DeleteFiles)
 	}
 
-	// Prepare template data
+	// Prepare template data with ACTUAL totals from database
 	data := map[string]interface{}{
 		"Title":                  "Duplicate Files",
 		"ActiveTab":              activeTab,
 		"CrossDiskGroups":        crossDiskPlans,
 		"SameDiskGroups":         sameDiskPlans,
-		"CrossDiskCount":         len(crossDiskPlans),
-		"SameDiskCount":          len(sameDiskPlans),
-		"TotalSavings":           totalSavings,
-		"CrossDiskSavings":       crossDiskSavings,
-		"SameDiskSavings":        sameDiskSavings,
+		"CrossDiskCount":         duplicateStats.CrossDiskGroups,            // ACTUAL total from DB
+		"SameDiskCount":          duplicateStats.SameDiskGroups,             // ACTUAL total from DB
+		"TotalSavings":           duplicateStats.TotalPotentialSavings,      // ACTUAL total from DB
+		"CrossDiskSavings":       duplicateStats.CrossDiskPotentialSavings,  // ACTUAL total from DB
+		"SameDiskSavings":        duplicateStats.SameDiskPotentialSavings,   // ACTUAL total from DB
 		"CrossDiskFilesToDelete": crossDiskFilesToDelete,
 		"SameDiskFilesToLink":    sameDiskFilesToLink,
 		"HashScanningEnabled":    true,
+		"DisplayLimit":           duplicateGroupLimit, // Show user we're limiting display
+		"ShowingCrossDisk":       len(crossDiskPlans),
+		"ShowingSameDisk":        len(sameDiskPlans),
 	}
 
 	// Render template
