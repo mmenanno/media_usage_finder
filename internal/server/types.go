@@ -127,12 +127,14 @@ type FilesData struct {
 	AvailableDisks    []*disk.DiskInfo     // Available disks for filter dropdown
 	DiskResolver      *disk.DeviceResolver // For resolving device IDs to friendly names
 	HasDiskLocations  bool                 // True if disk location tracking is enabled
+	Version           string               // Application version
 }
 
 // ConfigData represents data for the configuration template
 type ConfigData struct {
-	Config interface{}
-	Title  string
+	Config  interface{}
+	Title   string
+	Version string // Application version
 }
 
 // StatsData represents data for the statistics template
@@ -142,6 +144,7 @@ type StatsData struct {
 	Disks                  []*disk.DiskInfo
 	CrossDiskDuplicates    int64 // Count of files on multiple disks
 	HasDiskLocations       bool  // True if disk location tracking is enabled
+	Version                string // Application version
 }
 
 // HardlinksData represents data for the hardlinks template
@@ -155,6 +158,7 @@ type HardlinksData struct {
 	Search     string // Search query for filtering by path
 	OrderBy    string // Sort field (link_count, space_saved, first_path)
 	Direction  string // Sort direction (asc, desc)
+	Version    string // Application version
 }
 
 // ScansData represents data for the scans history template
@@ -164,10 +168,12 @@ type ScansData struct {
 	Page       int64
 	TotalPages int
 	Title      string
+	Version    string // Application version
 }
 
 // AdvancedData represents data for the advanced settings template
 type AdvancedData struct {
-	Stats interface{}
-	Title string
+	Stats   interface{}
+	Title   string
+	Version string // Application version
 }

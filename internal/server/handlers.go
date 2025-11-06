@@ -409,6 +409,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		AvailableDisks:    availableDisks,
 		DiskResolver:      s.diskResolver,
 		HasDiskLocations:  len(s.config.Disks) > 0,
+		Version:           s.version,
 	}
 
 	s.renderTemplate(w, "files.html", data)
@@ -441,8 +442,9 @@ func (s *Server) HandleGetFileExtensions(w http.ResponseWriter, r *http.Request)
 // HandleConfig serves the configuration page
 func (s *Server) HandleConfig(w http.ResponseWriter, r *http.Request) {
 	data := ConfigData{
-		Config: s.config,
-		Title:  "Configuration",
+		Config:  s.config,
+		Title:   "Configuration",
+		Version: s.version,
 	}
 
 	s.renderTemplate(w, "config.html", data)
@@ -481,6 +483,7 @@ func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 		Disks:               disks,
 		CrossDiskDuplicates: crossDiskDuplicates,
 		HasDiskLocations:    hasDiskLocations,
+		Version:             s.version,
 	}
 
 	s.renderTemplate(w, "stats.html", data)
@@ -565,6 +568,7 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 		Search:     search,
 		OrderBy:    orderBy,
 		Direction:  direction,
+		Version:    s.version,
 	}
 
 	s.renderTemplate(w, "hardlinks.html", data)
@@ -618,6 +622,7 @@ func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
 		Page:       int64(page),
 		TotalPages: CalculateTotalPages(total, limit),
 		Title:      "Scan History",
+		Version:    s.version,
 	}
 
 	s.renderTemplate(w, "scans.html", data)
@@ -3010,8 +3015,9 @@ func (s *Server) HandleAdvanced(w http.ResponseWriter, r *http.Request) {
 	dbStats := s.getDatabaseStats()
 
 	data := AdvancedData{
-		Title: "Advanced Settings",
-		Stats: dbStats,
+		Title:   "Advanced Settings",
+		Stats:   dbStats,
+		Version: s.version,
 	}
 
 	s.renderTemplate(w, "advanced.html", data)
@@ -3464,6 +3470,9 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 		},
 		"mul": func(a, b interface{}) float64 {
 			return toFloat64(a) * toFloat64(b)
+		},
+		"mulInt": func(a, b interface{}) int64 {
+			return int64(toFloat64(a) * toFloat64(b))
 		},
 		"div": func(a, b interface{}) float64 {
 			fb := toFloat64(b)
