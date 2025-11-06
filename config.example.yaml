@@ -188,6 +188,12 @@ duplicate_detection:
   # - Set to 0 to hash all files
   min_file_size: 10485760
 
+  # Don't hash files larger than this size (in bytes)
+  # - Default: 0 (unlimited - hash all files)
+  # - Useful for focusing on small files only
+  # - Example: 104857600 (100 MB) to only hash files under 100MB
+  max_file_size: 0
+
   # Rate limit for hashing in MB/s (0 = unlimited)
   # - Default: 200 (200 MB/s)
   # - Helps prevent disk saturation during hash scanning

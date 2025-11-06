@@ -107,6 +107,7 @@ type DuplicateDetectionConfig struct {
 	HashWorkers           int    `yaml:"hash_workers"`             // Number of parallel hash workers
 	HashBufferSize        string `yaml:"hash_buffer_size"`         // Buffer size for file reads (e.g., "4MB", "8MB")
 	MinFileSize           int64  `yaml:"min_file_size"`            // Only hash files larger than this (bytes)
+	MaxFileSize           int64  `yaml:"max_file_size"`            // Don't hash files larger than this (bytes, 0 = unlimited)
 	MaxHashRateMB         int    `yaml:"max_hash_rate_mbps"`       // Rate limit for hashing (MB/s, 0 = unlimited)
 	EnableProgressiveHash bool   `yaml:"enable_progressive_hash"`  // Enable progressive hash verification (incremental levels)
 	HashOrder             string `yaml:"hash_order"`               // Order strategy: "smallest_first", "largest_first", "random", "by_disk", "by_duplicate_probability", "by_modification_time_newest", "by_modification_time_oldest", "db_order"
@@ -164,6 +165,7 @@ func Default() *Config {
 			HashWorkers:           4,
 			HashBufferSize:        "4MB",            // 4MB buffer for file reads
 			MinFileSize:           10485760,         // 10MB
+			MaxFileSize:           0,                // 0 = unlimited (hash all files)
 			MaxHashRateMB:         200,
 			EnableProgressiveHash: false,            // Progressive mode opt-in
 			HashOrder:             "smallest_first", // Hash smaller files first for fast initial progress

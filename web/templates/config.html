@@ -581,6 +581,14 @@
                     </div>
 
                     <div>
+                        <label for="max_file_size" class="block text-sm font-medium text-gray-400 mb-2">Maximum File Size (MB)</label>
+                        <input type="number" id="max_file_size" name="max_file_size" min="0" step="1"
+                               value="{{div .Config.DuplicateDetection.MaxFileSize 1048576}}"
+                               class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Don't hash files larger than this (0 = unlimited)</p>
+                    </div>
+
+                    <div>
                         <label for="max_hash_rate" class="block text-sm font-medium text-gray-400 mb-2">Max Hash Rate (MB/s)</label>
                         <input type="number" id="max_hash_rate" name="max_hash_rate" min="0" step="10"
                                value="{{.Config.DuplicateDetection.MaxHashRateMB}}"

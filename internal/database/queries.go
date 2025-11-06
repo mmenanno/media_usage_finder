@@ -2538,13 +2538,18 @@ func (db *DB) GetHashedFileCount() (int64, error) {
 }
 
 // GetTotalHashableFileCount returns the count of all files (for progress tracking)
-func (db *DB) GetTotalHashableFileCount(minSize int64) (int64, error) {
+func (db *DB) GetTotalHashableFileCount(minSize int64, maxSize int64) (int64, error) {
 	query := `SELECT COUNT(*) FROM files WHERE 1=1`
 	args := []interface{}{}
 
 	if minSize > 0 {
 		query += ` AND size >= ?`
 		args = append(args, minSize)
+	}
+
+	if maxSize > 0 {
+		query += ` AND size <= ?`
+		args = append(args, maxSize)
 	}
 
 	var count int64

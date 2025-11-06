@@ -57,27 +57,39 @@
                 <button
                     hx-post="/api/hash/verify"
                     hx-swap="none"
-                    class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 rounded transition cursor-pointer text-sm">
+                    class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 rounded transition cursor-pointer text-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
                     Verify Duplicates
                 </button>
                 <button
                     hx-post="/api/hash/verify-progressive"
                     hx-swap="none"
                     hx-confirm="Start progressive verification? This will upgrade duplicates through increasing hash levels (1MB → 10MB → 100MB → 1GB → 10GB → Full)"
-                    class="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded transition cursor-pointer text-sm"
+                    class="px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded transition cursor-pointer text-sm flex items-center gap-2"
                     title="Progressive verification upgrades hash levels incrementally">
-                    🔄 Progressive Verify
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Progressive Verify
                 </button>
                 <button
                     hx-post="/api/hash/upgrade-all"
                     hx-swap="none"
-                    class="px-3 py-2 bg-orange-600 hover:bg-orange-700 rounded transition cursor-pointer text-sm">
+                    class="px-3 py-2 bg-orange-600 hover:bg-orange-700 rounded transition cursor-pointer text-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path>
+                    </svg>
                     Upgrade All Hashes
                 </button>
                 <button
                     hx-post="/api/hash/start"
                     hx-swap="none"
-                    class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition cursor-pointer">
+                    class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition cursor-pointer flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+                    </svg>
                     Calculate Hashes
                 </button>
             </div>

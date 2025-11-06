@@ -1704,6 +1704,13 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	maxFileSize := r.FormValue("max_file_size")
+	if maxFileSize != "" {
+		if size, err := strconv.ParseInt(maxFileSize, 10, 64); err == nil && size >= 0 {
+			s.config.DuplicateDetection.MaxFileSize = size * 1024 * 1024 // Convert MB to bytes
+		}
+	}
+
 	maxHashRate := r.FormValue("max_hash_rate")
 	if maxHashRate != "" {
 		if rate, err := strconv.Atoi(maxHashRate); err == nil && rate >= 0 {
@@ -3727,7 +3734,8 @@ func (s *Server) HandleStartHashScan(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 
 		minSize := s.config.DuplicateDetection.MinFileSize
-		if err := s.hashScanner.Start(ctx, minSize, 0); err != nil {
+		maxSize := s.config.DuplicateDetection.MaxFileSize
+		if err := s.hashScanner.Start(ctx, minSize, maxSize); err != nil {
 			log.Printf("ERROR: Hash scan failed: %v", err)
 		} else {
 			log.Printf("INFO: Hash scan completed successfully")
@@ -3845,7 +3853,7 @@ func (s *Server) HandleHashProgressHTML(w http.ResponseWriter, r *http.Request) 
 	if progress == nil || !progress.IsRunning {
 		// No hash scan running
 		hashedCount, _ := s.db.GetHashedFileCount()
-		totalCount, _ := s.db.GetTotalHashableFileCount(s.config.DuplicateDetection.MinFileSize)
+		totalCount, _ := s.db.GetTotalHashableFileCount(s.config.DuplicateDetection.MinFileSize, s.config.DuplicateDetection.MaxFileSize)
 		quickDupCount, _ := s.db.GetQuickHashDuplicateCount()
 		quickHashCount, _ := s.db.GetQuickHashCount()
 
