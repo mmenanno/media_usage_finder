@@ -795,14 +795,20 @@ func (db *DB) GetScanLogs(filters LogFilters) ([]*ScanLog, error) {
 		args = append(args, filters.Offset)
 	}
 
+	// Debug logging
+	log.Printf("DEBUG: GetScanLogs query: %s, args: %v", query, args)
+
 	rows, err := db.conn.Query(query, args...)
 	if err != nil {
+		log.Printf("ERROR: GetScanLogs query failed: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
 
 	var logs []*ScanLog
+	rowCount := 0
 	for rows.Next() {
+		rowCount++
 		var log ScanLog
 		var timestampUnix int64
 		var createdAtUnix int64
@@ -825,6 +831,7 @@ func (db *DB) GetScanLogs(filters LogFilters) ([]*ScanLog, error) {
 		logs = append(logs, &log)
 	}
 
+	log.Printf("DEBUG: GetScanLogs retrieved %d rows", rowCount)
 	return logs, rows.Err()
 }
 

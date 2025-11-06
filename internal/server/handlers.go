@@ -731,6 +731,10 @@ func (s *Server) HandleGetScanLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Debug logging to diagnose "Showing 0" issue
+	log.Printf("DEBUG: HandleGetScanLogs - Retrieved %d logs, total count: %d, limit: %d, offset: %d",
+		len(logs), total, filters.Limit, filters.Offset)
+
 	// Calculate pagination info
 	currentPage := (filters.Offset / filters.Limit) + 1
 	totalPages := (total + filters.Limit - 1) / filters.Limit
