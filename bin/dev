@@ -84,6 +84,51 @@ cleanup() {
 
 trap cleanup INT TERM
 
+# Function to kill existing instances
+kill_existing_instances() {
+  echo -e "${CYAN}Checking for existing instances...${NC}"
+
+  # Find processes by binary name
+  EXISTING_PIDS=$(pgrep -f "media-finder-dev serve" || true)
+
+  if [ ! -z "$EXISTING_PIDS" ]; then
+    echo -e "${YELLOW}Found existing instance(s), shutting down...${NC}"
+    echo "$EXISTING_PIDS" | while read pid; do
+      echo "  Killing PID $pid"
+      kill $pid 2>/dev/null || true
+    done
+
+    # Wait a moment for graceful shutdown
+    sleep 1
+
+    # Force kill if still running
+    STILL_RUNNING=$(pgrep -f "media-finder-dev serve" || true)
+    if [ ! -z "$STILL_RUNNING" ]; then
+      echo -e "${YELLOW}Force killing remaining processes...${NC}"
+      echo "$STILL_RUNNING" | while read pid; do
+        kill -9 $pid 2>/dev/null || true
+      done
+    fi
+
+    echo -e "${GREEN}✓ Existing instances stopped${NC}"
+  else
+    echo -e "${GREEN}✓ No existing instances found${NC}"
+  fi
+
+  # Also check if port 8787 is in use
+  PORT_PID=$(lsof -ti:8787 || true)
+  if [ ! -z "$PORT_PID" ]; then
+    echo -e "${YELLOW}Port 8787 is in use by PID $PORT_PID, killing...${NC}"
+    kill $PORT_PID 2>/dev/null || kill -9 $PORT_PID 2>/dev/null || true
+    sleep 1
+  fi
+
+  echo ""
+}
+
+# Kill any existing instances before starting
+kill_existing_instances
+
 echo -e "${GREEN}Starting development server on http://localhost:8787${NC}"
 echo -e "${CYAN}✓ Hot-reload enabled (polling mode)${NC}"
 echo "Press Ctrl+C to stop"

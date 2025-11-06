@@ -147,7 +147,9 @@ func (s *Server) LoadTemplates(pattern string) error {
 	}
 
 	for _, partial := range partials {
-		tmpl, err := template.New(partial).Funcs(s.templateFuncs).ParseFiles(
+		// Create template set without a named root to avoid conflicts
+		// ParseFiles will add the file content as a named template
+		tmpl, err := template.New("").Funcs(s.templateFuncs).ParseFiles(
 			baseDir + "/" + partial,
 		)
 		if err != nil {
@@ -731,10 +733,6 @@ func (s *Server) HandleGetScanLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Debug logging to diagnose "Showing 0" issue
-	log.Printf("DEBUG: HandleGetScanLogs - Retrieved %d logs, total count: %d, limit: %d, offset: %d",
-		len(logs), total, filters.Limit, filters.Offset)
-
 	// Calculate pagination info
 	currentPage := (filters.Offset / filters.Limit) + 1
 	totalPages := (total + filters.Limit - 1) / filters.Limit
@@ -753,23 +751,16 @@ func (s *Server) HandleGetScanLogs(w http.ResponseWriter, r *http.Request) {
 
 	if isHTMX {
 		// Return just the logs table fragment for HTMX updates
-		tmpl, ok := s.templates["logs_table.html"]
+		tmplSet, ok := s.templates["logs_table.html"]
 		if !ok {
 			http.Error(w, "logs_table template not found", http.StatusInternalServerError)
 			return
 		}
-		// Debug: Verify data structure before template execution
-		log.Printf("DEBUG: Template data - Logs type: %T, len: %d, nil: %v, Total: %v",
-			data["Logs"], len(logs), logs == nil, data["Total"])
-		if len(logs) > 0 {
-			log.Printf("DEBUG: First log - ID: %d, ScanID: %d, Level: %s",
-				logs[0].ID, logs[0].ScanID, logs[0].Level)
-		}
 
-		// Execute template directly without layout wrapper for partial update
-		if err := tmpl.Execute(w, data); err != nil {
-			log.Printf("ERROR: Failed to execute logs_table template: %v", err)
+		if err := tmplSet.ExecuteTemplate(w, "logs_table.html", data); err != nil {
+			log.Printf("ERROR: Failed to execute template: %v", err)
 			http.Error(w, "Failed to render logs", http.StatusInternalServerError)
+			return
 		}
 	} else {
 		// Return JSON for API requests
@@ -3655,16 +3646,7 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 			return toFloat64(a) / fb
 		},
 		"join": strings.Join,
-		"len": func(v interface{}) int {
-			switch val := v.(type) {
-			case map[string]interface{}:
-				return len(val)
-			case []interface{}:
-				return len(val)
-			default:
-				return 0
-			}
-		},
+		// Note: Using Go's built-in len function instead of custom override
 		"toInt64": func(v interface{}) int64 {
 			switch val := v.(type) {
 			case float64:
