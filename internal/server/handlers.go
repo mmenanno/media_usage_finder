@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -447,10 +448,21 @@ func (s *Server) HandleGetFileExtensions(w http.ResponseWriter, r *http.Request)
 
 // HandleConfig serves the configuration page
 func (s *Server) HandleConfig(w http.ResponseWriter, r *http.Request) {
+	cpuCores := runtime.NumCPU()
+	recommendedWorkers := cpuCores
+	if recommendedWorkers > 16 {
+		recommendedWorkers = 16 // Cap at 16 for diminishing returns
+	}
+	if recommendedWorkers < 4 {
+		recommendedWorkers = 4 // Minimum of 4
+	}
+
 	data := ConfigData{
-		Config:  s.config,
-		Title:   "Configuration",
-		Version: s.version,
+		Config:             s.config,
+		Title:              "Configuration",
+		Version:            s.version,
+		CPUCores:           cpuCores,
+		RecommendedWorkers: recommendedWorkers,
 	}
 
 	s.renderTemplate(w, "config.html", data)
@@ -1521,6 +1533,12 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if cacheSize := r.FormValue("db_cache_size"); cacheSize != "" {
+		if size, err := strconv.Atoi(cacheSize); err == nil && size > 0 {
+			s.config.DBCacheSize = size
+		}
+	}
+
 	// Collect all validation errors before updating config
 	var validationErrors []string
 
@@ -1685,6 +1703,17 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	if maxHashRate != "" {
 		if rate, err := strconv.Atoi(maxHashRate); err == nil && rate >= 0 {
 			s.config.DuplicateDetection.MaxHashRateMB = rate
+		}
+	}
+
+	hashBufferSize := r.FormValue("hash_buffer_size")
+	if hashBufferSize != "" {
+		// Validate buffer size using disk.ParseSize()
+		if size, err := disk.ParseSize(hashBufferSize); err == nil {
+			// Validate range: 512KB - 16MB
+			if size >= 524288 && size <= 16777216 {
+				s.config.DuplicateDetection.HashBufferSize = hashBufferSize
+			}
 		}
 	}
 
@@ -4125,8 +4154,16 @@ func (s *Server) HandleConsolidateDuplicates(w http.ResponseWriter, r *http.Requ
 	// Create analyzer and consolidator
 	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
 
+	// Parse buffer size from config
+	bufferSize := 4 * 1024 * 1024 // Default 4MB
+	if s.config.DuplicateDetection.HashBufferSize != "" {
+		if size, err := disk.ParseSize(s.config.DuplicateDetection.HashBufferSize); err == nil {
+			bufferSize = int(size)
+		}
+	}
+
 	// Create hasher for verification
-	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm)
+	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm, bufferSize)
 	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
 
 	// Get all cross-disk duplicates (0 = no limit, needed for consolidation)
@@ -4193,8 +4230,16 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	// Create analyzer and consolidator
 	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
 
+	// Parse buffer size from config
+	bufferSize := 4 * 1024 * 1024 // Default 4MB
+	if s.config.DuplicateDetection.HashBufferSize != "" {
+		if size, err := disk.ParseSize(s.config.DuplicateDetection.HashBufferSize); err == nil {
+			bufferSize = int(size)
+		}
+	}
+
 	// Create hasher for verification
-	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm)
+	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm, bufferSize)
 	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
 
 	// Get all same-disk duplicates (0 = no limit, needed for hardlinking)
@@ -4256,8 +4301,16 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 	// Create analyzer
 	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
 
+	// Parse buffer size from config
+	bufferSize := 4 * 1024 * 1024 // Default 4MB
+	if s.config.DuplicateDetection.HashBufferSize != "" {
+		if size, err := disk.ParseSize(s.config.DuplicateDetection.HashBufferSize); err == nil {
+			bufferSize = int(size)
+		}
+	}
+
 	// Create hasher and consolidator
-	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm)
+	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm, bufferSize)
 	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
 
 	var plans []*duplicates.ConsolidationPlan

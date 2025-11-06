@@ -496,7 +496,18 @@
                         <input type="number" id="hash_workers" name="hash_workers" min="1" max="32"
                                value="{{.Config.DuplicateDetection.HashWorkers}}"
                                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
-                        <p class="text-xs text-gray-500 mt-1">Parallel hash calculation workers (default: 4)</p>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Parallel hash calculation workers (default: 4)
+                            {{if .CPUCores}}<br>Your server has {{.CPUCores}} CPU cores. Recommended: {{.RecommendedWorkers}} workers.{{end}}
+                        </p>
+                    </div>
+
+                    <div>
+                        <label for="hash_buffer_size" class="block text-sm font-medium text-gray-400 mb-2">Hash Buffer Size</label>
+                        <input type="text" id="hash_buffer_size" name="hash_buffer_size"
+                               value="{{.Config.DuplicateDetection.HashBufferSize}}" placeholder="4MB"
+                               class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Buffer size for reading files (e.g., "1MB", "4MB", "8MB"). Larger = faster for big files. Default: 4MB</p>
                     </div>
 
                     <div>
@@ -513,6 +524,14 @@
                                value="{{.Config.DuplicateDetection.MaxHashRateMB}}"
                                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                         <p class="text-xs text-gray-500 mt-1">Rate limit for hashing (0 = unlimited)</p>
+                    </div>
+
+                    <div>
+                        <label for="db_cache_size" class="block text-sm font-medium text-gray-400 mb-2">Database Cache Size (KB)</label>
+                        <input type="number" id="db_cache_size" name="db_cache_size" min="0" step="100000"
+                               value="{{.Config.DBCacheSize}}" placeholder="1000000"
+                               class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">SQLite cache size in KB (1000000 ≈ 1GB). Larger = faster queries. Default: 1000000</p>
                     </div>
                 </div>
             </div>

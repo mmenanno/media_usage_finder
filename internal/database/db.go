@@ -21,6 +21,7 @@ type DBConfig struct {
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
+	CacheSize       int // SQLite cache size in KB (0 = default)
 }
 
 // New creates a new database connection and initializes the schema
@@ -49,6 +50,15 @@ func NewWithConfig(dbPath string, cfg DBConfig) (*DB, error) {
 	conn.SetMaxOpenConns(cfg.MaxOpenConns)
 	conn.SetMaxIdleConns(cfg.MaxIdleConns)
 	conn.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+
+	// Apply SQLite cache size if configured (negative value = KB)
+	if cfg.CacheSize > 0 {
+		_, err = conn.Exec(fmt.Sprintf("PRAGMA cache_size = -%d", cfg.CacheSize))
+		if err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("failed to set cache size: %w", err)
+		}
+	}
 
 	db := &DB{conn: conn}
 

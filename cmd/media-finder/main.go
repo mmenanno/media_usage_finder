@@ -69,6 +69,7 @@ orphaned files and optimizes storage through hardlink detection.`,
 				MaxOpenConns:    cfg.DBMaxOpenConns,
 				MaxIdleConns:    cfg.DBMaxIdleConns,
 				ConnMaxLifetime: cfg.DBConnMaxLifetime,
+				CacheSize:       cfg.DBCacheSize,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to open database: %w", err)

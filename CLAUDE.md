@@ -479,6 +479,16 @@ scan_workers: 10           # Number of concurrent file processors
 scan_buffer_size: 100      # File processing queue buffer size
 api_timeout: 30s           # Timeout for service API calls
 stats_cache_ttl: 30s       # Statistics cache duration
+
+# Hash verification performance (for 128GB RAM servers)
+hash_buffer_size: "4MB"    # Buffer for file reads (512KB-16MB range)
+                           # Larger = faster for big files (fewer syscalls)
+                           # 4MB default optimal for most media files
+                           # 8MB recommended for 4K/8K remuxes (50GB+)
+
+db_cache_size: 1000000     # SQLite cache size in KB (~1GB)
+                           # Larger = faster queries during scans
+                           # Adjust based on available RAM
 ```
 
 ### Server Configuration
@@ -661,6 +671,19 @@ Currently no authentication is implemented. If exposing to internet:
 - SQLite WAL mode enabled by default (allows concurrent reads)
 - Comprehensive indexes for common query patterns
 - Use `VACUUM` periodically to optimize database file
+- Increase `db_cache_size` for high-RAM systems (default: 1GB for 128GB RAM)
+
+**Hash Verification** (v0.41.0+):
+
+- **Buffer size optimization**: Use larger buffers for faster hashing
+  - Default: 4MB (optimal for most media files)
+  - Large files (50GB+ 4K remuxes): Try 8MB
+  - Available RAM: Even 16MB × 10 workers = only 160MB
+- **OS-level optimizations**: Automatic `POSIX_FADV_SEQUENTIAL` hints
+  - Doubles kernel read-ahead for 20-40% faster sequential reads
+  - Automatic cache management for files >1GB
+- **Hardware acceleration**: BLAKE3 auto-uses AVX2/AVX-512 if available
+  - i9-12900K: AVX-512 support depends on manufacturing date (2021=yes, 2022+=no)
 
 **Statistics**:
 

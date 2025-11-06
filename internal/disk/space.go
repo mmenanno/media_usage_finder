@@ -81,6 +81,70 @@ func FormatBytes(bytes int64) string {
 	}
 }
 
+// ParseSize converts human-readable size strings to bytes
+// Supports formats: "4MB", "10GB", "512KB", "2TB", or plain numbers (bytes)
+// Case-insensitive. Returns error for invalid formats.
+func ParseSize(sizeStr string) (int64, error) {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+		TB = GB * 1024
+		PB = TB * 1024
+	)
+
+	if sizeStr == "" {
+		return 0, fmt.Errorf("size string cannot be empty")
+	}
+
+	// Try parsing as plain number first (bytes)
+	var value float64
+	var unit string
+	n, err := fmt.Sscanf(sizeStr, "%f%s", &value, &unit)
+
+	if err != nil || n == 0 {
+		return 0, fmt.Errorf("invalid size format: %s (expected format like '4MB', '10GB', or '1024')", sizeStr)
+	}
+
+	if value < 0 {
+		return 0, fmt.Errorf("size cannot be negative: %s", sizeStr)
+	}
+
+	// If no unit specified, treat as bytes
+	if n == 1 {
+		return int64(value), nil
+	}
+
+	// Convert unit to uppercase for case-insensitive matching
+	unit = fmt.Sprintf("%s", sizeStr[len(sizeStr)-len(unit):])
+	unitUpper := ""
+	for _, r := range unit {
+		if r >= 'a' && r <= 'z' {
+			unitUpper += string(r - 32)
+		} else {
+			unitUpper += string(r)
+		}
+	}
+
+	// Match unit and calculate bytes
+	switch unitUpper {
+	case "B":
+		return int64(value), nil
+	case "KB":
+		return int64(value * KB), nil
+	case "MB":
+		return int64(value * MB), nil
+	case "GB":
+		return int64(value * GB), nil
+	case "TB":
+		return int64(value * TB), nil
+	case "PB":
+		return int64(value * PB), nil
+	default:
+		return 0, fmt.Errorf("unsupported unit: %s (supported: B, KB, MB, GB, TB, PB)", unitUpper)
+	}
+}
+
 // GetDiskUsageSummary returns a summary string for a disk
 func GetDiskUsageSummary(info *SpaceInfo) string {
 	return fmt.Sprintf("%s used / %s total (%.1f%% full)",

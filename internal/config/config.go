@@ -25,6 +25,7 @@ type Config struct {
 	DBMaxOpenConns    int           `yaml:"db_max_open_conns"`
 	DBMaxIdleConns    int           `yaml:"db_max_idle_conns"`
 	DBConnMaxLifetime time.Duration `yaml:"db_conn_max_lifetime"`
+	DBCacheSize       int           `yaml:"db_cache_size"` // SQLite cache size in KB (e.g., 1000000 = ~1GB)
 
 	LocalPathMappings   []PathMapping            `yaml:"local_path_mappings"`
 	ServicePathMappings map[string][]PathMapping `yaml:"service_path_mappings"`
@@ -100,12 +101,13 @@ type DiskConfig struct {
 
 // DuplicateDetectionConfig contains configuration for file hashing and duplicate detection
 type DuplicateDetectionConfig struct {
-	Enabled       bool   `yaml:"enabled"`         // Enable duplicate detection features
-	HashAlgorithm string `yaml:"hash_algorithm"`  // Hash algorithm to use ("sha256" or "blake3")
-	HashMode      string `yaml:"hash_mode"`       // Hash mode: "full", "quick_manual", or "quick_auto"
-	HashWorkers   int    `yaml:"hash_workers"`    // Number of parallel hash workers
-	MinFileSize   int64  `yaml:"min_file_size"`   // Only hash files larger than this (bytes)
-	MaxHashRateMB int    `yaml:"max_hash_rate_mbps"` // Rate limit for hashing (MB/s, 0 = unlimited)
+	Enabled        bool   `yaml:"enabled"`            // Enable duplicate detection features
+	HashAlgorithm  string `yaml:"hash_algorithm"`     // Hash algorithm to use ("sha256" or "blake3")
+	HashMode       string `yaml:"hash_mode"`          // Hash mode: "full", "quick_manual", or "quick_auto"
+	HashWorkers    int    `yaml:"hash_workers"`       // Number of parallel hash workers
+	HashBufferSize string `yaml:"hash_buffer_size"`   // Buffer size for file reads (e.g., "4MB", "8MB")
+	MinFileSize    int64  `yaml:"min_file_size"`      // Only hash files larger than this (bytes)
+	MaxHashRateMB  int    `yaml:"max_hash_rate_mbps"` // Rate limit for hashing (MB/s, 0 = unlimited)
 }
 
 // DuplicateConsolidationConfig contains configuration for duplicate file consolidation
@@ -130,6 +132,7 @@ func Default() *Config {
 		DBMaxOpenConns:       25,
 		DBMaxIdleConns:       5,
 		DBConnMaxLifetime:    5 * time.Minute,
+		DBCacheSize:          1000000, // 1GB SQLite cache
 		LocalPathMappings: []PathMapping{
 			{Service: "/media", Local: "/mnt/user/data/media"},
 			{Service: "/downloads", Local: "/mnt/user/data/downloads/torrents"},
@@ -153,12 +156,13 @@ func Default() *Config {
 		ScanPaths: []string{"/media", "/downloads"},
 		Disks: []DiskConfig{},
 		DuplicateDetection: DuplicateDetectionConfig{
-			Enabled:       true,
-			HashAlgorithm: "sha256",
-			HashMode:      "quick_manual", // Default to quick hash with manual verification
-			HashWorkers:   4,
-			MinFileSize:   10485760, // 10MB
-			MaxHashRateMB: 200,
+			Enabled:        true,
+			HashAlgorithm:  "sha256",
+			HashMode:       "quick_manual", // Default to quick hash with manual verification
+			HashWorkers:    4,
+			HashBufferSize: "4MB", // 4MB buffer for file reads
+			MinFileSize:    10485760, // 10MB
+			MaxHashRateMB:  200,
 		},
 		DuplicateConsolidation: DuplicateConsolidationConfig{
 			Enabled:              true,

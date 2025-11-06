@@ -15,13 +15,19 @@ import (
 type FileHasher struct {
 	algorithm     string // "sha256" or "blake3"
 	quickHashSize int64  // Size of quick hash chunks (default: 1MB)
+	bufferSize    int    // Buffer size for full hash reads (configurable)
 }
 
-// NewFileHasher creates a new FileHasher with the specified algorithm
-func NewFileHasher(algorithm string) *FileHasher {
+// NewFileHasher creates a new FileHasher with the specified algorithm and buffer size
+func NewFileHasher(algorithm string, bufferSize int) *FileHasher {
+	// Default to 4MB if buffer size not specified or invalid
+	if bufferSize <= 0 {
+		bufferSize = 4 * 1024 * 1024 // 4MB default
+	}
 	return &FileHasher{
 		algorithm:     algorithm,
 		quickHashSize: 1024 * 1024, // 1MB
+		bufferSize:    bufferSize,
 	}
 }
 
@@ -91,9 +97,23 @@ func (h *FileHasher) FullHash(path string) (string, error) {
 	}
 	defer f.Close()
 
+	// Hint to kernel that we'll read sequentially (doubles read-ahead)
+	// Gracefully degrades on non-Linux systems
+	applySequentialHint(f)
+
 	hasher := h.createHasher()
-	if _, err := io.Copy(hasher, f); err != nil {
+
+	// Use configurable buffer size for better performance
+	buf := make([]byte, h.bufferSize)
+	if _, err := io.CopyBuffer(hasher, f, buf); err != nil {
 		return "", fmt.Errorf("failed to hash file: %w", err)
+	}
+
+	// Get file size to determine if we should free cache
+	stat, err := f.Stat()
+	if err == nil {
+		// Free page cache for large files to prevent cache pollution
+		releaseCacheForLargeFile(f, stat.Size())
 	}
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
@@ -108,10 +128,13 @@ func (h *FileHasher) HashWithProgress(path string, progressFunc func(bytesRead i
 	}
 	defer f.Close()
 
+	// Hint to kernel that we'll read sequentially (doubles read-ahead)
+	applySequentialHint(f)
+
 	hasher := h.createHasher()
 
-	// Use a buffer for reading
-	buf := make([]byte, 32*1024) // 32KB buffer
+	// Use configurable buffer size for reading
+	buf := make([]byte, h.bufferSize)
 	var totalRead int64
 
 	for {
@@ -135,6 +158,9 @@ func (h *FileHasher) HashWithProgress(path string, progressFunc func(bytesRead i
 			return "", fmt.Errorf("failed to read file: %w", err)
 		}
 	}
+
+	// Free page cache for large files to prevent cache pollution
+	releaseCacheForLargeFile(f, totalRead)
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }

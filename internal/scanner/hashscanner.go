@@ -10,6 +10,7 @@ import (
 
 	"github.com/mmenanno/media-usage-finder/internal/config"
 	"github.com/mmenanno/media-usage-finder/internal/database"
+	"github.com/mmenanno/media-usage-finder/internal/disk"
 )
 
 // HashScanner handles file hashing operations
@@ -29,10 +30,18 @@ type HashScanner struct {
 
 // NewHashScanner creates a new hash scanner
 func NewHashScanner(db *database.DB, cfg *config.DuplicateDetectionConfig) *HashScanner {
+	// Parse buffer size from config string (e.g., "4MB")
+	bufferSize := 4 * 1024 * 1024 // Default 4MB
+	if cfg.HashBufferSize != "" {
+		if size, err := disk.ParseSize(cfg.HashBufferSize); err == nil {
+			bufferSize = int(size)
+		}
+	}
+
 	return &HashScanner{
 		db:     db,
 		config: cfg,
-		hasher: NewFileHasher(cfg.HashAlgorithm),
+		hasher: NewFileHasher(cfg.HashAlgorithm, bufferSize),
 	}
 }
 

@@ -134,9 +134,11 @@ type FilesData struct {
 
 // ConfigData represents data for the configuration template
 type ConfigData struct {
-	Config  interface{}
-	Title   string
-	Version string // Application version
+	Config             interface{}
+	Title              string
+	Version            string // Application version
+	CPUCores           int    // Number of CPU cores on the server
+	RecommendedWorkers int    // Recommended number of hash workers
 }
 
 // StatsData represents data for the statistics template
