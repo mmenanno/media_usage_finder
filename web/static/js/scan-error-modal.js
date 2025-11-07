@@ -100,7 +100,7 @@ class ScanErrorModal {
                         </div>
                         <button
                             onclick="scanErrorModal.hide()"
-                            class="text-gray-400 hover:text-white transition p-1 cursor-pointer"
+                            class="text-gray-400 hover:text-white transition p-1"
                             aria-label="Close">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -130,7 +130,7 @@ class ScanErrorModal {
                     <div class="bg-gray-700 px-6 py-4 flex justify-end items-center border-t border-gray-600">
                         <button
                             onclick="scanErrorModal.hide()"
-                            class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded transition cursor-pointer">
+                            class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded transition">
                             Close
                         </button>
                     </div>

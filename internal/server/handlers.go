@@ -1285,14 +1285,14 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 					hx-post="/api/scan/cancel"
 					hx-swap="none"
 					hx-confirm="Cancel the current scan gracefully? The current service update will complete before stopping."
-					class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm transition cursor-pointer">
+					class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm transition">
 					Cancel Scan
 				</button>
 				<button
 					hx-post="/api/scan/force-stop"
 					hx-swap="none"
 					hx-confirm="Force stop the scan immediately? This may leave the database in an inconsistent state."
-					class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition cursor-pointer">
+					class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition">
 					Force Stop
 				</button>
 			</div>
@@ -1393,14 +1393,14 @@ func (s *Server) HandleScanProgressHTML(w http.ResponseWriter, r *http.Request) 
 					hx-post="/api/scan/cancel"
 					hx-swap="none"
 					hx-confirm="Cancel the current scan gracefully? The scan will finish processing the current file before stopping."
-					class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm transition cursor-pointer">
+					class="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-sm transition">
 					Cancel Scan
 				</button>
 				<button
 					hx-post="/api/scan/force-stop"
 					hx-swap="none"
 					hx-confirm="Force stop the scan immediately? This may leave the database in an inconsistent state."
-					class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition cursor-pointer">
+					class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition">
 					Force Stop
 				</button>
 			</div>
@@ -3910,7 +3910,7 @@ func (s *Server) HandleHashProgressHTML(w http.ResponseWriter, r *http.Request) 
 			<button
 				hx-post="/api/hash/cancel"
 				hx-swap="none"
-				class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm cursor-pointer">
+				class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm">
 				Cancel
 			</button>
 		</div>

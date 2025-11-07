@@ -303,10 +303,10 @@ showToast(
         </svg>
     </button>
     <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700">
-        <div data-dropdown-option data-value="option1" class="px-4 py-2 hover:bg-gray-600 cursor-pointer">
+        <div data-dropdown-option data-value="option1" class="px-4 py-2 hover:bg-gray-600">
             Option 1
         </div>
-        <div data-dropdown-option data-value="option2" class="px-4 py-2 hover:bg-gray-600 cursor-pointer">
+        <div data-dropdown-option data-value="option2" class="px-4 py-2 hover:bg-gray-600">
             Option 2
         </div>
     </div>

@@ -23,6 +23,60 @@
   --color-service-stash: #FF6B35;
 }
 
+/* Global cursor-pointer for interactive elements */
+@layer base {
+  /* Buttons and links - needed due to CSS reset */
+  button,
+  a {
+    cursor: pointer;
+  }
+
+  /* Custom dropdown components */
+  [data-dropdown-button],
+  [data-dropdown-option] {
+    cursor: pointer;
+  }
+
+  /* Custom service/device selection buttons */
+  [data-services-button],
+  [data-devices-button],
+  [data-select-all-services] {
+    cursor: pointer;
+  }
+
+  /* Form controls - checkboxes and radios */
+  input[type="checkbox"],
+  input[type="radio"] {
+    cursor: pointer;
+  }
+
+  /* Labels wrapping form controls */
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) {
+    cursor: pointer;
+  }
+
+  /* Common interactive elements with custom classes */
+  .service-checkbox,
+  .device-checkbox,
+  .file-checkbox {
+    cursor: pointer;
+  }
+
+  /* Pagination controls */
+  .pagination-btn {
+    cursor: pointer;
+  }
+
+  /* Close buttons and dismissible elements */
+  .toast-close,
+  .modal-close,
+  [aria-label="Close"],
+  [aria-label="Dismiss notification"] {
+    cursor: pointer;
+  }
+}
+
 /* Service color utility classes */
 .bg-service-plex { background-color: var(--color-service-plex); }
 .bg-service-plex-faded { background-color: rgba(255, 149, 0, 0.1); }

@@ -53,7 +53,7 @@
                             type="button"
                             data-services-button
                             aria-expanded="false"
-                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                             <span data-services-text>{{if .Services}}{{len .Services}} service(s){{else}}All Services{{end}}</span>
                             <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -64,15 +64,15 @@
                             <div class="px-4 py-3 border-b border-gray-600">
                                 <div class="text-xs font-medium text-gray-400 mb-2">Filter Mode:</div>
                                 <div class="space-y-1">
-                                    <label class="flex items-center space-x-2 cursor-pointer text-sm">
+                                    <label class="flex items-center space-x-2 text-sm">
                                         <input type="radio" name="service_filter_mode_radio" value="any" {{if or (not .ServiceFilterMode) (eq .ServiceFilterMode "any")}}checked{{end}} class="service-mode-radio w-3 h-3">
                                         <span class="text-gray-300">Any of selected</span>
                                     </label>
-                                    <label class="flex items-center space-x-2 cursor-pointer text-sm">
+                                    <label class="flex items-center space-x-2 text-sm">
                                         <input type="radio" name="service_filter_mode_radio" value="all" {{if eq .ServiceFilterMode "all"}}checked{{end}} class="service-mode-radio w-3 h-3">
                                         <span class="text-gray-300">All of selected</span>
                                     </label>
-                                    <label class="flex items-center space-x-2 cursor-pointer text-sm">
+                                    <label class="flex items-center space-x-2 text-sm">
                                         <input type="radio" name="service_filter_mode_radio" value="exact" {{if eq .ServiceFilterMode "exact"}}checked{{end}} class="service-mode-radio w-3 h-3">
                                         <span class="text-gray-300">Only selected (exact)</span>
                                     </label>
@@ -85,13 +85,13 @@
                                     <input
                                         type="checkbox"
                                         data-select-all-services
-                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded cursor-pointer">
-                                    <label class="text-sm font-medium text-gray-300 cursor-pointer">Select All</label>
+                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                                    <label class="text-sm font-medium text-gray-300">Select All</label>
                                 </div>
                             </div>
                             <div data-services-list>
                                 {{$selectedServices := .Services}}
-                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600 cursor-pointer">
+                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600">
                                     <input
                                         type="checkbox"
                                         value="plex"
@@ -99,7 +99,7 @@
                                         class="service-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded">
                                     <span class="text-gray-100">Plex</span>
                                 </label>
-                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600 cursor-pointer">
+                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600">
                                     <input
                                         type="checkbox"
                                         value="sonarr"
@@ -107,7 +107,7 @@
                                         class="service-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded">
                                     <span class="text-gray-100">Sonarr</span>
                                 </label>
-                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600 cursor-pointer">
+                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600">
                                     <input
                                         type="checkbox"
                                         value="radarr"
@@ -115,7 +115,7 @@
                                         class="service-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded">
                                     <span class="text-gray-100">Radarr</span>
                                 </label>
-                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600 cursor-pointer">
+                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600">
                                     <input
                                         type="checkbox"
                                         value="qbittorrent"
@@ -123,7 +123,7 @@
                                         class="service-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded">
                                     <span class="text-gray-100">qBittorrent</span>
                                 </label>
-                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600 cursor-pointer">
+                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600">
                                     <input
                                         type="checkbox"
                                         value="stash"
@@ -146,7 +146,7 @@
                             type="button"
                             data-devices-button
                             aria-expanded="false"
-                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                             <span data-devices-text>{{if .Devices}}{{len .Devices}} device(s){{else}}All Devices{{end}}</span>
                             <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -158,14 +158,14 @@
                                     <input
                                         type="checkbox"
                                         data-select-all-devices
-                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded cursor-pointer">
-                                    <label class="text-sm font-medium text-gray-300 cursor-pointer">Select All</label>
+                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                                    <label class="text-sm font-medium text-gray-300">Select All</label>
                                 </div>
                             </div>
                             <div data-devices-list>
                                 {{$selectedDevices := .Devices}}
                                 {{range $disk := .AvailableDisks}}
-                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600 cursor-pointer">
+                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600">
                                     <input
                                         type="checkbox"
                                         value="{{$disk.Name}}"
@@ -189,7 +189,7 @@
                             type="button"
                             data-extensions-button
                             aria-expanded="false"
-                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                             <span data-extensions-text>{{if .Extensions}}{{len .Extensions}} extension(s){{else}}All Extensions{{end}}</span>
                             <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
@@ -201,8 +201,8 @@
                                     <input
                                         type="checkbox"
                                         data-select-all-extensions
-                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded cursor-pointer">
-                                    <label class="text-sm font-medium text-gray-300 cursor-pointer">Select All</label>
+                                        class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                                    <label class="text-sm font-medium text-gray-300">Select All</label>
                                 </div>
                             </div>
                             <div data-extensions-list class="text-gray-400 text-sm px-4 py-2">Loading...</div>
@@ -213,7 +213,7 @@
 
             <!-- Orphaned Filter -->
             <div class="flex items-center">
-                <label class="flex items-center space-x-2 cursor-pointer">
+                <label class="flex items-center space-x-2">
                     <input
                         type="checkbox"
                         name="orphaned"
@@ -226,7 +226,7 @@
 
             <div class="flex justify-between items-center">
                 <div class="flex space-x-2">
-                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition cursor-pointer">
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
                         Apply Filters
                     </button>
                     <a href="/files" class="inline-block px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition">
@@ -244,21 +244,21 @@
                                 type="button"
                                 data-dropdown-button
                                 aria-expanded="false"
-                                class="pl-3 pr-8 py-1 bg-gray-700 border border-gray-600 rounded text-sm cursor-pointer focus:outline-none focus:border-blue-500 text-gray-100 text-left w-24">
+                                class="pl-3 pr-8 py-1 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500 text-gray-100 text-left w-24">
                                 <span data-dropdown-text>{{.Limit}}</span>
                                 <svg class="w-3 h-3 absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                 </svg>
                             </button>
                             <div data-dropdown-menu class="hidden absolute z-10 w-24 mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto right-0">
-                                <div data-dropdown-option data-value="25" class="px-3 py-1 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Limit 25}}bg-blue-600{{end}}" aria-selected="{{if eq .Limit 25}}true{{else}}false{{end}}">25</div>
-                                <div data-dropdown-option data-value="50" class="px-3 py-1 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Limit 50}}bg-blue-600{{end}}" aria-selected="{{if eq .Limit 50}}true{{else}}false{{end}}">50</div>
-                                <div data-dropdown-option data-value="100" class="px-3 py-1 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Limit 100}}bg-blue-600{{end}}" aria-selected="{{if eq .Limit 100}}true{{else}}false{{end}}">100</div>
-                                <div data-dropdown-option data-value="500" class="px-3 py-1 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Limit 500}}bg-blue-600{{end}}" aria-selected="{{if eq .Limit 500}}true{{else}}false{{end}}">500</div>
+                                <div data-dropdown-option data-value="25" class="px-3 py-1 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Limit 25}}bg-blue-600{{end}}" aria-selected="{{if eq .Limit 25}}true{{else}}false{{end}}">25</div>
+                                <div data-dropdown-option data-value="50" class="px-3 py-1 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Limit 50}}bg-blue-600{{end}}" aria-selected="{{if eq .Limit 50}}true{{else}}false{{end}}">50</div>
+                                <div data-dropdown-option data-value="100" class="px-3 py-1 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Limit 100}}bg-blue-600{{end}}" aria-selected="{{if eq .Limit 100}}true{{else}}false{{end}}">100</div>
+                                <div data-dropdown-option data-value="500" class="px-3 py-1 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Limit 500}}bg-blue-600{{end}}" aria-selected="{{if eq .Limit 500}}true{{else}}false{{end}}">500</div>
                             </div>
                         </div>
                     </div>
-                    <label class="flex items-center space-x-2 cursor-pointer">
+                    <label class="flex items-center space-x-2">
                         <input
                             type="checkbox"
                             name="infinite_scroll"
@@ -281,19 +281,19 @@
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             {{if and (eq .OrderBy "path") (eq .Direction "asc")}}
                             <a href="/files?order=path&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200 cursor-pointer"
+                               class="hover:text-gray-200"
                                aria-label="Sort by path descending">
                                 Path ↑
                             </a>
                             {{else if and (eq .OrderBy "path") (eq .Direction "desc")}}
                             <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200 cursor-pointer"
+                               class="hover:text-gray-200"
                                aria-label="Sort by path ascending">
                                 Path ↓
                             </a>
                             {{else}}
                             <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200 cursor-pointer"
+                               class="hover:text-gray-200"
                                aria-label="Sort by path">
                                 Path
                             </a>
@@ -302,19 +302,19 @@
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             {{if and (eq .OrderBy "size") (eq .Direction "asc")}}
                             <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200 cursor-pointer"
+                               class="hover:text-gray-200"
                                aria-label="Sort by size descending">
                                 Size ↑
                             </a>
                             {{else if and (eq .OrderBy "size") (eq .Direction "desc")}}
                             <a href="/files?order=size&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200 cursor-pointer"
+                               class="hover:text-gray-200"
                                aria-label="Sort by size ascending">
                                 Size ↓
                             </a>
                             {{else}}
                             <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200 cursor-pointer"
+                               class="hover:text-gray-200"
                                aria-label="Sort by size">
                                 Size
                             </a>
@@ -360,13 +360,13 @@
                                     data-file-id="{{.File.ID}}"
                                     data-action="show-details"
                                     aria-label="View file details"
-                                    class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm transition cursor-pointer whitespace-nowrap">
+                                    class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm transition whitespace-nowrap">
                                     Details
                                 </button>
                                 <button
                                     hx-post="/api/files/mark-rescan?id={{.File.ID}}"
                                     aria-label="Mark file for rescan"
-                                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer whitespace-nowrap">
+                                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition whitespace-nowrap">
                                     Rescan
                                 </button>
                                 <button
@@ -375,7 +375,7 @@
                                     hx-target="closest tr"
                                     hx-swap="outerHTML"
                                     aria-label="Delete file"
-                                    class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition cursor-pointer whitespace-nowrap">
+                                    class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition whitespace-nowrap">
                                     Delete
                                 </button>
                             </div>
@@ -410,7 +410,7 @@
                                         <button
                                             hx-post="/api/scan/start"
                                             hx-confirm="Start a new scan? This may take a while for large libraries."
-                                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition inline-flex items-center space-x-2 cursor-pointer">
+                                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition inline-flex items-center space-x-2">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                                             </svg>
@@ -735,7 +735,7 @@
             }
 
             extensionsList.innerHTML = availableExtensions.map(ext => `
-                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600 cursor-pointer">
+                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600">
                     <input
                         type="checkbox"
                         value="${ext}"

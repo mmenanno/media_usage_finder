@@ -102,7 +102,7 @@ class BatchSelection {
                 type="checkbox"
                 id="select-all"
                 aria-label="Select all files"
-                class="w-4 h-4 bg-gray-700 border-gray-600 rounded cursor-pointer">
+                class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
         `;
 
         thead.insertBefore(th, thead.firstChild);
@@ -134,7 +134,7 @@ class BatchSelection {
             td.innerHTML = `
                 <input
                     type="checkbox"
-                    class="file-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded cursor-pointer"
+                    class="file-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded"
                     data-file-id="${fileId}"
                     data-row-index="${index}"
                     aria-label="Select file">

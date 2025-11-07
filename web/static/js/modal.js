@@ -107,7 +107,7 @@ class ModalManager {
                     ${buttons.map((btn, i) => `
                         <button
                             data-action="${i}"
-                            class="px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer ${this.getButtonClass(btn.class)}"
+                            class="px-4 py-2 rounded-lg font-medium transition-colors ${this.getButtonClass(btn.class)}"
                         >
                             ${btn.text}
                         </button>

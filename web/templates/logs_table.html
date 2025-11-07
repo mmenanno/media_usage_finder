@@ -70,7 +70,7 @@
     <div class="flex gap-2">
         {{if gt .Page 1}}
         <button data-page="{{sub .Page 1}}"
-                class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition cursor-pointer">
+                class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
             Previous
         </button>
         {{end}}
@@ -84,7 +84,7 @@
                 <button class="px-3 py-1 bg-blue-600 text-white rounded cursor-default">{{$page}}</button>
                 {{else}}
                 <button data-page="{{$page}}"
-                        class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition cursor-pointer">
+                        class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
                     {{$page}}
                 </button>
                 {{end}}
@@ -97,7 +97,7 @@
 
         {{if lt .Page .TotalPages}}
         <button data-page="{{add .Page 1}}"
-                class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition cursor-pointer">
+                class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
             Next
         </button>
         {{end}}

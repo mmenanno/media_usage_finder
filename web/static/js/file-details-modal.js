@@ -105,7 +105,7 @@ class FileDetailsModal {
                         </div>
                         <button
                             onclick="fileDetailsModal.hide()"
-                            class="text-gray-400 hover:text-white transition p-1 cursor-pointer"
+                            class="text-gray-400 hover:text-white transition p-1"
                             aria-label="Close">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -168,19 +168,19 @@ class FileDetailsModal {
                         <div class="flex space-x-2">
                             <button
                                 hx-post="/api/files/mark-rescan?id=${fileData.id}"
-                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition cursor-pointer">
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
                                 Mark for Rescan
                             </button>
                             <button
                                 hx-delete="/api/files/delete?id=${fileData.id}"
                                 hx-confirm="Are you sure you want to delete this file? This action cannot be undone."
-                                class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition cursor-pointer">
+                                class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition">
                                 Delete File
                             </button>
                         </div>
                         <button
                             onclick="fileDetailsModal.hide()"
-                            class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded transition cursor-pointer">
+                            class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded transition">
                             Close
                         </button>
                     </div>

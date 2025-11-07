@@ -61,7 +61,7 @@
                     hx-target="#validation-errors"
                     hx-swap="innerHTML"
                     hx-indicator="#scan-paths-test-indicator"
-                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer">
+                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
                     <svg class="htmx-indicator hidden animate-spin h-4 w-4 text-white" id="scan-paths-test-indicator" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -91,7 +91,7 @@
                     hx-target="#validation-errors"
                     hx-swap="innerHTML"
                     hx-indicator="#path-mappings-test-indicator"
-                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer">
+                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
                     <svg class="htmx-indicator hidden animate-spin h-4 w-4 text-white" id="path-mappings-test-indicator" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -138,7 +138,7 @@
                     hx-post="/api/config/test?service=plex"
                     hx-include="[name='plex_url'], [name='plex_token']"
                     hx-indicator="#plex-test-indicator"
-                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer">
+                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
                     <svg class="htmx-indicator hidden animate-spin h-4 w-4 text-white" id="plex-test-indicator" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -172,7 +172,7 @@
                         <button
                             type="button"
                             id="fetch-plex-libraries-btn"
-                            class="flex items-center gap-2 px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs transition cursor-pointer">
+                            class="flex items-center gap-2 px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs transition">
                             <svg class="hidden animate-spin h-3 w-3 text-white" id="plex-libraries-spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -182,7 +182,7 @@
                     </div>
                     <div id="plex-libraries-container" class="hidden">
                         <div class="mb-2">
-                            <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-700 px-2 py-1 rounded">
+                            <label class="flex items-center gap-2 hover:bg-gray-700 px-2 py-1 rounded">
                                 <input type="checkbox" id="plex-select-all" class="w-4 h-4 bg-gray-700 border-gray-600 rounded">
                                 <span class="text-sm font-medium">Select All</span>
                             </label>
@@ -205,7 +205,7 @@
                     hx-post="/api/config/test?service=sonarr"
                     hx-include="[name='sonarr_url'], [name='sonarr_api_key']"
                     hx-indicator="#sonarr-test-indicator"
-                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer">
+                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
                     <svg class="htmx-indicator hidden animate-spin h-4 w-4 text-white" id="sonarr-test-indicator" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -245,7 +245,7 @@
                     hx-post="/api/config/test?service=radarr"
                     hx-include="[name='radarr_url'], [name='radarr_api_key']"
                     hx-indicator="#radarr-test-indicator"
-                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer">
+                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
                     <svg class="htmx-indicator hidden animate-spin h-4 w-4 text-white" id="radarr-test-indicator" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -285,7 +285,7 @@
                     hx-post="/api/config/test?service=qbittorrent"
                     hx-include="[name='qbittorrent_url'], [name='qbittorrent_username'], [name='qbittorrent_password'], [name='qbittorrent_qui_proxy_url']"
                     hx-indicator="#qbit-test-indicator"
-                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer">
+                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
                     <svg class="htmx-indicator hidden animate-spin h-4 w-4 text-white" id="qbit-test-indicator" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -346,7 +346,7 @@
                     hx-post="/api/config/test?service=stash"
                     hx-include="[name='stash_url'], [name='stash_api_key']"
                     hx-indicator="#stash-test-indicator"
-                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer">
+                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
                     <svg class="htmx-indicator hidden animate-spin h-4 w-4 text-white" id="stash-test-indicator" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -387,7 +387,7 @@
                 <button
                     type="button"
                     id="test-disk-detection-btn"
-                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition cursor-pointer">
+                    class="flex items-center gap-2 px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition">
                     <svg class="hidden animate-spin h-4 w-4 text-white" id="disk-detection-spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -439,7 +439,7 @@
                                 type="button"
                                 data-dropdown-button
                                 aria-expanded="false"
-                                class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                                class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                                 <span data-dropdown-text>
                                     {{if eq .Config.DuplicateDetection.HashAlgorithm "blake3"}}BLAKE3 (Faster, experimental){{else}}SHA-256 (Recommended){{end}}
                                 </span>
@@ -448,8 +448,8 @@
                                 </svg>
                             </button>
                             <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg">
-                                <div data-dropdown-option data-value="sha256" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashAlgorithm "sha256"}}bg-blue-600{{end}}">SHA-256 (Recommended)</div>
-                                <div data-dropdown-option data-value="blake3" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashAlgorithm "blake3"}}bg-blue-600{{end}}">BLAKE3 (Faster, experimental)</div>
+                                <div data-dropdown-option data-value="sha256" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashAlgorithm "sha256"}}bg-blue-600{{end}}">SHA-256 (Recommended)</div>
+                                <div data-dropdown-option data-value="blake3" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashAlgorithm "blake3"}}bg-blue-600{{end}}">BLAKE3 (Faster, experimental)</div>
                             </div>
                         </div>
                         <p class="text-xs text-gray-500 mt-1">Algorithm for calculating file hashes. BLAKE3 is 2-3× faster with hardware acceleration (AVX2/AVX-512)</p>
@@ -463,7 +463,7 @@
                                 type="button"
                                 data-dropdown-button
                                 aria-expanded="false"
-                                class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                                class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                                 <span data-dropdown-text>
                                     {{if eq .Config.DuplicateDetection.HashMode "full"}}Full File Hashing{{else if eq .Config.DuplicateDetection.HashMode "progressive"}}Progressive Hashing{{else if eq .Config.DuplicateDetection.HashMode "quick_auto"}}Quick Hash (Auto Verify){{else}}Quick Hash (Manual Verify){{end}}
                                 </span>
@@ -472,19 +472,19 @@
                                 </svg>
                             </button>
                             <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg">
-                                <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "full"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "full"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Full File Hashing</div>
                                     <div class="text-xs text-gray-400">Hash entire file content (slowest, most accurate)</div>
                                 </div>
-                                <div data-dropdown-option data-value="quick_manual" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "quick_manual"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="quick_manual" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "quick_manual"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Quick Hash (Manual Verify)</div>
                                     <div class="text-xs text-gray-400">Hash first+last 1MB only, manually verify duplicates (recommended)</div>
                                 </div>
-                                <div data-dropdown-option data-value="quick_auto" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "quick_auto"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="quick_auto" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "quick_auto"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Quick Hash (Auto Verify)</div>
                                     <div class="text-xs text-gray-400">Hash first+last 1MB, auto full-hash any quick duplicates</div>
                                 </div>
-                                <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "progressive"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashMode "progressive"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Progressive Hashing</div>
                                     <div class="text-xs text-gray-400">Start at 1MB, incrementally upgrade duplicates (1MB→10MB→100MB→1GB→10GB→Full)</div>
                                 </div>
@@ -505,7 +505,7 @@
                                 type="button"
                                 data-dropdown-button
                                 aria-expanded="false"
-                                class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                                class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                                 <span data-dropdown-text>
                                     {{if eq .Config.DuplicateDetection.HashOrder "smallest_first"}}Smallest Files First{{else if eq .Config.DuplicateDetection.HashOrder "largest_first"}}Largest Files First{{else if eq .Config.DuplicateDetection.HashOrder "random"}}Random Order{{else if eq .Config.DuplicateDetection.HashOrder "by_disk"}}Group by Disk{{else if eq .Config.DuplicateDetection.HashOrder "by_duplicate_probability"}}By Duplicate Probability{{else if eq .Config.DuplicateDetection.HashOrder "by_modification_time_newest"}}Newest Files First{{else if eq .Config.DuplicateDetection.HashOrder "by_modification_time_oldest"}}Oldest Files First{{else}}Database Order{{end}}
                                 </span>
@@ -514,35 +514,35 @@
                                 </svg>
                             </button>
                             <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-y-auto">
-                                <div data-dropdown-option data-value="smallest_first" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "smallest_first"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="smallest_first" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "smallest_first"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Smallest Files First</div>
                                     <div class="text-xs text-gray-400">Fast initial progress (default, recommended)</div>
                                 </div>
-                                <div data-dropdown-option data-value="largest_first" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "largest_first"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="largest_first" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "largest_first"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Largest Files First</div>
                                     <div class="text-xs text-gray-400">Prioritize space savings potential</div>
                                 </div>
-                                <div data-dropdown-option data-value="random" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "random"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="random" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "random"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Random Order</div>
                                     <div class="text-xs text-gray-400">Avoid disk seek patterns</div>
                                 </div>
-                                <div data-dropdown-option data-value="by_disk" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_disk"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="by_disk" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_disk"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Group by Disk</div>
                                     <div class="text-xs text-gray-400">Process one disk at a time</div>
                                 </div>
-                                <div data-dropdown-option data-value="by_duplicate_probability" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_duplicate_probability"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="by_duplicate_probability" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_duplicate_probability"}}bg-blue-600{{end}}">
                                     <div class="font-medium">By Duplicate Probability</div>
                                     <div class="text-xs text-gray-400">Group same-size files together</div>
                                 </div>
-                                <div data-dropdown-option data-value="by_modification_time_newest" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_modification_time_newest"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="by_modification_time_newest" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_modification_time_newest"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Newest Files First</div>
                                     <div class="text-xs text-gray-400">Process recently modified files first</div>
                                 </div>
-                                <div data-dropdown-option data-value="by_modification_time_oldest" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_modification_time_oldest"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="by_modification_time_oldest" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "by_modification_time_oldest"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Oldest Files First</div>
                                     <div class="text-xs text-gray-400">Process older files first</div>
                                 </div>
-                                <div data-dropdown-option data-value="db_order" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "db_order"}}bg-blue-600{{end}}">
+                                <div data-dropdown-option data-value="db_order" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateDetection.HashOrder "db_order"}}bg-blue-600{{end}}">
                                     <div class="font-medium">Database Order</div>
                                     <div class="text-xs text-gray-400">No specific ordering</div>
                                 </div>
@@ -658,7 +658,7 @@
                             type="button"
                             data-dropdown-button
                             aria-expanded="false"
-                            class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                            class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                             <span data-dropdown-text>
                                 {{if eq .Config.DuplicateConsolidation.Strategy "preferred_disk"}}Preferred Disk - Keep file based on predefined disk priority order{{else}}Least Full Disk - Keep file on disk with lowest usage percentage{{end}}
                             </span>
@@ -667,10 +667,10 @@
                             </svg>
                         </button>
                         <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg">
-                            <div data-dropdown-option data-value="least_full_disk" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateConsolidation.Strategy "least_full_disk"}}bg-blue-600{{end}}">
+                            <div data-dropdown-option data-value="least_full_disk" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateConsolidation.Strategy "least_full_disk"}}bg-blue-600{{end}}">
                                 Least Full Disk - Keep file on disk with lowest usage percentage
                             </div>
-                            <div data-dropdown-option data-value="preferred_disk" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .Config.DuplicateConsolidation.Strategy "preferred_disk"}}bg-blue-600{{end}}">
+                            <div data-dropdown-option data-value="preferred_disk" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 {{if eq .Config.DuplicateConsolidation.Strategy "preferred_disk"}}bg-blue-600{{end}}">
                                 Preferred Disk - Keep file based on predefined disk priority order
                             </div>
                         </div>
@@ -688,7 +688,7 @@
                 type="submit"
                 hx-target="#validation-errors"
                 hx-swap="innerHTML"
-                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded transition cursor-pointer">
+                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
                 Save Configuration
             </button>
         </div>
@@ -857,7 +857,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const isChecked = savedLibraries.includes(lib.key);
             console.log(`Library ${lib.title} (${lib.key}): ${isChecked ? 'CHECKED' : 'unchecked'}`);
             return `
-                <label class="flex items-center gap-2 cursor-pointer hover:bg-gray-700 px-2 py-1 rounded">
+                <label class="flex items-center gap-2 hover:bg-gray-700 px-2 py-1 rounded">
                     <input type="checkbox"
                            name="plex_libraries"
                            value="${lib.key}"

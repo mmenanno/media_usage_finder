@@ -50,7 +50,7 @@
                             {{if gt .CrossDiskCount 0}}
                             <button
                                 onclick="previewConsolidation('cross-disk')"
-                                class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors cursor-pointer">
+                                class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors">
                                 Preview Consolidation
                             </button>
                             {{end}}
@@ -70,17 +70,17 @@
                                     type="button"
                                     data-dropdown-button
                                     aria-expanded="false"
-                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                                     <span data-dropdown-text>All Hashes</span>
                                     <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </button>
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
-                                    <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">All Hashes</div>
-                                    <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Full Hash Only ✓</div>
-                                    <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Progressive Hash Only 🔄</div>
-                                    <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Quick Hash Only ⚠️</div>
+                                    <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">All Hashes</div>
+                                    <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Full Hash Only ✓</div>
+                                    <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Progressive Hash Only 🔄</div>
+                                    <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Quick Hash Only ⚠️</div>
                                 </div>
                             </div>
                         </div>
@@ -93,18 +93,18 @@
                                     type="button"
                                     data-dropdown-button
                                     aria-expanded="false"
-                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                                     <span data-dropdown-text>Any Size</span>
                                     <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </button>
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
-                                    <div data-dropdown-option data-value="0" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">Any Size</div>
-                                    <div data-dropdown-option data-value="10485760" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">10 MB+</div>
-                                    <div data-dropdown-option data-value="104857600" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">100 MB+</div>
-                                    <div data-dropdown-option data-value="1073741824" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">1 GB+</div>
-                                    <div data-dropdown-option data-value="10737418240" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">10 GB+</div>
+                                    <div data-dropdown-option data-value="0" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">Any Size</div>
+                                    <div data-dropdown-option data-value="10485760" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">10 MB+</div>
+                                    <div data-dropdown-option data-value="104857600" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">100 MB+</div>
+                                    <div data-dropdown-option data-value="1073741824" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">1 GB+</div>
+                                    <div data-dropdown-option data-value="10737418240" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">10 GB+</div>
                                 </div>
                             </div>
                         </div>
@@ -117,16 +117,16 @@
                                     type="button"
                                     data-dropdown-button
                                     aria-expanded="false"
-                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                                     <span data-dropdown-text>Largest Savings</span>
                                     <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </button>
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
-                                    <div data-dropdown-option data-value="savings" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">Largest Savings</div>
-                                    <div data-dropdown-option data-value="size" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Largest Files</div>
-                                    <div data-dropdown-option data-value="copies" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Most Copies</div>
+                                    <div data-dropdown-option data-value="savings" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">Largest Savings</div>
+                                    <div data-dropdown-option data-value="size" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Largest Files</div>
+                                    <div data-dropdown-option data-value="copies" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Most Copies</div>
                                 </div>
                             </div>
                         </div>
@@ -268,7 +268,7 @@
                             {{if gt .SameDiskCount 0}}
                             <button
                                 onclick="previewHardlinks()"
-                                class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors cursor-pointer">
+                                class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors">
                                 Preview Hardlinks
                             </button>
                             {{end}}
@@ -288,17 +288,17 @@
                                     type="button"
                                     data-dropdown-button
                                     aria-expanded="false"
-                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                                     <span data-dropdown-text>All Hashes</span>
                                     <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </button>
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
-                                    <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">All Hashes</div>
-                                    <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Full Hash Only ✓</div>
-                                    <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Progressive Hash Only 🔄</div>
-                                    <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Quick Hash Only ⚠️</div>
+                                    <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">All Hashes</div>
+                                    <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Full Hash Only ✓</div>
+                                    <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Progressive Hash Only 🔄</div>
+                                    <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Quick Hash Only ⚠️</div>
                                 </div>
                             </div>
                         </div>
@@ -311,18 +311,18 @@
                                     type="button"
                                     data-dropdown-button
                                     aria-expanded="false"
-                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                                     <span data-dropdown-text>Any Size</span>
                                     <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </button>
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
-                                    <div data-dropdown-option data-value="0" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">Any Size</div>
-                                    <div data-dropdown-option data-value="10485760" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">10 MB+</div>
-                                    <div data-dropdown-option data-value="104857600" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">100 MB+</div>
-                                    <div data-dropdown-option data-value="1073741824" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">1 GB+</div>
-                                    <div data-dropdown-option data-value="10737418240" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">10 GB+</div>
+                                    <div data-dropdown-option data-value="0" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">Any Size</div>
+                                    <div data-dropdown-option data-value="10485760" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">10 MB+</div>
+                                    <div data-dropdown-option data-value="104857600" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">100 MB+</div>
+                                    <div data-dropdown-option data-value="1073741824" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">1 GB+</div>
+                                    <div data-dropdown-option data-value="10737418240" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">10 GB+</div>
                                 </div>
                             </div>
                         </div>
@@ -335,16 +335,16 @@
                                     type="button"
                                     data-dropdown-button
                                     aria-expanded="false"
-                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                                     <span data-dropdown-text>Largest Savings</span>
                                     <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                     </svg>
                                 </button>
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
-                                    <div data-dropdown-option data-value="savings" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600" aria-selected="true">Largest Savings</div>
-                                    <div data-dropdown-option data-value="size" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Largest Files</div>
-                                    <div data-dropdown-option data-value="copies" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100" aria-selected="false">Most Copies</div>
+                                    <div data-dropdown-option data-value="savings" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">Largest Savings</div>
+                                    <div data-dropdown-option data-value="size" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Largest Files</div>
+                                    <div data-dropdown-option data-value="copies" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Most Copies</div>
                                 </div>
                             </div>
                         </div>
@@ -408,10 +408,10 @@
                                             <div class="text-xl font-bold text-green-400">{{$plan.SpaceSavings | formatBytes}}</div>
                                         </div>
                                         <div class="flex space-x-2">
-                                            <button onclick="previewSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded font-medium transition-colors cursor-pointer" title="Preview hardlinks for this group only">
+                                            <button onclick="previewSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded font-medium transition-colors" title="Preview hardlinks for this group only">
                                                 Preview
                                             </button>
-                                            <button onclick="linkSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors cursor-pointer" title="Create hardlinks for this group">
+                                            <button onclick="linkSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors" title="Create hardlinks for this group">
                                                 Link Group
                                             </button>
                                         </div>
@@ -586,7 +586,7 @@
                         </svg>
                         <span>Hardlink Preview Results</span>
                     </h3>
-                    <button onclick="closeDryRunSummary()" class="text-gray-400 hover:text-gray-200 cursor-pointer">
+                    <button onclick="closeDryRunSummary()" class="text-gray-400 hover:text-gray-200">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -700,10 +700,10 @@
                     This is a preview. No changes have been made yet.
                 </div>
                 <div class="flex space-x-3">
-                    <button onclick="closeDryRunSummary()" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors cursor-pointer">
+                    <button onclick="closeDryRunSummary()" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors">
                         Cancel
                     </button>
-                    <button id="confirmHardlinkBtn" onclick="confirmAndExecuteHardlinks()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors cursor-pointer">
+                    <button id="confirmHardlinkBtn" onclick="confirmAndExecuteHardlinks()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors">
                         Proceed with Hardlink Creation
                     </button>
                 </div>

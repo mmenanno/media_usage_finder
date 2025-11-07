@@ -19,16 +19,16 @@
                         type="button"
                         data-dropdown-button
                         aria-expanded="false"
-                        class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                        class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                         <span data-dropdown-text>All Scans</span>
                         <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
                     <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
-                        <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600">All Scans</div>
+                        <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600">All Scans</div>
                         {{range .Scans}}
-                        <div data-dropdown-option data-value="{{.ID}}" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">
+                        <div data-dropdown-option data-value="{{.ID}}" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">
                             Scan #{{.ID}} - {{.ScanType}} ({{formatTimestamp .StartedAt}})
                         </div>
                         {{end}}
@@ -45,18 +45,18 @@
                         type="button"
                         data-dropdown-button
                         aria-expanded="false"
-                        class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                        class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                         <span data-dropdown-text>All Levels</span>
                         <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
                     <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg">
-                        <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600">All Levels</div>
-                        <div data-dropdown-option data-value="info" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Info</div>
-                        <div data-dropdown-option data-value="warning" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Warning</div>
-                        <div data-dropdown-option data-value="error" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Error</div>
-                        <div data-dropdown-option data-value="debug" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Debug</div>
+                        <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600">All Levels</div>
+                        <div data-dropdown-option data-value="info" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Info</div>
+                        <div data-dropdown-option data-value="warning" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Warning</div>
+                        <div data-dropdown-option data-value="error" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Error</div>
+                        <div data-dropdown-option data-value="debug" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Debug</div>
                     </div>
                 </div>
             </div>
@@ -70,24 +70,24 @@
                         type="button"
                         data-dropdown-button
                         aria-expanded="false"
-                        class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left cursor-pointer">
+                        class="w-full pl-4 pr-10 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                         <span data-dropdown-text>All Phases</span>
                         <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
                     <div data-dropdown-menu class="hidden absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
-                        <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100 bg-blue-600">All Phases</div>
-                        <div data-dropdown-option data-value="Initializing" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Initializing</div>
-                        <div data-dropdown-option data-value="Counting" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Counting</div>
-                        <div data-dropdown-option data-value="Scanning" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Scanning</div>
-                        <div data-dropdown-option data-value="Updating Plex" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Updating Plex</div>
-                        <div data-dropdown-option data-value="Updating Sonarr" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Updating Sonarr</div>
-                        <div data-dropdown-option data-value="Updating Radarr" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Updating Radarr</div>
-                        <div data-dropdown-option data-value="Updating qBittorrent" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Updating qBittorrent</div>
-                        <div data-dropdown-option data-value="Updating Stash" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Updating Stash</div>
-                        <div data-dropdown-option data-value="Calculating Orphans" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Calculating Orphans</div>
-                        <div data-dropdown-option data-value="Completed" class="px-4 py-2 text-sm hover:bg-gray-600 cursor-pointer text-gray-100">Completed</div>
+                        <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600">All Phases</div>
+                        <div data-dropdown-option data-value="Initializing" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Initializing</div>
+                        <div data-dropdown-option data-value="Counting" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Counting</div>
+                        <div data-dropdown-option data-value="Scanning" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Scanning</div>
+                        <div data-dropdown-option data-value="Updating Plex" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Updating Plex</div>
+                        <div data-dropdown-option data-value="Updating Sonarr" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Updating Sonarr</div>
+                        <div data-dropdown-option data-value="Updating Radarr" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Updating Radarr</div>
+                        <div data-dropdown-option data-value="Updating qBittorrent" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Updating qBittorrent</div>
+                        <div data-dropdown-option data-value="Updating Stash" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Updating Stash</div>
+                        <div data-dropdown-option data-value="Calculating Orphans" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Calculating Orphans</div>
+                        <div data-dropdown-option data-value="Completed" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100">Completed</div>
                     </div>
                 </div>
             </div>
@@ -101,19 +101,19 @@
         </form>
 
         <div class="flex gap-2 mt-4">
-            <button id="apply-filters" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition flex items-center gap-2 cursor-pointer">
+            <button id="apply-filters" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
                 </svg>
                 Apply Filters
             </button>
-            <button id="clear-filters" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition flex items-center gap-2 cursor-pointer">
+            <button id="clear-filters" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
                 Clear
             </button>
-            <button id="refresh-logs" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition flex items-center gap-2 cursor-pointer">
+            <button id="refresh-logs" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition flex items-center gap-2">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                 </svg>

@@ -49,7 +49,7 @@
                             type="button"
                             data-dropdown-button
                             aria-expanded="false"
-                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 cursor-pointer text-gray-100 text-left">
+                            class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
                             <span data-dropdown-text>
                                 {{if eq .OrderBy "link_count"}}Link Count
                                 {{else if eq .OrderBy "space_saved"}}Space Saved
@@ -64,19 +64,19 @@
                             <a href="/hardlinks?order=link_count&direction={{.Direction}}{{if .Search}}&search={{.Search}}{{end}}"
                                data-dropdown-option
                                data-value="link_count"
-                               class="block px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .OrderBy "link_count"}}bg-blue-600{{end}}">
+                               class="block px-4 py-2 hover:bg-gray-600 text-gray-100 {{if eq .OrderBy "link_count"}}bg-blue-600{{end}}">
                                 Link Count
                             </a>
                             <a href="/hardlinks?order=space_saved&direction={{.Direction}}{{if .Search}}&search={{.Search}}{{end}}"
                                data-dropdown-option
                                data-value="space_saved"
-                               class="block px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .OrderBy "space_saved"}}bg-blue-600{{end}}">
+                               class="block px-4 py-2 hover:bg-gray-600 text-gray-100 {{if eq .OrderBy "space_saved"}}bg-blue-600{{end}}">
                                 Space Saved
                             </a>
                             <a href="/hardlinks?order=first_path&direction={{.Direction}}{{if .Search}}&search={{.Search}}{{end}}"
                                data-dropdown-option
                                data-value="first_path"
-                               class="block px-4 py-2 hover:bg-gray-600 cursor-pointer text-gray-100 {{if eq .OrderBy "first_path"}}bg-blue-600{{end}}">
+                               class="block px-4 py-2 hover:bg-gray-600 text-gray-100 {{if eq .OrderBy "first_path"}}bg-blue-600{{end}}">
                                 Path
                             </a>
                         </div>
