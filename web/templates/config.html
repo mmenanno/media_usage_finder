@@ -44,6 +44,13 @@
                         min="-1">
                     <p class="text-xs text-gray-500 mt-1">How long to keep scan logs in the database before automatic cleanup</p>
                 </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="auto_cleanup_deleted_files" name="auto_cleanup_deleted_files"
+                           {{if .Config.AutoCleanupDeletedFiles}}checked{{end}}
+                           class="w-5 h-5 bg-gray-700 border-gray-600 rounded">
+                    <label for="auto_cleanup_deleted_files" class="text-sm font-medium">Auto-cleanup deleted files during full scans</label>
+                </div>
+                <p class="text-xs text-gray-500 mt-1 ml-7">Automatically remove database entries for files that no longer exist on disk when running full scans</p>
             </div>
         </div>
 

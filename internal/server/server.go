@@ -45,6 +45,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/scan/update-services", s.HandleUpdateAllServices)
 	mux.HandleFunc("/api/scan/update-service", s.HandleUpdateSingleService)
 	mux.HandleFunc("/api/scan/recalculate-orphaned", s.HandleRecalculateOrphaned)
+	mux.HandleFunc("/api/scan/cleanup", s.HandleCleanupScan)
 	mux.HandleFunc("/api/scan/disk-locations", s.HandleScanDiskLocations)
 	mux.HandleFunc("/api/scan/disk-progress", s.HandleDiskScanProgress)
 	mux.HandleFunc("/api/scan/disk-progress-html", s.HandleDiskScanProgressHTML)

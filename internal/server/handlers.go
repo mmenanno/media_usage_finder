@@ -1107,6 +1107,39 @@ func (s *Server) HandleRecalculateOrphaned(w http.ResponseWriter, r *http.Reques
 	respondSuccess(w, "Recalculation started", nil)
 }
 
+// HandleCleanupScan runs a manual cleanup scan to remove database entries for missing files
+func (s *Server) HandleCleanupScan(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Check if a scan is already running
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to check scan status", "scan_check_failed")
+		return
+	}
+
+	if currentScan != nil {
+		respondError(w, http.StatusConflict, "Cannot start cleanup while a scan is running", "scan_running")
+		return
+	}
+
+	// Run cleanup scan in background
+	go func() {
+		if err := s.scanner.RunCleanupScan(); err != nil {
+			log.Printf("ERROR: Failed to run cleanup scan: %v", err)
+		} else {
+			log.Printf("INFO: Cleanup scan completed successfully")
+		}
+	}()
+
+	w.Header().Set("X-Toast-Message", "Starting cleanup scan...")
+	w.Header().Set("X-Toast-Type", "info")
+
+	respondSuccess(w, "Cleanup scan started", nil)
+}
+
 // HandleScanProgress returns the current scan progress
 func (s *Server) HandleScanProgress(w http.ResponseWriter, r *http.Request) {
 	progress := s.scanner.GetProgress()
@@ -1537,6 +1570,9 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 			s.config.ScanLogRetentionDays = days
 		}
 	}
+
+	// Note: HTML checkboxes send "on" when checked, or nothing when unchecked
+	s.config.AutoCleanupDeletedFiles = r.FormValue("auto_cleanup_deleted_files") != ""
 
 	if cacheSize := r.FormValue("db_cache_size"); cacheSize != "" {
 		if size, err := strconv.Atoi(cacheSize); err == nil && size > 0 {

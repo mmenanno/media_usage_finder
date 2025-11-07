@@ -308,6 +308,25 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 		return fmt.Errorf("filesystem scan failed: %w", err)
 	}
 
+	// Phase 2.5: Clean up deleted files (only during full scans if auto-cleanup is enabled)
+	if !incremental && s.config.AutoCleanupDeletedFiles {
+		s.updatePhase(scanID, "Cleaning Up Deleted Files")
+		s.progress.Log("Removing files from database that no longer exist on disk...")
+
+		deletedCount, err := s.db.DeleteUnverifiedFiles(ctx, scanID)
+		if err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to cleanup deleted files: %v", err))
+		} else if deletedCount > 0 {
+			s.progress.Log(fmt.Sprintf("Removed %d files that no longer exist on disk", deletedCount))
+			// Update scan record with deleted count
+			if err := s.db.UpdateScanDeletedCount(scanID, deletedCount); err != nil {
+				s.progress.Log(fmt.Sprintf("Warning: Failed to update deleted files count: %v", err))
+			}
+		} else {
+			s.progress.Log("No deleted files found to cleanup")
+		}
+	}
+
 	// Phase 3: Update service usage
 	// Count configured services for progress tracking
 	totalServices := 0
@@ -1191,6 +1210,151 @@ func (s *Scanner) ScanDiskLocations(detector *disk.Detector) error {
 
 	if err != nil {
 		return fmt.Errorf("disk scanning failed: %w", err)
+	}
+
+	return nil
+}
+
+// RunCleanupScan walks the filesystem and removes database entries for files that no longer exist
+// This is a manual cleanup operation that can be run independently of full scans
+func (s *Scanner) RunCleanupScan() error {
+	// Check if there's already a running scan
+	currentScan, err := s.db.GetCurrentScan()
+	if err != nil {
+		return fmt.Errorf("failed to check for running scan: %w", err)
+	}
+
+	if currentScan != nil {
+		return fmt.Errorf("cannot start cleanup scan while another scan is running (ID: %d)", currentScan.ID)
+	}
+
+	// Create scan record with type 'cleanup'
+	scan, err := s.db.CreateScan("cleanup")
+	if err != nil {
+		return fmt.Errorf("failed to create cleanup scan record: %w", err)
+	}
+
+	// Create progress tracker with persistent logging
+	if s.progress != nil {
+		return fmt.Errorf("cleanup scan already in progress")
+	}
+	s.progress = NewProgress(scan.ID, s.db)
+
+	// Ensure progress is stopped and scan is finalized
+	defer func() {
+		if s.progress != nil {
+			s.progress.Stop()
+			s.progress = nil
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Store scan context
+	s.scanCtx = ctx
+
+	// Run the cleanup operation
+	var cleanupErr error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				cleanupErr = fmt.Errorf("cleanup scan panic: %v", r)
+				s.progress.Log(fmt.Sprintf("PANIC: %v", r))
+			}
+		}()
+
+		s.progress.SetPhase("Initializing")
+		s.progress.Log("Starting cleanup scan - walking filesystem to find existing files...")
+
+		// Update scan phase
+		if err := s.db.UpdateScanPhase(scan.ID, "Walking filesystem"); err != nil {
+			cleanupErr = fmt.Errorf("failed to update scan phase: %w", err)
+			return
+		}
+
+		// Walk filesystem and collect existing file paths using WalkFiles
+		s.progress.SetPhase("Walking filesystem")
+
+		// Create channel to receive file info
+		fileInfoChan := make(chan FileInfo, s.config.ScanBufferSize)
+		existingPaths := make(map[string]bool)
+
+		// Start goroutine to collect paths from channel
+		collectDone := make(chan struct{})
+		go func() {
+			defer close(collectDone)
+			for fileInfo := range fileInfoChan {
+				existingPaths[fileInfo.Path] = true
+				s.progress.IncrementFiles(fileInfo.Size)
+			}
+		}()
+
+		// Walk filesystem
+		s.progress.Log("Walking filesystem to find existing files...")
+		err := WalkFiles(ctx, s.config.ScanPaths, fileInfoChan, s.progress)
+		close(fileInfoChan) // Signal collection goroutine to finish
+		<-collectDone       // Wait for collection to complete
+
+		if err != nil {
+			if ctx.Err() != nil {
+				cleanupErr = fmt.Errorf("cleanup scan cancelled")
+				return
+			}
+			cleanupErr = fmt.Errorf("failed to walk filesystem: %w", err)
+			return
+		}
+
+		s.progress.Log(fmt.Sprintf("Found %d files on disk", len(existingPaths)))
+
+		// Delete files not in the existing set
+		s.progress.SetPhase("Removing missing files")
+		if err := s.db.UpdateScanPhase(scan.ID, "Removing missing files"); err != nil {
+			cleanupErr = fmt.Errorf("failed to update scan phase: %w", err)
+			return
+		}
+
+		deletedCount, err := s.db.DeleteFilesNotInSet(ctx, existingPaths, scan.ID)
+		if err != nil {
+			cleanupErr = fmt.Errorf("failed to delete missing files: %w", err)
+			return
+		}
+
+		if deletedCount > 0 {
+			s.progress.Log(fmt.Sprintf("Removed %d files that no longer exist on disk", deletedCount))
+			// Update scan record with deleted count
+			if err := s.db.UpdateScanDeletedCount(scan.ID, deletedCount); err != nil {
+				s.progress.Log(fmt.Sprintf("Warning: Failed to update deleted files count: %v", err))
+			}
+		} else {
+			s.progress.Log("No missing files found to cleanup")
+		}
+
+		s.progress.SetPhase("Completed")
+		s.progress.Log("Cleanup scan completed successfully!")
+	}()
+
+	// Update scan status
+	status := "completed"
+	var errorStr *string
+	if cleanupErr != nil {
+		status = "failed"
+		errMsg := cleanupErr.Error()
+		errorStr = &errMsg
+	}
+
+	processedFiles := s.progress.ProcessedFiles
+	if err := s.db.UpdateScan(scan.ID, status, processedFiles, errorStr); err != nil {
+		return fmt.Errorf("failed to update scan status: %w", err)
+	}
+
+	// Call onScanComplete callback to invalidate stats cache
+	if s.onScanComplete != nil {
+		s.onScanComplete()
+	}
+
+	if cleanupErr != nil {
+		return cleanupErr
 	}
 
 	return nil

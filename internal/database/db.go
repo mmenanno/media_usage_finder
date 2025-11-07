@@ -488,6 +488,78 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 10: Add deleted_files_count column to scans table if it doesn't exist
+	var hasDeletedFilesCount int
+	err = db.conn.QueryRow(`
+		SELECT COUNT(*)
+		FROM pragma_table_info('scans')
+		WHERE name = 'deleted_files_count'
+	`).Scan(&hasDeletedFilesCount)
+
+	if err != nil {
+		return fmt.Errorf("failed to check for deleted_files_count column: %w", err)
+	}
+
+	// If deleted_files_count column doesn't exist, add it
+	if hasDeletedFilesCount == 0 {
+		_, err = db.conn.Exec(migrateAddDeletedFilesCount)
+		if err != nil {
+			return fmt.Errorf("failed to add deleted_files_count column: %w", err)
+		}
+	}
+
+	// Migration 11: Update scans table CHECK constraint to include 'cleanup'
+	// Test if migration is needed by trying to insert a test record with scan_type='cleanup'
+	needsCleanupScanTypeMigration := false
+
+	// Start a transaction for the test
+	tx6, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction for cleanup scan_type migration check: %w", err)
+	}
+	defer tx6.Rollback()
+
+	// Try to insert a test record with scan_type='cleanup'
+	_, err = tx6.Exec(`
+		INSERT INTO scans (started_at, status, scan_type)
+		VALUES (?, 'completed', 'cleanup')
+	`, time.Now().Unix())
+
+	if err != nil {
+		// Check if the error is a CHECK constraint failure
+		if strings.Contains(err.Error(), "CHECK constraint failed") {
+			needsCleanupScanTypeMigration = true
+		}
+	} else {
+		// If insert succeeded, delete the test record
+		_, _ = tx6.Exec(`DELETE FROM scans WHERE scan_type = 'cleanup'`)
+	}
+
+	// Rollback the test transaction
+	tx6.Rollback()
+
+	// Run migration if needed
+	if needsCleanupScanTypeMigration {
+		// Disable foreign key constraints for migration
+		_, err = db.conn.Exec("PRAGMA foreign_keys = OFF")
+		if err != nil {
+			return fmt.Errorf("failed to disable foreign keys for cleanup scan_type migration: %w", err)
+		}
+
+		_, err = db.conn.Exec(migrateAddCleanupToScanType)
+		if err != nil {
+			// Re-enable foreign keys before returning error
+			db.conn.Exec("PRAGMA foreign_keys = ON")
+			return fmt.Errorf("failed to update scans table CHECK constraint for cleanup: %w", err)
+		}
+
+		// Re-enable foreign key constraints
+		_, err = db.conn.Exec("PRAGMA foreign_keys = ON")
+		if err != nil {
+			return fmt.Errorf("failed to re-enable foreign keys after cleanup scan_type migration: %w", err)
+		}
+	}
+
 	return nil
 }
 

@@ -71,13 +71,14 @@ CREATE TABLE IF NOT EXISTS scans (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	started_at INTEGER NOT NULL,
 	completed_at INTEGER,
-	status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed', 'interrupted')),
+	status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed', 'interrupted', 'completed_with_errors')),
 	files_scanned INTEGER NOT NULL DEFAULT 0,
 	errors TEXT,
-	scan_type TEXT NOT NULL DEFAULT 'full' CHECK(scan_type IN ('full', 'incremental', 'disk_location')),
+	scan_type TEXT NOT NULL DEFAULT 'full' CHECK(scan_type IN ('full', 'incremental', 'disk_location', 'service_update_all', 'service_update_plex', 'service_update_sonarr', 'service_update_radarr', 'service_update_qbittorrent', 'service_update_stash', 'hash_scan', 'cleanup')),
 	current_phase TEXT,
 	last_processed_path TEXT,
 	resume_from_scan_id INTEGER,
+	deleted_files_count INTEGER DEFAULT 0,
 	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 	FOREIGN KEY (resume_from_scan_id) REFERENCES scans(id)
 );
@@ -95,7 +96,7 @@ CREATE TABLE IF NOT EXISTS config (
 -- Audit log for tracking deletions and modifications
 CREATE TABLE IF NOT EXISTS audit_log (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	action TEXT NOT NULL CHECK(action IN ('delete', 'mark_rescan', 'config_change', 'consolidate', 'hardlink')),
+	action TEXT NOT NULL CHECK(action IN ('delete', 'mark_rescan', 'config_change', 'consolidate', 'hardlink', 'cleanup')),
 	entity_type TEXT NOT NULL,
 	entity_id INTEGER,
 	details TEXT,
@@ -460,7 +461,7 @@ DROP TABLE IF EXISTS audit_log_new;
 -- Create new audit_log table with updated CHECK constraint
 CREATE TABLE audit_log_new (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	action TEXT NOT NULL CHECK(action IN ('delete', 'mark_rescan', 'config_change', 'consolidate', 'hardlink')),
+	action TEXT NOT NULL CHECK(action IN ('delete', 'mark_rescan', 'config_change', 'consolidate', 'hardlink', 'cleanup')),
 	entity_type TEXT NOT NULL,
 	entity_id INTEGER,
 	details TEXT,
@@ -483,4 +484,50 @@ ALTER TABLE audit_log_new RENAME TO audit_log;
 -- Recreate indexes
 CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
 CREATE INDEX idx_audit_log_action ON audit_log(action);
+`
+
+// Migration to add deleted_files_count column to scans table
+const migrateAddDeletedFilesCount = `
+-- Add deleted_files_count column to scans table
+ALTER TABLE scans ADD COLUMN deleted_files_count INTEGER DEFAULT 0;
+`
+
+// Migration to add 'cleanup' scan type to scans table CHECK constraint
+const migrateAddCleanupToScanType = `
+-- Drop scans_new if it exists from a previous failed migration
+DROP TABLE IF EXISTS scans_new;
+
+-- Create new scans table with updated CHECK constraint
+CREATE TABLE scans_new (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	started_at INTEGER NOT NULL,
+	completed_at INTEGER,
+	status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed', 'interrupted', 'completed_with_errors')),
+	files_scanned INTEGER NOT NULL DEFAULT 0,
+	errors TEXT,
+	scan_type TEXT NOT NULL DEFAULT 'full' CHECK(scan_type IN ('full', 'incremental', 'disk_location', 'service_update_all', 'service_update_plex', 'service_update_sonarr', 'service_update_radarr', 'service_update_qbittorrent', 'service_update_stash', 'hash_scan', 'cleanup')),
+	current_phase TEXT,
+	last_processed_path TEXT,
+	resume_from_scan_id INTEGER,
+	deleted_files_count INTEGER DEFAULT 0,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (resume_from_scan_id) REFERENCES scans(id)
+);
+
+-- Copy data from old table (use COALESCE to handle NULL values)
+INSERT INTO scans_new (id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, last_processed_path, resume_from_scan_id, deleted_files_count, created_at)
+SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, last_processed_path, resume_from_scan_id, COALESCE(deleted_files_count, 0), COALESCE(created_at, started_at)
+FROM scans;
+
+-- Drop old table and indexes
+DROP INDEX IF EXISTS idx_scans_status;
+DROP INDEX IF EXISTS idx_scans_started_at;
+DROP TABLE scans;
+
+-- Rename new table
+ALTER TABLE scans_new RENAME TO scans;
+
+-- Recreate indexes
+CREATE INDEX idx_scans_status ON scans(status);
+CREATE INDEX idx_scans_started_at ON scans(started_at);
 `

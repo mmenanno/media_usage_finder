@@ -87,6 +87,7 @@ type Scan struct {
 	CurrentPhase      *string
 	LastProcessedPath *string
 	ResumeFromScanID  *int64
+	DeletedFilesCount int64
 	CreatedAt         time.Time
 }
 
@@ -498,6 +499,13 @@ func (db *DB) UpdateScanFilesProcessed(scanID int64, filesProcessed int64) error
 	return err
 }
 
+// UpdateScanDeletedCount updates the deleted files count for a scan
+func (db *DB) UpdateScanDeletedCount(scanID int64, deletedCount int64) error {
+	query := `UPDATE scans SET deleted_files_count = ? WHERE id = ?`
+	_, err := db.conn.Exec(query, deletedCount, scanID)
+	return err
+}
+
 // GetLastInterruptedScan returns the most recent interrupted scan that can be resumed
 func (db *DB) GetLastInterruptedScan() (*Scan, error) {
 	query := `
@@ -666,7 +674,7 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 
 	// Get scans
 	query := `
-		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, last_processed_path, resume_from_scan_id, created_at
+		SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, last_processed_path, resume_from_scan_id, deleted_files_count, created_at
 		FROM scans
 		ORDER BY started_at DESC
 		LIMIT ? OFFSET ?
@@ -699,6 +707,7 @@ func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 			&currentPhase,
 			&lastProcessedPath,
 			&resumeFromScanID,
+			&scan.DeletedFilesCount,
 			&createdAt,
 		)
 		if err != nil {
@@ -2845,4 +2854,147 @@ func (db *DB) LogHardlinkCreation(primaryFile, duplicateFile *DuplicateFile, rea
 
 	_, err = db.conn.Exec(query, "hardlink", "file", duplicateFile.ID, string(detailsJSON), time.Now().Unix())
 	return err
+}
+
+// DeleteUnverifiedFiles removes files that weren't updated during the current scan
+// This is used during full scans to clean up files that no longer exist on disk
+func (db *DB) DeleteUnverifiedFiles(ctx context.Context, scanID int64) (int64, error) {
+	tx, err := db.BeginTx()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	// Find all files that weren't updated in this scan
+	var fileCount int64
+	err = tx.QueryRow(`SELECT COUNT(*) FROM files WHERE scan_id != ? OR scan_id IS NULL`, scanID).Scan(&fileCount)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count unverified files: %w", err)
+	}
+
+	// Log the cleanup action to audit log
+	if fileCount > 0 {
+		_, err = tx.Exec(
+			`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('cleanup', 'scan', ?, ?)`,
+			scanID, fmt.Sprintf("Removed %d files that no longer exist on disk", fileCount),
+		)
+		if err != nil {
+			return 0, fmt.Errorf("failed to log cleanup: %w", err)
+		}
+	}
+
+	// Delete files not updated in this scan (usage records will be cascade deleted)
+	result, err := tx.Exec(`DELETE FROM files WHERE scan_id != ? OR scan_id IS NULL`, scanID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to delete unverified files: %w", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	return rowsAffected, nil
+}
+
+// GetAllFilePaths returns all file paths from the database
+// This is used by the manual cleanup scan to check which files still exist
+func (db *DB) GetAllFilePaths(ctx context.Context) ([]string, error) {
+	rows, err := db.conn.QueryContext(ctx, `SELECT path FROM files ORDER BY path`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query file paths: %w", err)
+	}
+	defer rows.Close()
+
+	var paths []string
+	for rows.Next() {
+		var path string
+		if err := rows.Scan(&path); err != nil {
+			return nil, fmt.Errorf("failed to scan path: %w", err)
+		}
+		paths = append(paths, path)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating paths: %w", err)
+	}
+
+	return paths, nil
+}
+
+// DeleteFilesNotInSet removes files from the database that are not in the provided set
+// This is used by the manual cleanup scan to remove files that no longer exist on disk
+func (db *DB) DeleteFilesNotInSet(ctx context.Context, existingPaths map[string]bool, scanID int64) (int64, error) {
+	tx, err := db.BeginTx()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	// Get all file paths from database
+	rows, err := tx.Query(`SELECT id, path FROM files`)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query files: %w", err)
+	}
+	defer rows.Close()
+
+	// Collect IDs of files to delete
+	var toDelete []int64
+	for rows.Next() {
+		var id int64
+		var path string
+		if err := rows.Scan(&id, &path); err != nil {
+			return 0, fmt.Errorf("failed to scan file: %w", err)
+		}
+
+		// If path doesn't exist in the filesystem set, mark for deletion
+		if !existingPaths[path] {
+			toDelete = append(toDelete, id)
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return 0, fmt.Errorf("error iterating files: %w", err)
+	}
+
+	// Log the cleanup action if we're deleting files
+	if len(toDelete) > 0 {
+		_, err = tx.Exec(
+			`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('cleanup', 'scan', ?, ?)`,
+			scanID, fmt.Sprintf("Manual cleanup removed %d files that no longer exist on disk", len(toDelete)),
+		)
+		if err != nil {
+			return 0, fmt.Errorf("failed to log cleanup: %w", err)
+		}
+
+		// Delete files in batches to avoid query length limits
+		batchSize := 500
+		for i := 0; i < len(toDelete); i += batchSize {
+			end := i + batchSize
+			if end > len(toDelete) {
+				end = len(toDelete)
+			}
+			batch := toDelete[i:end]
+
+			// Build placeholders for IN clause
+			placeholders := make([]string, len(batch))
+			args := make([]interface{}, len(batch))
+			for j, id := range batch {
+				placeholders[j] = "?"
+				args[j] = id
+			}
+
+			query := fmt.Sprintf(`DELETE FROM files WHERE id IN (%s)`, strings.Join(placeholders, ","))
+			_, err = tx.Exec(query, args...)
+			if err != nil {
+				return 0, fmt.Errorf("failed to delete file batch: %w", err)
+			}
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit: %w", err)
+	}
+
+	return int64(len(toDelete)), nil
 }

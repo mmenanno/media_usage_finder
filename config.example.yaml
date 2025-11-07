@@ -46,6 +46,13 @@ stats_cache_ttl: 30s
 # - Older logs are automatically cleaned up during scheduled maintenance
 scan_log_retention_days: 30
 
+# Auto-Cleanup Deleted Files: Automatically remove database entries during full scans
+# - Default: true (recommended)
+# - Set to false to manually control cleanup (via "Cleanup Missing Files" button)
+# - Only applies to full scans (not incremental scans)
+# - Ensures database stays in sync with filesystem
+auto_cleanup_deleted_files: true
+
 # Database Connection Pool Settings
 # - Defaults are optimized for SQLite with WAL mode
 # - max_open_conns: Maximum concurrent database connections

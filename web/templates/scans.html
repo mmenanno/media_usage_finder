@@ -48,6 +48,8 @@
                                 <span class="px-2 py-1 bg-red-600 rounded text-xs">Update qBittorrent</span>
                             {{else if eq .ScanType "service_update_stash"}}
                                 <span class="px-2 py-1 bg-pink-600 rounded text-xs">Update Stash</span>
+                            {{else if eq .ScanType "cleanup"}}
+                                <span class="px-2 py-1 bg-red-600 rounded text-xs">Cleanup Scan</span>
                             {{else}}
                                 <span class="px-2 py-1 bg-gray-600 rounded text-xs capitalize">{{.ScanType}}</span>
                             {{end}}
@@ -62,7 +64,12 @@
                                 <span class="text-yellow-400">Running...</span>
                             {{end}}
                         </td>
-                        <td class="px-6 py-4 text-sm text-gray-400">{{.ActualFileCount}}</td>
+                        <td class="px-6 py-4 text-sm text-gray-400">
+                            <div>{{.ActualFileCount}}</div>
+                            {{if and (eq .ScanType "cleanup") (gt .DeletedFilesCount 0)}}
+                                <div class="text-xs text-red-400 mt-1">{{.DeletedFilesCount}} deleted</div>
+                            {{end}}
+                        </td>
                         <td class="px-6 py-4 text-sm">
                             <div class="flex flex-col gap-2">
                                 <!-- Status Badge -->
