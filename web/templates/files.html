@@ -430,7 +430,7 @@
         {{if gt .TotalPages 1}}
         <div id="pagination-container" class="bg-gray-700 px-6 py-4 flex items-center justify-between">
             <div class="text-sm text-gray-400">
-                Page {{.Page}} of {{.TotalPages}}
+                <span id="current-page-display">Page {{.Page}} of {{.TotalPages}}</span>
             </div>
             <div class="flex space-x-2">
                 {{if gt .Page 1}}
@@ -444,18 +444,12 @@
                 <a id="next-page-btn"
                    href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition"
-                   hx-get="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
-                   hx-trigger="revealed"
-                   hx-target="#files-table tbody"
-                   hx-swap="beforeend"
-                   hx-select="#files-table tbody > tr"
-                   hx-indicator="#infinite-scroll-loading"
+                   data-next-url="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    data-current-page="{{.Page}}"
-                   data-total-pages="{{.TotalPages}}"
-                   hx-disabled="true">
+                   data-total-pages="{{.TotalPages}}">
                     Next
                 </a>
-                <div id="infinite-scroll-loading" class="htmx-indicator px-3 py-1 text-sm text-gray-400">
+                <div id="infinite-scroll-loading" class="hidden px-3 py-1 text-sm text-gray-400">
                     <svg class="animate-spin h-4 w-4 inline-block mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -465,68 +459,208 @@
                 {{end}}
             </div>
         </div>
+        <!-- Infinite scroll sentinel (invisible trigger point) -->
+        <div id="infinite-scroll-sentinel"
+             class="h-1"
+             data-next-url="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
+             data-current-page="{{.Page}}"
+             data-total-pages="{{.TotalPages}}"
+             style="display: none;">
+        </div>
         {{end}}
     </div>
 
     <script>
-    // Infinite scroll toggle
-    const infiniteScrollToggle = document.getElementById('infinite-scroll-toggle');
-    const nextPageBtn = document.getElementById('next-page-btn');
+    // ============================================================================
+    // INFINITE SCROLL IMPLEMENTATION
+    // ============================================================================
 
-    if (infiniteScrollToggle && nextPageBtn) {
-        infiniteScrollToggle.addEventListener('change', function() {
-            if (this.checked) {
-                // Enable infinite scroll
-                nextPageBtn.removeAttribute('hx-disabled');
-                nextPageBtn.classList.add('hidden');
-                document.getElementById('pagination-container').classList.add('border-t-2', 'border-blue-500');
-                // Re-initialize htmx on this element to pick up the attribute change
-                htmx.process(nextPageBtn);
-            } else {
-                // Disable infinite scroll
-                nextPageBtn.setAttribute('hx-disabled', 'true');
-                nextPageBtn.classList.remove('hidden');
-                document.getElementById('pagination-container').classList.remove('border-t-2', 'border-blue-500');
+    (function() {
+        const infiniteScrollToggle = document.getElementById('infinite-scroll-toggle');
+        const nextPageBtn = document.getElementById('next-page-btn');
+        const sentinel = document.getElementById('infinite-scroll-sentinel');
+        const loadingIndicator = document.getElementById('infinite-scroll-loading');
+        const paginationContainer = document.getElementById('pagination-container');
+        const currentPageDisplay = document.getElementById('current-page-display');
+
+        if (!infiniteScrollToggle || !nextPageBtn || !sentinel) {
+            return;
+        }
+
+        // State management
+        let isEnabled = false;
+        let isLoading = false;
+        let currentPage = parseInt(nextPageBtn.getAttribute('data-current-page') || '1');
+        let totalPages = parseInt(nextPageBtn.getAttribute('data-total-pages') || '1');
+        let observer = null;
+
+        // Function to update the page display
+        function updatePageDisplay() {
+            if (currentPageDisplay) {
+                currentPageDisplay.textContent = `Page 1-${currentPage} of ${totalPages}`;
             }
-        });
+        }
 
-        // Update next page URL after each infinite scroll load
-        document.body.addEventListener('htmx:afterSwap', function(event) {
-            // Only process infinite scroll swaps when enabled
-            const isInfiniteScrollEnabled = infiniteScrollToggle && infiniteScrollToggle.checked;
-            if (!isInfiniteScrollEnabled) return;
+        // Function to load next page
+        async function loadNextPage() {
+            if (isLoading || currentPage >= totalPages) {
+                return;
+            }
 
-            // Check if this was an infinite scroll load (tbody swap)
-            if (event.detail.target && event.detail.target.matches &&
-                event.detail.target.matches('#files-table tbody')) {
-                const btn = document.getElementById('next-page-btn');
-                if (!btn) return;
+            isLoading = true;
+            const nextPage = currentPage + 1;
+            const nextUrl = sentinel.getAttribute('data-next-url');
 
-                const currentPage = parseInt(btn.getAttribute('data-current-page') || '1');
-                const totalPages = parseInt(btn.getAttribute('data-total-pages') || '1');
-                const nextPage = currentPage + 1;
+            // Show loading indicator
+            if (loadingIndicator) {
+                loadingIndicator.classList.remove('hidden');
+            }
+            if (nextPageBtn) {
+                nextPageBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
 
-                if (nextPage <= totalPages) {
-                    // Update page number in data attribute
-                    btn.setAttribute('data-current-page', nextPage);
+            try {
+                const response = await fetch(nextUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-                    // Update URLs for the NEXT page to load (not the one we just loaded)
-                    const currentUrl = new URL(btn.getAttribute('hx-get'), window.location.origin);
-                    currentUrl.searchParams.set('page', nextPage);
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newRows = doc.querySelectorAll('#files-table tbody > tr');
 
-                    btn.setAttribute('hx-get', currentUrl.pathname + currentUrl.search);
-                    btn.setAttribute('href', currentUrl.pathname + currentUrl.search);
+                if (newRows.length === 0) {
+                    disableInfiniteScroll();
+                    return;
+                }
 
-                    // Re-process the element so HTMX picks up the new URL
-                    htmx.process(btn);
+                const tbody = document.querySelector('#files-table tbody');
+                if (!tbody) return;
+
+                const clonedRows = [];
+                newRows.forEach(row => {
+                    const clonedRow = row.cloneNode(true);
+                    tbody.appendChild(clonedRow);
+                    clonedRows.push(clonedRow);
+                });
+
+                // Add batch selection checkboxes to new rows
+                if (window.batchSelection) {
+                    window.batchSelection.addRowCheckboxes();
+                }
+
+                // Re-process HTMX attributes on new rows
+                if (window.htmx) {
+                    clonedRows.forEach(row => htmx.process(row));
+                }
+
+                // Update current page
+                currentPage = nextPage;
+                updatePageDisplay();
+
+                // Update URL for next page if there are more pages
+                if (currentPage < totalPages) {
+                    const currentUrl = new URL(nextUrl, window.location.origin);
+                    currentUrl.searchParams.set('page', currentPage + 1);
+                    const newNextUrl = currentUrl.pathname + currentUrl.search;
+
+                    sentinel.setAttribute('data-next-url', newNextUrl);
+                    sentinel.setAttribute('data-current-page', currentPage);
+
+                    if (nextPageBtn) {
+                        nextPageBtn.setAttribute('data-next-url', newNextUrl);
+                        nextPageBtn.setAttribute('data-current-page', currentPage);
+                        nextPageBtn.setAttribute('href', newNextUrl);
+                    }
                 } else {
-                    // No more pages, disable infinite scroll
-                    btn.setAttribute('hx-disabled', 'true');
-                    btn.classList.add('hidden');
+                    disableInfiniteScroll();
+                }
+            } catch (error) {
+                console.error('Infinite scroll error:', error);
+            } finally {
+                isLoading = false;
+
+                if (loadingIndicator) {
+                    loadingIndicator.classList.add('hidden');
+                }
+                if (nextPageBtn) {
+                    nextPageBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 }
             }
+        }
+
+        // Function to enable infinite scroll
+        function enableInfiniteScroll() {
+            if (isEnabled) return;
+
+            isEnabled = true;
+
+            if (nextPageBtn) {
+                nextPageBtn.classList.add('hidden');
+            }
+
+            if (paginationContainer) {
+                paginationContainer.classList.add('border-t-2', 'border-blue-500');
+            }
+
+            if (sentinel) {
+                sentinel.style.display = 'block';
+
+                observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting && isEnabled && !isLoading) {
+                            loadNextPage();
+                        }
+                    });
+                }, {
+                    root: null,
+                    rootMargin: '100px',
+                    threshold: 0.01
+                });
+
+                observer.observe(sentinel);
+            }
+        }
+
+        // Function to disable infinite scroll
+        function disableInfiniteScroll() {
+            if (!isEnabled) return;
+
+            isEnabled = false;
+
+            if (nextPageBtn) {
+                nextPageBtn.classList.remove('hidden');
+            }
+
+            if (paginationContainer) {
+                paginationContainer.classList.remove('border-t-2', 'border-blue-500');
+            }
+
+            if (sentinel) {
+                sentinel.style.display = 'none';
+            }
+
+            if (observer) {
+                observer.disconnect();
+                observer = null;
+            }
+        }
+
+        // Toggle event handler
+        infiniteScrollToggle.addEventListener('change', function() {
+            if (this.checked) {
+                enableInfiniteScroll();
+            } else {
+                disableInfiniteScroll();
+            }
         });
-    }
+
+        // Initialize based on checkbox state
+        if (infiniteScrollToggle.checked) {
+            enableInfiniteScroll();
+        }
+    })();
 
     // Extension multiselect functionality
     const extensionMultiselect = document.querySelector('[data-extension-multiselect]');
