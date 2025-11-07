@@ -10,22 +10,33 @@
                 <button
                     hx-post="/api/scan/resume"
                     hx-swap="none"
-                    class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded transition">
+                    class="px-4 py-2 bg-amber-600 hover:bg-amber-700 rounded transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
                     Resume Scan #{{.InterruptedScanID}}
                 </button>
-                <div class="text-xs text-yellow-300 mt-1 text-center">Last phase: {{.InterruptedScanPhase}}</div>
+                <div class="text-xs text-amber-300 mt-1 text-center">Last phase: {{.InterruptedScanPhase}}</div>
             </div>
             {{end}}
             <button
                 hx-post="/api/scan/start"
                 hx-swap="none"
-                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
                 Start Full Scan
             </button>
             <button
                 hx-post="/api/scan/start?incremental=true"
                 hx-swap="none"
-                class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition">
+                class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
                 Start Incremental Scan
             </button>
         </div>
@@ -86,7 +97,7 @@
                 <button
                     hx-post="/api/hash/start"
                     hx-swap="none"
-                    class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition flex items-center gap-2">
+                    class="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded transition text-sm flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
                     </svg>
@@ -149,31 +160,59 @@
     <!-- Statistics Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <!-- Total Files -->
-        <div class="bg-linear-to-br from-blue-900 to-gray-800 rounded-lg p-6 border border-blue-700">
-            <div class="text-blue-200 text-sm font-medium">Total Files</div>
-            <div class="text-3xl font-bold mt-2 text-blue-100">{{.Stats.TotalFiles}}</div>
-            <div class="text-blue-300 text-sm mt-1">{{formatSize .Stats.TotalSize}}</div>
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <div class="text-gray-400 text-sm font-medium">Total Files</div>
+                <div class="p-3 bg-blue-500/20 rounded-full">
+                    <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="text-3xl font-bold text-white">{{formatNumber .Stats.TotalFiles}}</div>
+            <div class="text-gray-400 text-sm mt-1">{{formatSize .Stats.TotalSize}}</div>
         </div>
 
         <!-- Orphaned Files -->
-        <div class="bg-linear-to-br from-yellow-900 to-gray-800 rounded-lg p-6 border border-yellow-700">
-            <div class="text-yellow-200 text-sm font-medium">Orphaned Files</div>
-            <div class="text-3xl font-bold mt-2 text-yellow-400">{{.Stats.OrphanedFiles}}</div>
-            <div class="text-yellow-300 text-sm mt-1">{{formatSize .Stats.OrphanedSize}}</div>
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <div class="text-gray-400 text-sm font-medium">Orphaned Files</div>
+                <div class="p-3 bg-amber-500/20 rounded-full">
+                    <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="text-3xl font-bold text-white">{{formatNumber .Stats.OrphanedFiles}}</div>
+            <div class="text-gray-400 text-sm mt-1">{{formatSize .Stats.OrphanedSize}}</div>
         </div>
 
         <!-- Hardlink Groups -->
-        <div class="bg-linear-to-br from-cyan-900 to-gray-800 rounded-lg p-6 border border-cyan-700">
-            <div class="text-cyan-200 text-sm font-medium">Hardlink Groups</div>
-            <div class="text-3xl font-bold mt-2 text-cyan-400">{{.Stats.HardlinkGroups}}</div>
-            <div class="text-cyan-300 text-sm mt-1">Saving {{formatSize .Stats.HardlinkSavings}}</div>
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <div class="text-gray-400 text-sm font-medium">Hardlink Groups</div>
+                <div class="p-3 bg-cyan-500/20 rounded-full">
+                    <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="text-3xl font-bold text-white">{{formatNumber .Stats.HardlinkGroups}}</div>
+            <div class="text-gray-400 text-sm mt-1">Saving {{formatSize .Stats.HardlinkSavings}}</div>
         </div>
 
         <!-- Services -->
-        <div class="bg-linear-to-br from-green-900 to-gray-800 rounded-lg p-6 border border-green-700">
-            <div class="text-green-200 text-sm font-medium">Active Services</div>
-            <div class="text-3xl font-bold mt-2 text-green-100">{{.Stats.ActiveServiceCount}}</div>
-            <div class="text-green-300 text-sm mt-1">Tracking files</div>
+        <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <div class="text-gray-400 text-sm font-medium">Active Services</div>
+                <div class="p-3 bg-green-500/20 rounded-full">
+                    <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="text-3xl font-bold text-white">{{formatNumber .Stats.ActiveServiceCount}}</div>
+            <div class="text-gray-400 text-sm mt-1">Tracking files</div>
         </div>
     </div>
 
@@ -182,10 +221,19 @@
     <div class="bg-linear-to-br from-purple-900 to-gray-800 rounded-lg p-6 border border-purple-700">
         <div class="flex justify-between items-start mb-4">
             <div>
-                <h3 class="text-xl font-semibold text-purple-100">Duplicate Files</h3>
-                <p class="text-sm text-purple-300 mt-1">Space optimization opportunities</p>
+                <div class="flex items-center gap-2 mb-1">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                    </svg>
+                    <h3 class="text-xl font-semibold text-purple-100">Duplicate Files</h3>
+                </div>
+                <p class="text-sm text-purple-300">Space optimization opportunities</p>
             </div>
-            <a href="/duplicates" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition text-sm">
+            <a href="/duplicates" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition text-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
                 View Duplicates
             </a>
         </div>
@@ -194,7 +242,7 @@
             <!-- Cross-Disk Duplicates -->
             <div class="bg-gray-800 bg-opacity-50 rounded p-4 border border-purple-600">
                 <div class="text-purple-300 text-xs font-medium mb-1">Cross-Disk</div>
-                <div class="text-2xl font-bold text-white">{{.DuplicateStats.CrossDiskGroups}}</div>
+                <div class="text-2xl font-bold text-white">{{formatNumber .DuplicateStats.CrossDiskGroups}}</div>
                 <div class="text-xs text-purple-200 mt-1">groups</div>
                 <div class="text-sm text-green-400 font-semibold mt-2">
                     {{formatBytes .DuplicateStats.CrossDiskPotentialSavings}}
@@ -205,7 +253,7 @@
             <!-- Same-Disk Duplicates -->
             <div class="bg-gray-800 bg-opacity-50 rounded p-4 border border-purple-600">
                 <div class="text-purple-300 text-xs font-medium mb-1">Same-Disk</div>
-                <div class="text-2xl font-bold text-white">{{.DuplicateStats.SameDiskGroups}}</div>
+                <div class="text-2xl font-bold text-white">{{formatNumber .DuplicateStats.SameDiskGroups}}</div>
                 <div class="text-xs text-purple-200 mt-1">groups</div>
                 <div class="text-sm text-green-400 font-semibold mt-2">
                     {{formatBytes .DuplicateStats.SameDiskPotentialSavings}}
@@ -221,7 +269,7 @@
                 </div>
                 <div class="text-xs text-gray-400 mt-1">combined savings</div>
                 <div class="mt-2 text-xs text-gray-500">
-                    {{add .DuplicateStats.CrossDiskGroups .DuplicateStats.SameDiskGroups}} total groups
+                    {{formatNumber (add .DuplicateStats.CrossDiskGroups .DuplicateStats.SameDiskGroups)}} total groups
                 </div>
             </div>
         </div>
@@ -236,13 +284,18 @@
 
     <!-- Disk Status (if configured) -->
     {{if .Disks}}
-    <div class="bg-linear-to-br from-teal-900 to-gray-800 rounded-lg p-6 border border-teal-700">
-        <h3 class="text-xl font-semibold mb-4 text-teal-100">Disk Status</h3>
+    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div class="flex items-center gap-2 mb-4">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+            </svg>
+            <h3 class="text-xl font-semibold text-white">Disk Status</h3>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {{range .Disks}}
             <div class="bg-gray-700 rounded p-4 border-l-4 {{if ge .UsedPercent 90.0}}border-red-500{{else if ge .UsedPercent 80.0}}border-yellow-500{{else}}border-green-500{{end}}">
                 <div class="flex justify-between items-center mb-2">
-                    <span class="text-lg font-medium">{{.Name}}</span>
+                    <span class="text-lg font-medium text-white">{{.Name}}</span>
                     <span class="text-sm {{if ge .UsedPercent 90.0}}text-red-400{{else if ge .UsedPercent 80.0}}text-yellow-400{{else}}text-green-400{{end}} font-semibold">{{printf "%.1f%%" .UsedPercent}}</span>
                 </div>
                 <div class="text-sm text-gray-400 mb-2">
@@ -265,7 +318,10 @@
             <button
                 hx-post="/api/scan/disk-locations"
                 hx-swap="none"
-                class="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition text-sm">
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition text-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
                 Scan Disk Locations
             </button>
         </div>
@@ -274,25 +330,114 @@
         </div>
     </div>
     {{else}}
-    <div class="bg-linear-to-br from-teal-900 to-gray-800 rounded-lg p-6 border border-teal-700">
-        <h3 class="text-xl font-semibold mb-2 text-teal-100">Disk Status</h3>
-        <p class="text-teal-300 text-sm mb-2">No disks configured for cross-disk duplicate detection.</p>
-        <p class="text-teal-400 text-xs">To enable: configure 'disks' in <a href="/config" class="text-blue-400 hover:underline">config</a> and mount disks in docker-compose.yml</p>
+    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div class="flex items-center gap-2 mb-2">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
+            </svg>
+            <h3 class="text-xl font-semibold text-white">Disk Status</h3>
+        </div>
+        <p class="text-gray-400 text-sm mb-2">No disks configured for cross-disk duplicate detection.</p>
+        <p class="text-gray-500 text-xs">To enable: configure 'disks' in <a href="/config" class="text-blue-400 hover:underline">config</a> and mount disks in docker-compose.yml</p>
     </div>
     {{end}}
 
     <!-- Service Breakdown -->
-    <div class="bg-linear-to-br from-gray-900 to-gray-800 rounded-lg p-6 border border-gray-600">
-        <h3 class="text-xl font-semibold mb-4 text-gray-100">Service Breakdown</h3>
+    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div class="flex items-center gap-2 mb-4">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+            </svg>
+            <h3 class="text-xl font-semibold text-white">Service Breakdown</h3>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {{range $service, $stats := .Stats.ServiceBreakdown}}
-            <div class="bg-gray-700 {{serviceClass $service "bg-gradient"}} rounded p-4 border-l-4 {{serviceClass $service "border"}}">
-                <div class="flex justify-between items-center">
-                    <span class="text-lg font-medium">{{formatServiceName $service}}</span>
-                    <span class="text-gray-300">{{$stats.FileCount}} files</span>
+            {{if eq $service "plex"}}
+            <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
+                <div class="p-3 bg-orange-500/20 rounded-full flex-shrink-0">
+                    <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
                 </div>
-                <div class="text-sm text-gray-400 mt-1">{{formatSize $stats.TotalSize}}</div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName $service}}</div>
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="text-orange-400 font-medium">{{formatNumber $stats.FileCount}}</span>
+                        <span class="text-gray-500">files</span>
+                        <span class="text-gray-600">•</span>
+                        <span class="text-gray-400">{{formatSize $stats.TotalSize}}</span>
+                    </div>
+                </div>
             </div>
+            {{else if eq $service "sonarr"}}
+            <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
+                <div class="p-3 bg-cyan-500/20 rounded-full flex-shrink-0">
+                    <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName $service}}</div>
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="text-cyan-400 font-medium">{{formatNumber $stats.FileCount}}</span>
+                        <span class="text-gray-500">files</span>
+                        <span class="text-gray-600">•</span>
+                        <span class="text-gray-400">{{formatSize $stats.TotalSize}}</span>
+                    </div>
+                </div>
+            </div>
+            {{else if eq $service "radarr"}}
+            <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
+                <div class="p-3 bg-amber-500/20 rounded-full flex-shrink-0">
+                    <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName $service}}</div>
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="text-amber-400 font-medium">{{formatNumber $stats.FileCount}}</span>
+                        <span class="text-gray-500">files</span>
+                        <span class="text-gray-600">•</span>
+                        <span class="text-gray-400">{{formatSize $stats.TotalSize}}</span>
+                    </div>
+                </div>
+            </div>
+            {{else if eq $service "qbittorrent"}}
+            <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
+                <div class="p-3 bg-blue-500/20 rounded-full flex-shrink-0">
+                    <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName $service}}</div>
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="text-blue-400 font-medium">{{formatNumber $stats.FileCount}}</span>
+                        <span class="text-gray-500">files</span>
+                        <span class="text-gray-600">•</span>
+                        <span class="text-gray-400">{{formatSize $stats.TotalSize}}</span>
+                    </div>
+                </div>
+            </div>
+            {{else if eq $service "stash"}}
+            <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
+                <div class="p-3 bg-red-500/20 rounded-full flex-shrink-0">
+                    <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName $service}}</div>
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="text-red-400 font-medium">{{formatNumber $stats.FileCount}}</span>
+                        <span class="text-gray-500">files</span>
+                        <span class="text-gray-600">•</span>
+                        <span class="text-gray-400">{{formatSize $stats.TotalSize}}</span>
+                    </div>
+                </div>
+            </div>
+            {{end}}
             {{end}}
         </div>
     </div>
@@ -323,9 +468,14 @@
     </script>
 
     <!-- Manual Service Updates -->
-    <div class="bg-linear-to-br from-violet-900 to-gray-800 rounded-lg p-6 border border-violet-700">
-        <h3 class="text-xl font-semibold mb-4 text-violet-100">Manual Service Updates</h3>
-        <p class="text-sm text-violet-300 mb-4">Manually update service tracking without running a full scan</p>
+    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div class="flex items-center gap-2 mb-2">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            <h3 class="text-xl font-semibold text-white">Manual Service Updates</h3>
+        </div>
+        <p class="text-sm text-gray-400 mb-4">Manually update service tracking without running a full scan</p>
 
         <!-- Primary Actions -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -333,83 +483,114 @@
                 hx-post="/api/scan/update-services"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 border-l-4 border-purple-500 hover:bg-gray-600 rounded transition text-center {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium text-white">Update All Services</div>
-                <div class="text-sm text-gray-300 mt-1">Check all services and recalculate orphaned status</div>
+                class="p-4 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-200 text-left flex items-center gap-4 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="p-3 bg-blue-500/20 rounded-full flex-shrink-0 transition-colors group-hover:bg-blue-500/30">
+                    <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-base font-semibold text-white mb-1">Update All Services</div>
+                    <div class="text-sm text-gray-400">Check all services and recalculate orphaned status</div>
+                </div>
             </button>
             <button
                 hx-post="/api/scan/recalculate-orphaned"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 border-l-4 border-orange-500 hover:bg-gray-600 rounded transition text-center {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium text-white">Recalculate Orphaned</div>
-                <div class="text-sm text-gray-300 mt-1">Update orphaned status without checking services</div>
+                class="p-4 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-200 text-left flex items-center gap-4 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="p-3 bg-amber-500/20 rounded-full flex-shrink-0 transition-colors group-hover:bg-amber-500/30">
+                    <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-base font-semibold text-white mb-1">Recalculate Orphaned</div>
+                    <div class="text-sm text-gray-400">Update orphaned status without checking services</div>
+                </div>
             </button>
         </div>
 
         <!-- Individual Services -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <button
                 hx-post="/api/scan/update-service?service=plex"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 {{serviceClass "plex" "bg-gradient"}} border-l-4 {{serviceClass "plex" "border"}} hover:bg-gray-600 rounded transition text-center {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium text-white">Update Plex</div>
-                <div class="text-sm text-gray-300 mt-1">Check Plex only</div>
+                class="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-orange-500/50 hover:shadow-md hover:shadow-orange-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="p-2 bg-orange-500/20 rounded-full flex-shrink-0">
+                    <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-white">Update Plex</div>
+                    <div class="text-xs text-gray-400">Check Plex only</div>
+                </div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=sonarr"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 {{serviceClass "sonarr" "bg-gradient"}} border-l-4 {{serviceClass "sonarr" "border"}} hover:bg-gray-600 rounded transition text-center {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium text-white">Update Sonarr</div>
-                <div class="text-sm text-gray-300 mt-1">Check Sonarr only</div>
+                class="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-cyan-500/50 hover:shadow-md hover:shadow-cyan-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="p-2 bg-cyan-500/20 rounded-full flex-shrink-0">
+                    <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-white">Update Sonarr</div>
+                    <div class="text-xs text-gray-400">Check Sonarr only</div>
+                </div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=radarr"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 {{serviceClass "radarr" "bg-gradient"}} border-l-4 {{serviceClass "radarr" "border"}} hover:bg-gray-600 rounded transition text-center {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium text-white">Update Radarr</div>
-                <div class="text-sm text-gray-300 mt-1">Check Radarr only</div>
+                class="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-amber-500/50 hover:shadow-md hover:shadow-amber-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="p-2 bg-amber-500/20 rounded-full flex-shrink-0">
+                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-white">Update Radarr</div>
+                    <div class="text-xs text-gray-400">Check Radarr only</div>
+                </div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=qbittorrent"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 {{serviceClass "qbittorrent" "bg-gradient"}} border-l-4 {{serviceClass "qbittorrent" "border"}} hover:bg-gray-600 rounded transition text-center {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium text-white">Update qBittorrent</div>
-                <div class="text-sm text-gray-300 mt-1">Check qBittorrent only</div>
+                class="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-blue-500/50 hover:shadow-md hover:shadow-blue-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="p-2 bg-blue-500/20 rounded-full flex-shrink-0">
+                    <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-white">Update qBittorrent</div>
+                    <div class="text-xs text-gray-400">Check qBittorrent only</div>
+                </div>
             </button>
             <button
                 hx-post="/api/scan/update-service?service=stash"
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
-                class="p-4 bg-gray-700 {{serviceClass "stash" "bg-gradient"}} border-l-4 {{serviceClass "stash" "border"}} hover:bg-gray-600 rounded transition text-center {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="text-lg font-medium text-white">Update Stash</div>
-                <div class="text-sm text-gray-300 mt-1">Check Stash only</div>
+                class="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-red-500/50 hover:shadow-md hover:shadow-red-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="p-2 bg-red-500/20 rounded-full flex-shrink-0">
+                    <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-white">Update Stash</div>
+                    <div class="text-xs text-gray-400">Check Stash only</div>
+                </div>
             </button>
         </div>
     </div>
 
-    <!-- Quick Actions -->
-    <div class="bg-linear-to-br from-emerald-900 to-gray-800 rounded-lg p-6 border border-emerald-700">
-        <h3 class="text-xl font-semibold mb-4 text-emerald-100">Quick Actions</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <a href="/files?orphaned=true" class="block p-4 bg-gray-700 rounded hover:bg-gray-600 transition text-center">
-                <div class="text-lg font-medium">View Orphaned Files</div>
-                <div class="text-sm text-gray-400 mt-1">Files not tracked by any service</div>
-            </a>
-            <a href="/hardlinks" class="block p-4 bg-gray-700 rounded hover:bg-gray-600 transition text-center">
-                <div class="text-lg font-medium">View Hardlinks</div>
-                <div class="text-sm text-gray-400 mt-1">Files with multiple references</div>
-            </a>
-            <a href="/api/export?orphaned=true&format=json" class="block p-4 bg-gray-700 rounded hover:bg-gray-600 transition text-center">
-                <div class="text-lg font-medium">Export Orphaned</div>
-                <div class="text-sm text-gray-400 mt-1">Download list as JSON</div>
-            </a>
-        </div>
-    </div>
 </div>
 {{end}}
 
