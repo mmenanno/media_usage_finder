@@ -31,6 +31,17 @@
                         class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                 </div>
                 <div>
+                    <label for="api_timeout" class="block text-sm font-medium text-gray-400 mb-2">API Timeout</label>
+                    <input
+                        id="api_timeout"
+                        type="text"
+                        name="api_timeout"
+                        value="{{.Config.APITimeout}}"
+                        placeholder="30s"
+                        class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
+                    <p class="text-xs text-gray-500 mt-1">Timeout for external service API calls (e.g., 30s, 5m, 10m). Increase for large libraries. Effective timeout is 2× this value.</p>
+                </div>
+                <div>
                     <label for="scan_log_retention_days" class="block text-sm font-medium text-gray-400 mb-2">
                         Scan Log Retention (Days)
                         <span class="text-xs text-gray-500 font-normal ml-2">0 = keep forever, -1 = disable logging</span>

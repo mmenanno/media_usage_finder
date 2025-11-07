@@ -1565,6 +1565,12 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if apiTimeout := r.FormValue("api_timeout"); apiTimeout != "" {
+		if timeout, err := time.ParseDuration(apiTimeout); err == nil && timeout >= time.Second {
+			s.config.APITimeout = timeout
+		}
+	}
+
 	if retentionDays := r.FormValue("scan_log_retention_days"); retentionDays != "" {
 		if days, err := strconv.Atoi(retentionDays); err == nil && days >= -1 {
 			s.config.ScanLogRetentionDays = days
