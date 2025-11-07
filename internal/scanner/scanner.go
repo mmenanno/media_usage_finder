@@ -292,12 +292,8 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 		}
 	}()
 
-	// Try to get previous scan's file count as estimate for progress tracking
-	// This allows showing percentage and ETA even without pre-counting files
-	if lastCount, err := s.db.GetLastCompletedScanFileCount(); err == nil && lastCount > 0 {
-		s.progress.SetEstimatedTotal(lastCount)
-		s.progress.Log(fmt.Sprintf("Using previous scan count (%d files) as estimate for progress tracking", lastCount))
-	}
+	// Initialize progress totals using the current database contents (with fallback)
+	s.initializeProgressTotal()
 
 	// Scan filesystem immediately (no file counting phase)
 	// Files are counted dynamically as they're processed
@@ -425,12 +421,8 @@ func (s *Scanner) runScanWithResume(ctx context.Context, scanID int64, increment
 		}
 	}()
 
-	// Try to get previous scan's file count as estimate for progress tracking
-	// This allows showing percentage and ETA even without pre-counting files
-	if lastCount, err := s.db.GetLastCompletedScanFileCount(); err == nil && lastCount > 0 {
-		s.progress.SetEstimatedTotal(lastCount)
-		s.progress.Log(fmt.Sprintf("Using previous scan count (%d files) as estimate for progress tracking", lastCount))
-	}
+	// Initialize progress totals using the current database contents (with fallback)
+	s.initializeProgressTotal()
 
 	// Scan filesystem immediately (no file counting phase)
 	// Files are counted dynamically as they're processed
@@ -935,6 +927,30 @@ func (s *Scanner) logCacheStats() {
 	if s.progress != nil {
 		s.progress.Log(fmt.Sprintf("Path cache: %d entries, %.1f%% hit rate, %d evictions",
 			size, hitRate*100, evictions))
+	}
+}
+
+// initializeProgressTotal sets up the progress tracker with the best-known total file count
+func (s *Scanner) initializeProgressTotal() {
+	if s.progress == nil {
+		return
+	}
+
+	if currentCount, err := s.db.GetCurrentFileCount(); err == nil {
+		if currentCount > 0 {
+			// Use the current DB count but mark it as an estimate since new files may appear mid-scan
+			s.progress.SetEstimatedTotal(currentCount)
+			s.progress.Log(fmt.Sprintf("Estimating progress using %d files currently stored in the database", currentCount))
+			return
+		}
+	} else {
+		s.progress.Log(fmt.Sprintf("Warning: Failed to read current database file count: %v", err))
+	}
+
+	// Fallback to last completed scan count if database has no files yet
+	if lastCount, err := s.db.GetLastCompletedScanFileCount(); err == nil && lastCount > 0 {
+		s.progress.SetEstimatedTotal(lastCount)
+		s.progress.Log(fmt.Sprintf("Using previous scan count (%d files) as estimate for progress tracking", lastCount))
 	}
 }
 

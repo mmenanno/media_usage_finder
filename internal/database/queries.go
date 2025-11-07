@@ -645,6 +645,16 @@ func (db *DB) GetLastCompletedScanFileCount() (int64, error) {
 	return count, nil
 }
 
+// GetCurrentFileCount returns the number of files currently stored in the database
+func (db *DB) GetCurrentFileCount() (int64, error) {
+	var count int64
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM files`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get current file count: %w", err)
+	}
+	return count, nil
+}
+
 // ListScans retrieves recent scans with pagination
 func (db *DB) ListScans(limit, offset int) ([]*Scan, int, error) {
 	// Count total
