@@ -979,9 +979,11 @@ async function executeConsolidation() {
 
 // Dry run summary modal management
 let currentDryRunData = null;
+let currentPreviewGroupHashes = null; // Track which groups were previewed
 
-function showDryRunSummary(data) {
+function showDryRunSummary(data, groupHashes = null) {
     currentDryRunData = data;
+    currentPreviewGroupHashes = groupHashes; // Store the group hashes used in preview
 
     // Populate summary statistics
     document.getElementById('summary-groups').textContent = data.groups_processed || 0;
@@ -1089,11 +1091,21 @@ function showDryRunSummary(data) {
 function closeDryRunSummary() {
     document.getElementById('dryRunSummaryModal').classList.add('hidden');
     currentDryRunData = null;
+    currentPreviewGroupHashes = null;
 }
 
 function confirmAndExecuteHardlinks() {
+    // Store group hashes before closing (which clears them)
+    const groupHashes = currentPreviewGroupHashes;
     closeDryRunSummary();
-    executeHardlinks();
+
+    // If we previewed specific groups, execute only those groups
+    if (groupHashes && groupHashes.length > 0) {
+        executeSingleGroupHardlink(groupHashes[0]);
+    } else {
+        // Otherwise execute all hardlinks
+        executeHardlinks();
+    }
 }
 
 async function previewHardlinks() {
@@ -1129,7 +1141,7 @@ async function previewHardlinks() {
 
         if (data.status === 'success') {
             // Show detailed summary modal instead of simple confirm
-            showDryRunSummary(data);
+            showDryRunSummary(data, null); // null = all groups
         } else {
             console.error('Preview failed, data:', data);
             showToast('Preview failed: ' + (data.message || 'Unknown error'), 'error');
@@ -1211,7 +1223,7 @@ async function previewSingleGroup(groupHash) {
 
         if (data.status === 'success') {
             // Show detailed summary modal for single group
-            showDryRunSummary(data);
+            showDryRunSummary(data, [groupHash]); // Pass the group hash so we execute only this group
         } else {
             showToast('Preview failed: ' + (data.message || 'Unknown error'), 'error');
         }
@@ -1240,16 +1252,24 @@ function executeSingleGroupHardlink(groupHash) {
     // Show loading toast with long duration
     showToast('Creating hardlinks...', 'info', {duration: 30000}); // 30 seconds
 
+    console.log('Executing single group hardlink for hash:', groupHash);
+    const requestBody = {
+        dry_run: false,
+        group_hashes: [groupHash]
+    };
+    console.log('Request body:', JSON.stringify(requestBody));
+
     fetch('/api/duplicates/hardlink', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            dry_run: false,
-            group_hashes: [groupHash]
-        })
+        body: JSON.stringify(requestBody)
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        return response.json();
+    })
     .then(async data => {
+        console.log('Response data:', data);
         if (data.status === 'success') {
             // Dismiss loading, show success
             showToast('Hardlinks created successfully!', 'success', {duration: 3000});

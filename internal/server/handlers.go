@@ -4287,6 +4287,10 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Log the request details for debugging
+	log.Printf("HandleCreateHardlinks called: dry_run=%v, group_hashes=%v (count: %d)",
+		req.DryRun, req.GroupHashes, len(req.GroupHashes))
+
 	// Create analyzer and consolidator
 	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
 
@@ -4446,9 +4450,14 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	// Execute hardlink creation
 	result, err := consolidator.CreateHardlinks(plans, req.DryRun)
 	if err != nil {
+		log.Printf("ERROR: Hardlink creation failed: %v", err)
 		respondError(w, http.StatusInternalServerError, "Hardlink creation failed", "hardlink_failed")
 		return
 	}
+
+	// Log the result
+	log.Printf("Hardlink operation completed: dry_run=%v, groups_processed=%d, files_linked=%d, space_saved=%d, errors=%d",
+		result.DryRun, result.GroupsProcessed, result.FilesDeleted, result.SpaceFreed, len(result.Errors))
 
 	// Invalidate stats cache
 	s.statsCache.Invalidate()
