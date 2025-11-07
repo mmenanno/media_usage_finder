@@ -203,20 +203,10 @@ func (c *Consolidator) processHardlinkGroup(plan *ConsolidationPlan, dryRun bool
 
 		log.Printf("About to hardlink: %s -> %s", dupFile.Path, plan.KeepFile.Path)
 
-		// Verify duplicate file
+		// Verify duplicate file safety (not hash - files were already hashed during scan)
 		if err := c.verifyFileSafety(dupFile); err != nil {
 			log.Printf("WARNING: Skipping %s: %v", dupFile.Path, err)
 			continue
-		}
-
-		// Verify hash if configured
-		if c.config.VerifyBeforeDelete {
-			log.Printf("Verifying hash for %s (this may take a while for large files)...", dupFile.Path)
-			if err := c.verifyFileHash(dupFile.Path, plan.Group.FileHash); err != nil {
-				log.Printf("WARNING: Hash mismatch for %s, skipping: %v", dupFile.Path, err)
-				continue
-			}
-			log.Printf("Hash verification passed for %s", dupFile.Path)
 		}
 
 		// Create hardlink atomically

@@ -450,6 +450,44 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 11: Update audit_log table CHECK constraint to include 'consolidate' and 'hardlink'
+	// Test if migration is needed by trying to insert a test record with action='hardlink'
+	needsAuditLogMigration := false
+
+	// Start a transaction for the test
+	tx5, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction for audit_log migration check: %w", err)
+	}
+	defer tx5.Rollback()
+
+	// Try to insert a test record with action='hardlink'
+	_, err = tx5.Exec(`
+		INSERT INTO audit_log (action, entity_type, entity_id, details)
+		VALUES ('hardlink', 'test', 0, 'migration test')
+	`)
+
+	if err != nil {
+		// Check if the error is a CHECK constraint failure
+		if strings.Contains(err.Error(), "CHECK constraint failed") {
+			needsAuditLogMigration = true
+		}
+	} else {
+		// If insert succeeded, delete the test record
+		_, _ = tx5.Exec(`DELETE FROM audit_log WHERE action = 'hardlink' AND details = 'migration test'`)
+	}
+
+	// Rollback the test transaction
+	tx5.Rollback()
+
+	// Run migration if needed
+	if needsAuditLogMigration {
+		_, err = db.conn.Exec(migrateAddConsolidateHardlinkToAuditLog)
+		if err != nil {
+			return fmt.Errorf("failed to update audit_log table CHECK constraint: %w", err)
+		}
+	}
+
 	return nil
 }
 

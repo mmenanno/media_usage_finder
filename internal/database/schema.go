@@ -451,3 +451,36 @@ ALTER TABLE scans_new RENAME TO scans;
 CREATE INDEX idx_scans_status ON scans(status);
 CREATE INDEX idx_scans_started_at ON scans(started_at);
 `
+
+// Migration to add 'consolidate' and 'hardlink' to audit_log action CHECK constraint
+const migrateAddConsolidateHardlinkToAuditLog = `
+-- Drop audit_log_new if it exists from a previous failed migration
+DROP TABLE IF EXISTS audit_log_new;
+
+-- Create new audit_log table with updated CHECK constraint
+CREATE TABLE audit_log_new (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	action TEXT NOT NULL CHECK(action IN ('delete', 'mark_rescan', 'config_change', 'consolidate', 'hardlink')),
+	entity_type TEXT NOT NULL,
+	entity_id INTEGER,
+	details TEXT,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+
+-- Copy data from old table
+INSERT INTO audit_log_new (id, action, entity_type, entity_id, details, created_at)
+SELECT id, action, entity_type, entity_id, details, created_at
+FROM audit_log;
+
+-- Drop old table and indexes
+DROP INDEX IF EXISTS idx_audit_log_created_at;
+DROP INDEX IF EXISTS idx_audit_log_action;
+DROP TABLE audit_log;
+
+-- Rename new table
+ALTER TABLE audit_log_new RENAME TO audit_log;
+
+-- Recreate indexes
+CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
+CREATE INDEX idx_audit_log_action ON audit_log(action);
+`
