@@ -29,20 +29,20 @@ import (
 
 // Server holds the application state
 type Server struct {
-	db                 *database.DB
-	config             *config.Config
-	scanner            *scanner.Scanner
-	hashScanner        *scanner.HashScanner // Hash scanner for duplicate detection
-	templates          map[string]*template.Template // Map of template name to parsed template
-	statsCache         *stats.Cache
-	dbStatsCache       *database.DatabaseStats // Database stats cache
-	dbStatsCachedAt    time.Time               // When database stats were cached
-	dbStatsCacheMutex  sync.RWMutex            // Mutex for database stats cache
-	templateFuncs      template.FuncMap        // Cached template functions
-	version            string                  // Application version
-	clientFactory      *api.ClientFactory      // Factory for creating service clients
-	diskDetector       *disk.Detector          // Disk detector for cross-disk duplicate detection
-	diskResolver       *disk.DeviceResolver    // Device resolver for friendly disk names in UI
+	db                *database.DB
+	config            *config.Config
+	scanner           *scanner.Scanner
+	hashScanner       *scanner.HashScanner          // Hash scanner for duplicate detection
+	templates         map[string]*template.Template // Map of template name to parsed template
+	statsCache        *stats.Cache
+	dbStatsCache      *database.DatabaseStats // Database stats cache
+	dbStatsCachedAt   time.Time               // When database stats were cached
+	dbStatsCacheMutex sync.RWMutex            // Mutex for database stats cache
+	templateFuncs     template.FuncMap        // Cached template functions
+	version           string                  // Application version
+	clientFactory     *api.ClientFactory      // Factory for creating service clients
+	diskDetector      *disk.Detector          // Disk detector for cross-disk duplicate detection
+	diskResolver      *disk.DeviceResolver    // Device resolver for friendly disk names in UI
 }
 
 // NewServer creates a new server instance
@@ -741,12 +741,12 @@ func (s *Server) HandleGetScanLogs(w http.ResponseWriter, r *http.Request) {
 	isHTMX := r.Header.Get("HX-Request") == "true"
 
 	data := map[string]interface{}{
-		"Logs":        logs,
-		"Total":       total,
-		"Page":        currentPage,
-		"TotalPages":  totalPages,
-		"Filters":     filters,
-		"IsHTMX":      isHTMX,
+		"Logs":       logs,
+		"Total":      total,
+		"Page":       currentPage,
+		"TotalPages": totalPages,
+		"Filters":    filters,
+		"IsHTMX":     isHTMX,
 	}
 
 	if isHTMX {
@@ -2210,7 +2210,7 @@ func (s *Server) HandleGetFileDiskLocations(w http.ResponseWriter, r *http.Reque
 		FileID       int64  `json:"file_id"`
 		DiskName     string `json:"disk_name"`
 		DeviceID     int64  `json:"device_id"`
-		DeviceName   string `json:"device_name"` // Friendly name from resolver
+		DeviceName   string `json:"device_name"`  // Friendly name from resolver
 		DeviceColor  string `json:"device_color"` // Badge color
 		DiskPath     string `json:"disk_path"`
 		Size         int64  `json:"size"`
@@ -4106,7 +4106,7 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if hash scanning is enabled
-	if s.config.DuplicateDetection.Enabled == false {
+	if !s.config.DuplicateDetection.Enabled {
 		// Show page with message that hash scanning is disabled
 		data := &DuplicatesData{
 			Title:               "Duplicate Files",
@@ -4307,14 +4307,18 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
 
 	// Get all same-disk duplicates (0 = no limit, needed for hardlinking)
+	log.Printf("Analyzing same-disk duplicates...")
 	plans, err := analyzer.AnalyzeSameDiskDuplicates(0)
 	if err != nil {
+		log.Printf("ERROR: Failed to analyze duplicates: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to analyze duplicates", "analysis_failed")
 		return
 	}
+	log.Printf("Found %d total plans", len(plans))
 
 	// Filter to specific groups if requested
 	if len(req.GroupHashes) > 0 {
+		log.Printf("Filtering to specific groups: %v", req.GroupHashes)
 		hashSet := make(map[string]bool)
 		for _, h := range req.GroupHashes {
 			hashSet[h] = true
@@ -4327,6 +4331,7 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		plans = filteredPlans
+		log.Printf("Filtered to %d plans", len(plans))
 	}
 
 	// Calculate detailed statistics before execution (for dry run summary)
@@ -4351,12 +4356,13 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 
 	// Build list of files to be linked (for preview)
 	type FileToLink struct {
-		Path     string `json:"path"`
-		Size     int64  `json:"size"`
+		Path      string `json:"path"`
+		Size      int64  `json:"size"`
 		GroupHash string `json:"group_hash"`
 	}
 	filesToLink := make([]FileToLink, 0)
 
+	log.Printf("Building statistics for %d plans...", len(plans))
 	for _, plan := range plans {
 		// Count files needing action vs already linked
 		for _, cluster := range plan.LinkClusters {
@@ -4376,8 +4382,8 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 				for i, file := range cluster.Files {
 					if i > 0 { // Skip first file (keeper)
 						filesToLink = append(filesToLink, FileToLink{
-							Path:     file.Path,
-							Size:     file.Size,
+							Path:      file.Path,
+							Size:      file.Size,
 							GroupHash: plan.Group.FileHash,
 						})
 					}
@@ -4447,6 +4453,8 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 		warnings = append(warnings, fmt.Sprintf("%d group(s) use quick hash - verification recommended before linking", hashBreakdown["quick_hash"]))
 	}
 
+	log.Printf("Statistics complete. About to execute hardlinks for %d plans (dry_run=%v)...", len(plans), req.DryRun)
+
 	// Execute hardlink creation
 	result, err := consolidator.CreateHardlinks(plans, req.DryRun)
 	if err != nil {
@@ -4464,20 +4472,20 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 
 	// Return enhanced result
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"status":                     "success",
-		"dry_run":                    result.DryRun,
-		"groups_processed":           result.GroupsProcessed,
-		"files_linked":               result.FilesDeleted, // "Deleted" is used for linked in same-disk
-		"files_to_link":              totalFilesToLink,
-		"files_already_linked":       totalFilesAlreadyLinked,
-		"clusters_needing_link":      totalClustersNeedingLink,
-		"clusters_already_linked":    totalClustersAlreadyLinked,
-		"space_saved":                result.SpaceFreed,
-		"hash_breakdown":             hashBreakdown,
-		"top_groups":                 topGroups,
-		"warnings":                   warnings,
-		"errors":                     result.Errors,
-		"files_list":                 filesToLink,
+		"status":                  "success",
+		"dry_run":                 result.DryRun,
+		"groups_processed":        result.GroupsProcessed,
+		"files_linked":            result.FilesDeleted, // "Deleted" is used for linked in same-disk
+		"files_to_link":           totalFilesToLink,
+		"files_already_linked":    totalFilesAlreadyLinked,
+		"clusters_needing_link":   totalClustersNeedingLink,
+		"clusters_already_linked": totalClustersAlreadyLinked,
+		"space_saved":             result.SpaceFreed,
+		"hash_breakdown":          hashBreakdown,
+		"top_groups":              topGroups,
+		"warnings":                warnings,
+		"errors":                  result.Errors,
+		"files_list":              filesToLink,
 	})
 }
 
@@ -4528,10 +4536,10 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 
 	// Return preview data
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"type":                 consolidationType,
-		"total_groups":         preview.TotalGroups,
+		"type":                   consolidationType,
+		"total_groups":           preview.TotalGroups,
 		"total_files_to_process": preview.TotalFilesToDelete,
-		"total_space_saved":    preview.TotalSpaceSaved,
-		"disk_impacts":         preview.DiskImpacts,
+		"total_space_saved":      preview.TotalSpaceSaved,
+		"disk_impacts":           preview.DiskImpacts,
 	})
 }

@@ -128,11 +128,13 @@ func (c *Consolidator) processGroup(plan *ConsolidationPlan, dryRun bool) error 
 
 // CreateHardlinks creates hardlinks for same-disk duplicates
 func (c *Consolidator) CreateHardlinks(plans []*ConsolidationPlan, dryRun bool) (*ConsolidationResult, error) {
+	log.Printf("CreateHardlinks: Starting with %d plans, dryRun=%v", len(plans), dryRun)
 	result := &ConsolidationResult{
 		DryRun: dryRun,
 	}
 
-	for _, plan := range plans {
+	for i, plan := range plans {
+		log.Printf("CreateHardlinks: Processing plan %d/%d (group: %s)", i+1, len(plans), plan.Group.FileHash[:16])
 		if err := c.processHardlinkGroup(plan, dryRun); err != nil {
 			result.Errors = append(result.Errors, ConsolidationError{
 				GroupHash: plan.Group.FileHash,
@@ -199,6 +201,8 @@ func (c *Consolidator) processHardlinkGroup(plan *ConsolidationPlan, dryRun bool
 			continue
 		}
 
+		log.Printf("About to hardlink: %s -> %s", dupFile.Path, plan.KeepFile.Path)
+
 		// Verify duplicate file
 		if err := c.verifyFileSafety(dupFile); err != nil {
 			log.Printf("WARNING: Skipping %s: %v", dupFile.Path, err)
@@ -207,10 +211,12 @@ func (c *Consolidator) processHardlinkGroup(plan *ConsolidationPlan, dryRun bool
 
 		// Verify hash if configured
 		if c.config.VerifyBeforeDelete {
+			log.Printf("Verifying hash for %s (this may take a while for large files)...", dupFile.Path)
 			if err := c.verifyFileHash(dupFile.Path, plan.Group.FileHash); err != nil {
 				log.Printf("WARNING: Hash mismatch for %s, skipping: %v", dupFile.Path, err)
 				continue
 			}
+			log.Printf("Hash verification passed for %s", dupFile.Path)
 		}
 
 		// Create hardlink atomically
