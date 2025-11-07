@@ -68,6 +68,8 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/config/test-path-mappings", s.HandleTestPathMappings)
 	mux.HandleFunc("/api/disks/detect", s.HandleDetectDisks)
 	mux.HandleFunc("/api/export", s.HandleExport)
+	mux.HandleFunc("/api/missing-files", s.HandleGetMissingFiles)
+	mux.HandleFunc("/api/missing-files/export", s.HandleExportMissingFiles)
 	mux.HandleFunc("/api/files/extensions", s.HandleGetFileExtensions)
 	mux.HandleFunc("/api/files/delete", s.HandleDeleteFile)
 	mux.HandleFunc("/api/files/mark-rescan", s.HandleMarkRescan)

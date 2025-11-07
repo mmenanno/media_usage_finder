@@ -118,6 +118,20 @@ type ScanLog struct {
 	CreatedAt time.Time
 }
 
+// MissingFile represents a file that a service reports but doesn't exist in the filesystem
+type MissingFile struct {
+	ID             int64                  `json:"id"`
+	ScanID         int64                  `json:"scan_id"`
+	Service        string                 `json:"service"`
+	ServicePath    string                 `json:"service_path"`
+	TranslatedPath string                 `json:"translated_path"`
+	Size           int64                  `json:"size"`
+	ServiceGroup   string                 `json:"service_group"`
+	ServiceGroupID string                 `json:"service_group_id"`
+	Metadata       map[string]interface{} `json:"metadata"`
+	CreatedAt      time.Time              `json:"created_at"`
+}
+
 // LogFilters defines filters for querying scan logs
 type LogFilters struct {
 	ScanID     *int64
@@ -2997,4 +3011,96 @@ func (db *DB) DeleteFilesNotInSet(ctx context.Context, existingPaths map[string]
 	}
 
 	return int64(len(toDelete)), nil
+}
+
+// ClearMissingFiles deletes all missing file records for a specific scan
+func (db *DB) ClearMissingFiles(ctx context.Context, scanID int64) error {
+	_, err := db.conn.ExecContext(ctx, `DELETE FROM service_missing_files WHERE scan_id = ?`, scanID)
+	return err
+}
+
+// InsertMissingFile inserts a missing file record into the database
+func (db *DB) InsertMissingFile(ctx context.Context, missing *MissingFile) error {
+	// Serialize metadata to JSON
+	var metadataJSON []byte
+	var err error
+	if missing.Metadata != nil {
+		metadataJSON, err = json.Marshal(missing.Metadata)
+		if err != nil {
+			return fmt.Errorf("failed to marshal metadata: %w", err)
+		}
+	}
+
+	_, err = db.conn.ExecContext(ctx, `
+		INSERT INTO service_missing_files (
+			scan_id, service, service_path, translated_path,
+			size, service_group, service_group_id, metadata
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, missing.ScanID, missing.Service, missing.ServicePath, missing.TranslatedPath,
+		missing.Size, missing.ServiceGroup, missing.ServiceGroupID, metadataJSON)
+
+	return err
+}
+
+// GetMissingFilesByScan retrieves all missing files for a specific scan
+func (db *DB) GetMissingFilesByScan(ctx context.Context, scanID int64) ([]*MissingFile, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT id, scan_id, service, service_path, translated_path,
+		       size, service_group, service_group_id, metadata, created_at
+		FROM service_missing_files
+		WHERE scan_id = ?
+		ORDER BY service, size DESC
+	`, scanID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var missingFiles []*MissingFile
+	for rows.Next() {
+		var missing MissingFile
+		var createdAt int64
+		var metadataJSON sql.NullString
+
+		err := rows.Scan(
+			&missing.ID, &missing.ScanID, &missing.Service, &missing.ServicePath,
+			&missing.TranslatedPath, &missing.Size, &missing.ServiceGroup,
+			&missing.ServiceGroupID, &metadataJSON, &createdAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		missing.CreatedAt = time.Unix(createdAt, 0)
+
+		// Deserialize metadata
+		if metadataJSON.Valid && metadataJSON.String != "" {
+			if err := json.Unmarshal([]byte(metadataJSON.String), &missing.Metadata); err != nil {
+				log.Printf("Warning: failed to unmarshal metadata for missing file %d: %v", missing.ID, err)
+			}
+		}
+
+		missingFiles = append(missingFiles, &missing)
+	}
+
+	return missingFiles, rows.Err()
+}
+
+// GetLatestMissingFiles retrieves missing files from the most recent scan
+func (db *DB) GetLatestMissingFiles(ctx context.Context) ([]*MissingFile, error) {
+	// First, get the most recent scan ID
+	var latestScanID int64
+	err := db.conn.QueryRowContext(ctx, `
+		SELECT id FROM scans
+		ORDER BY started_at DESC
+		LIMIT 1
+	`).Scan(&latestScanID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return []*MissingFile{}, nil
+		}
+		return nil, err
+	}
+
+	return db.GetMissingFilesByScan(ctx, latestScanID)
 }

@@ -273,6 +273,13 @@ func (p *Progress) Stop() {
 	})
 }
 
+// GetScanID returns the scan ID for this progress tracker
+func (p *Progress) GetScanID() int64 {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.scanID
+}
+
 // GetSnapshot returns a snapshot of the current progress
 func (p *Progress) GetSnapshot() ProgressSnapshot {
 	p.mu.RLock()

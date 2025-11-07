@@ -560,6 +560,26 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 12: Add service_missing_files table if it doesn't exist
+	var hasServiceMissingFilesTable int
+	err = db.conn.QueryRow(`
+		SELECT COUNT(*)
+		FROM sqlite_master
+		WHERE type='table' AND name='service_missing_files'
+	`).Scan(&hasServiceMissingFilesTable)
+
+	if err != nil {
+		return fmt.Errorf("failed to check for service_missing_files table: %w", err)
+	}
+
+	// If service_missing_files table doesn't exist, create it
+	if hasServiceMissingFilesTable == 0 {
+		_, err = db.conn.Exec(migrateAddServiceMissingFilesTable)
+		if err != nil {
+			return fmt.Errorf("failed to create service_missing_files table: %w", err)
+		}
+	}
+
 	return nil
 }
 

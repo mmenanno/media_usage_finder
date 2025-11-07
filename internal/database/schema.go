@@ -145,6 +145,27 @@ CREATE INDEX IF NOT EXISTS idx_disk_locations_file_id ON file_disk_locations(fil
 CREATE INDEX IF NOT EXISTS idx_disk_locations_disk_device ON file_disk_locations(disk_device_id);
 CREATE INDEX IF NOT EXISTS idx_disk_locations_disk_path ON file_disk_locations(disk_path);
 CREATE INDEX IF NOT EXISTS idx_disk_locations_inode ON file_disk_locations(disk_device_id, inode);
+
+-- Service missing files table for tracking files services report but don't exist in filesystem
+-- Cleared at each scan start to only show current scan's missing files
+CREATE TABLE IF NOT EXISTS service_missing_files (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	scan_id INTEGER NOT NULL,
+	service TEXT NOT NULL CHECK(service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash')),
+	service_path TEXT NOT NULL,
+	translated_path TEXT NOT NULL,
+	size INTEGER,
+	service_group TEXT,
+	service_group_id TEXT,
+	metadata TEXT,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (scan_id) REFERENCES scans(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_missing_files_scan_id ON service_missing_files(scan_id);
+CREATE INDEX IF NOT EXISTS idx_missing_files_service ON service_missing_files(service);
+CREATE INDEX IF NOT EXISTS idx_missing_files_size ON service_missing_files(size DESC);
+CREATE INDEX IF NOT EXISTS idx_missing_files_scan_service ON service_missing_files(scan_id, service);
 `
 
 // GetSchema returns the database schema
@@ -490,6 +511,30 @@ CREATE INDEX idx_audit_log_action ON audit_log(action);
 const migrateAddDeletedFilesCount = `
 -- Add deleted_files_count column to scans table
 ALTER TABLE scans ADD COLUMN deleted_files_count INTEGER DEFAULT 0;
+`
+
+// Migration to add service_missing_files table
+const migrateAddServiceMissingFilesTable = `
+-- Service missing files table for tracking files services report but don't exist in filesystem
+-- Cleared at each scan start to only show current scan's missing files
+CREATE TABLE IF NOT EXISTS service_missing_files (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	scan_id INTEGER NOT NULL,
+	service TEXT NOT NULL CHECK(service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash')),
+	service_path TEXT NOT NULL,
+	translated_path TEXT NOT NULL,
+	size INTEGER,
+	service_group TEXT,
+	service_group_id TEXT,
+	metadata TEXT,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (scan_id) REFERENCES scans(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_missing_files_scan_id ON service_missing_files(scan_id);
+CREATE INDEX IF NOT EXISTS idx_missing_files_service ON service_missing_files(service);
+CREATE INDEX IF NOT EXISTS idx_missing_files_size ON service_missing_files(size DESC);
+CREATE INDEX IF NOT EXISTS idx_missing_files_scan_service ON service_missing_files(scan_id, service);
 `
 
 // Migration to add 'cleanup' scan type to scans table CHECK constraint

@@ -4579,3 +4579,104 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 		"disk_impacts":           preview.DiskImpacts,
 	})
 }
+
+// HandleGetMissingFiles returns missing files from the latest scan as JSON
+func (s *Server) HandleGetMissingFiles(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	ctx := r.Context()
+	missingFiles, err := s.db.GetLatestMissingFiles(ctx)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to retrieve missing files", "query_failed")
+		return
+	}
+
+	// Group by service for easier rendering
+	type ServiceMissingFiles struct {
+		Service string                    `json:"service"`
+		Count   int                       `json:"count"`
+		Files   []*database.MissingFile   `json:"files"`
+	}
+
+	groupedByService := make(map[string]*ServiceMissingFiles)
+	for _, mf := range missingFiles {
+		if _, exists := groupedByService[mf.Service]; !exists {
+			groupedByService[mf.Service] = &ServiceMissingFiles{
+				Service: mf.Service,
+				Files:   []*database.MissingFile{},
+			}
+		}
+		groupedByService[mf.Service].Files = append(groupedByService[mf.Service].Files, mf)
+		groupedByService[mf.Service].Count++
+	}
+
+	// Convert map to slice for consistent ordering
+	result := make([]*ServiceMissingFiles, 0, len(groupedByService))
+	for _, group := range groupedByService {
+		result = append(result, group)
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"total":    len(missingFiles),
+		"services": result,
+	})
+}
+
+// HandleExportMissingFiles exports missing files as CSV
+func (s *Server) HandleExportMissingFiles(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	ctx := r.Context()
+	missingFiles, err := s.db.GetLatestMissingFiles(ctx)
+	if err != nil {
+		http.Error(w, "Failed to retrieve missing files", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=missing_files.csv")
+
+	csvWriter := csv.NewWriter(w)
+	defer csvWriter.Flush()
+
+	// Write CSV header
+	header := []string{
+		"Service",
+		"Service Path",
+		"Translated Path",
+		"Size (Bytes)",
+		"Size (Human)",
+		"Grouping Name",
+		"Grouping ID",
+	}
+	if err := csvWriter.Write(header); err != nil {
+		http.Error(w, "Failed to write CSV header", http.StatusInternalServerError)
+		return
+	}
+
+	// Write data rows
+	for _, mf := range missingFiles {
+		// Format size in human-readable format
+		sizeHuman := disk.FormatBytes(mf.Size)
+
+		record := []string{
+			mf.Service,
+			mf.ServicePath,
+			mf.TranslatedPath,
+			fmt.Sprintf("%d", mf.Size),
+			sizeHuman,
+			mf.ServiceGroup,
+			mf.ServiceGroupID,
+		}
+		if err := csvWriter.Write(record); err != nil {
+			log.Printf("Failed to write CSV record: %v", err)
+			continue
+		}
+	}
+
+	csvWriter.Flush()
+}

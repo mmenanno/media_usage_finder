@@ -685,7 +685,13 @@ func (s *Scanner) updateServiceUsage(ctx context.Context, serviceName string, fi
 
 	log.Printf("%s: Found %d files in database out of %d queried", serviceName, len(dbFiles), len(hostPaths))
 
-	// Collect usage records
+	// Get scan ID from progress tracker (if available)
+	var scanID int64
+	if s.progress != nil {
+		scanID = s.progress.GetScanID()
+	}
+
+	// Collect usage records and track missing files
 	var usages []*database.Usage
 	notFoundCount := 0
 	for hostPath, file := range pathToFile {
@@ -703,6 +709,79 @@ func (s *Scanner) updateServiceUsage(ctx context.Context, serviceName string, fi
 				log.Printf("%s: File not in database: %s", serviceName, hostPath)
 			}
 			notFoundCount++
+
+			// Track missing file in database if we have a scan ID
+			if scanID > 0 {
+				metadata := file.GetMetadata()
+
+				// Extract service-specific grouping information
+				var serviceGroup, serviceGroupID string
+				var size int64
+
+				switch serviceName {
+				case "qbittorrent":
+					if name, ok := metadata["torrent_name"].(string); ok {
+						serviceGroup = name
+					}
+					if hash, ok := metadata["torrent_hash"].(string); ok {
+						serviceGroupID = hash
+					}
+					if s, ok := metadata["size"].(int64); ok {
+						size = s
+					}
+				case "stash":
+					if title, ok := metadata["title"].(string); ok {
+						serviceGroup = title
+					}
+					if sceneID, ok := metadata["scene_id"].(string); ok {
+						serviceGroupID = sceneID
+					}
+					if s, ok := metadata["size"].(int64); ok {
+						size = s
+					}
+				case "sonarr":
+					if seriesTitle, ok := metadata["series_title"].(string); ok {
+						serviceGroup = seriesTitle
+					}
+					if episodeID, ok := metadata["episode_id"].(float64); ok {
+						serviceGroupID = fmt.Sprintf("%d", int64(episodeID))
+					}
+					if s, ok := metadata["size"].(int64); ok {
+						size = s
+					}
+				case "radarr":
+					if movieTitle, ok := metadata["movie_title"].(string); ok {
+						serviceGroup = movieTitle
+					}
+					if movieID, ok := metadata["movie_id"].(float64); ok {
+						serviceGroupID = fmt.Sprintf("%d", int64(movieID))
+					}
+					if s, ok := metadata["size"].(int64); ok {
+						size = s
+					}
+				case "plex":
+					// Plex doesn't have grouping info in metadata typically
+					if s, ok := metadata["size"].(int64); ok {
+						size = s
+					}
+				}
+
+				missingFile := &database.MissingFile{
+					ScanID:         scanID,
+					Service:        serviceName,
+					ServicePath:    file.GetPath(),
+					TranslatedPath: hostPath,
+					Size:           size,
+					ServiceGroup:   serviceGroup,
+					ServiceGroupID: serviceGroupID,
+					Metadata:       metadata,
+				}
+
+				if err := s.db.InsertMissingFile(ctx, missingFile); err != nil {
+					log.Printf("Warning: Failed to insert missing file record: %v", err)
+				}
+			}
+
 			continue
 		}
 
