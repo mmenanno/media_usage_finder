@@ -131,9 +131,7 @@ class KeyboardShortcuts {
                 <div class="bg-gray-700 px-6 py-4 flex justify-between items-center border-b border-gray-600">
                     <h3 class="text-lg font-semibold text-white">Keyboard Shortcuts</h3>
                     <button onclick="keyboardShortcuts.hideHelp()" class="text-gray-400 hover:text-white">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
+                        ${Icons.get('close', 5)}
                     </button>
                 </div>
                 <div class="p-6">

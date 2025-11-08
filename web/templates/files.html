@@ -226,11 +226,13 @@
 
             <div class="flex justify-between items-center">
                 <div class="flex space-x-2">
-                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
-                        Apply Filters
+                    <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition flex items-center gap-2">
+                        <span id="apply-filters-icon"></span>
+                        <span>Apply Filters</span>
                     </button>
-                    <a href="/files" class="inline-block px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition">
-                        Clear
+                    <a href="/files" class="inline-block px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition flex items-center gap-2">
+                        <span id="clear-filters-icon"></span>
+                        <span>Clear</span>
                     </a>
                 </div>
 
@@ -360,14 +362,16 @@
                                     data-file-id="{{.File.ID}}"
                                     data-action="show-details"
                                     aria-label="View file details"
-                                    class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm transition whitespace-nowrap">
-                                    Details
+                                    class="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm transition whitespace-nowrap flex items-center gap-1.5">
+                                    <span class="file-details-icon"></span>
+                                    <span>Details</span>
                                 </button>
                                 <button
                                     hx-post="/api/files/mark-rescan?id={{.File.ID}}"
                                     aria-label="Mark file for rescan"
-                                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition whitespace-nowrap">
-                                    Rescan
+                                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition whitespace-nowrap flex items-center gap-1.5">
+                                    <span class="file-rescan-icon"></span>
+                                    <span>Rescan</span>
                                 </button>
                                 <button
                                     hx-delete="/api/files/delete?id={{.File.ID}}"
@@ -375,8 +379,9 @@
                                     hx-target="closest tr"
                                     hx-swap="outerHTML"
                                     aria-label="Delete file"
-                                    class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition whitespace-nowrap">
-                                    Delete
+                                    class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition whitespace-nowrap flex items-center gap-1.5">
+                                    <span class="file-delete-icon"></span>
+                                    <span>Delete</span>
                                 </button>
                             </div>
                         </td>
@@ -1007,14 +1012,16 @@
                 <h4 class="text-sm font-medium text-gray-400 mb-2">Export</h4>
                 <div class="flex space-x-4">
                     <a href="/api/export?format=json{{if .Orphaned}}&orphaned=true{{end}}"
-                       class="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition"
+                       class="inline-block px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition flex items-center gap-2"
                        download>
-                        Export as JSON
+                        <span id="export-json-icon"></span>
+                        <span>Export as JSON</span>
                     </a>
                     <a href="/api/export?format=csv{{if .Orphaned}}&orphaned=true{{end}}"
-                       class="inline-block px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition"
+                       class="inline-block px-4 py-2 bg-green-600 hover:bg-green-700 rounded transition flex items-center gap-2"
                        download>
-                        Export as CSV
+                        <span id="export-csv-icon"></span>
+                        <span>Export as CSV</span>
                     </a>
                 </div>
             </div>
@@ -1041,6 +1048,32 @@
             {{end}}
         </div>
     </div>
+
+    <script>
+        // Inject icons from centralized Icons object
+        document.addEventListener('DOMContentLoaded', function() {
+            // Filter buttons
+            const applyIcon = document.getElementById('apply-filters-icon');
+            const clearIcon = document.getElementById('clear-filters-icon');
+            if (applyIcon) applyIcon.innerHTML = Icons.get('check', 5);
+            if (clearIcon) clearIcon.innerHTML = Icons.get('xCircle', 5);
+
+            // Table row action buttons (inject for all rows)
+            const detailsIcons = document.querySelectorAll('.file-details-icon');
+            const rescanIcons = document.querySelectorAll('.file-rescan-icon');
+            const deleteIcons = document.querySelectorAll('.file-delete-icon');
+
+            detailsIcons.forEach(icon => icon.innerHTML = Icons.get('eye', 4));
+            rescanIcons.forEach(icon => icon.innerHTML = Icons.get('refresh', 4));
+            deleteIcons.forEach(icon => icon.innerHTML = Icons.get('trash', 4));
+
+            // Export buttons
+            const exportJsonIcon = document.getElementById('export-json-icon');
+            const exportCsvIcon = document.getElementById('export-csv-icon');
+            if (exportJsonIcon) exportJsonIcon.innerHTML = Icons.get('download', 5);
+            if (exportCsvIcon) exportCsvIcon.innerHTML = Icons.get('download', 5);
+        });
+    </script>
 </div>
 {{end}}
 

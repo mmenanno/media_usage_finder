@@ -88,12 +88,8 @@
                         onclick="toggleMobileMenu()"
                         aria-label="Toggle menu"
                         class="md:hidden p-2 rounded-lg hover:bg-gray-700 transition">
-                        <svg id="menu-icon-open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                        </svg>
-                        <svg id="menu-icon-close" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
+                        <span id="menu-icon-open"></span>
+                        <span id="menu-icon-close" class="hidden"></span>
                     </button>
                 </div>
             </div>
@@ -140,6 +136,11 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
     <script src="/static/js/icons.js"></script>
+    <script>
+        // Inject menu icons from centralized Icons object
+        document.getElementById('menu-icon-open').innerHTML = Icons.get('menu', 6);
+        document.getElementById('menu-icon-close').innerHTML = Icons.get('close', 6);
+    </script>
     <script src="/static/js/modal.js"></script>
     <script src="/static/js/loading-states.js"></script>
     <script src="/static/js/notifications.js"></script>
