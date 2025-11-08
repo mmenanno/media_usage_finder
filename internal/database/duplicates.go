@@ -283,32 +283,84 @@ func (db *DB) GetSameDiskDuplicateCount(filters DuplicateFilters) (int64, error)
 
 // GetCrossDiskDuplicates finds files with the same hash across different disks
 // These are candidates for consolidation to the least full disk
-// If limit is 0 or negative, returns all results
-func (db *DB) GetCrossDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
-	query := `
+// Accepts filters for searching, hash type, and minimum size
+func (db *DB) GetCrossDiskDuplicates(filters DuplicateFilters) ([]*DuplicateGroup, error) {
+	// Set default limit if not specified
+	if filters.Limit <= 0 {
+		filters.Limit = 100
+	}
+
+	// Build WHERE conditions for file filtering
+	var whereConditions []string
+	var args []interface{}
+
+	// Search in file paths or hash
+	if filters.SearchText != "" {
+		whereConditions = append(whereConditions, "(file_hash LIKE ? OR id IN (SELECT id FROM files WHERE path LIKE ?))")
+		searchPattern := "%" + filters.SearchText + "%"
+		args = append(args, searchPattern, searchPattern)
+	}
+
+	// Hash type filter
+	if filters.HashType != "" && filters.HashType != "all" {
+		whereConditions = append(whereConditions, "hash_type = ?")
+		args = append(args, filters.HashType)
+	}
+
+	// Build WHERE clause
+	whereClause := "WHERE file_hash IS NOT NULL AND hash_calculated = 1 AND hash_type IS NOT NULL"
+	if len(whereConditions) > 0 {
+		whereClause += " AND " + strings.Join(whereConditions, " AND ")
+	}
+
+	// Build ORDER BY clause
+	orderBy := "ORDER BY size * (total_copies - 1) DESC" // Default: largest savings
+	switch filters.SortBy {
+	case "files":
+		orderBy = "ORDER BY total_copies DESC, size DESC"
+	case "recent":
+		orderBy = "ORDER BY max_modified DESC"
+	}
+
+	query := fmt.Sprintf(`
 		SELECT
 			file_hash,
 			hash_algorithm,
 			hash_type,
 			hash_level,
-			COUNT(*) as total_copies,
-			COUNT(DISTINCT device_id) as disk_count,
-			MAX(size) as size
-		FROM files
-		WHERE file_hash IS NOT NULL
-		  AND hash_calculated = 1
-		  AND hash_type IS NOT NULL
-		GROUP BY file_hash, hash_algorithm, hash_type, hash_level
-		HAVING COUNT(DISTINCT device_id) > 1
-		ORDER BY size * (COUNT(*) - 1) DESC
-	`
+			total_copies,
+			disk_count,
+			size,
+			max_modified
+		FROM (
+			SELECT
+				file_hash,
+				hash_algorithm,
+				hash_type,
+				hash_level,
+				COUNT(*) as total_copies,
+				COUNT(DISTINCT device_id) as disk_count,
+				MAX(size) as size,
+				MAX(modified_time) as max_modified
+			FROM files
+			%s
+			GROUP BY file_hash, hash_algorithm, hash_type, hash_level
+			HAVING COUNT(DISTINCT device_id) > 1
+		)
+		%s
+	`, whereClause, orderBy)
 
-	// Add limit if specified
-	if limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", limit)
+	// Add minimum size filter in outer query if specified
+	if filters.MinSize > 0 {
+		query = fmt.Sprintf("SELECT * FROM (%s) WHERE size >= ?", query)
+		args = append(args, filters.MinSize)
 	}
 
-	rows, err := db.conn.Query(query)
+	// Add pagination
+	query += " LIMIT ? OFFSET ?"
+	args = append(args, filters.Limit, filters.Offset)
+
+	rows, err := db.conn.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query cross-disk duplicates: %w", err)
 	}
@@ -319,9 +371,9 @@ func (db *DB) GetCrossDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 		var hash, algorithm string
 		var hashType sql.NullString
 		var hashLevel sql.NullInt64
-		var totalCopies, diskCount, size int64
+		var totalCopies, diskCount, size, maxModified int64
 
-		if err := rows.Scan(&hash, &algorithm, &hashType, &hashLevel, &totalCopies, &diskCount, &size); err != nil {
+		if err := rows.Scan(&hash, &algorithm, &hashType, &hashLevel, &totalCopies, &diskCount, &size, &maxModified); err != nil {
 			return nil, fmt.Errorf("failed to scan duplicate group: %w", err)
 		}
 
@@ -351,6 +403,60 @@ func (db *DB) GetCrossDiskDuplicates(limit int) ([]*DuplicateGroup, error) {
 	}
 
 	return groups, nil
+}
+
+// GetCrossDiskDuplicateCount returns the total count of cross-disk duplicate groups matching the filters
+// This is used for pagination and button label calculations
+func (db *DB) GetCrossDiskDuplicateCount(filters DuplicateFilters) (int64, error) {
+	// Build WHERE conditions for file filtering (same as GetCrossDiskDuplicates)
+	var whereConditions []string
+	var args []interface{}
+
+	// Search in file paths or hash
+	if filters.SearchText != "" {
+		whereConditions = append(whereConditions, "(file_hash LIKE ? OR id IN (SELECT id FROM files WHERE path LIKE ?))")
+		searchPattern := "%" + filters.SearchText + "%"
+		args = append(args, searchPattern, searchPattern)
+	}
+
+	// Hash type filter
+	if filters.HashType != "" && filters.HashType != "all" {
+		whereConditions = append(whereConditions, "hash_type = ?")
+		args = append(args, filters.HashType)
+	}
+
+	// Build WHERE clause
+	whereClause := "WHERE file_hash IS NOT NULL AND hash_calculated = 1 AND hash_type IS NOT NULL"
+	if len(whereConditions) > 0 {
+		whereClause += " AND " + strings.Join(whereConditions, " AND ")
+	}
+
+	query := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM (
+			SELECT
+				file_hash,
+				MAX(size) as size
+			FROM files
+			%s
+			GROUP BY file_hash, hash_algorithm, hash_type, hash_level
+			HAVING COUNT(DISTINCT device_id) > 1
+		)
+	`, whereClause)
+
+	// Add minimum size filter if specified
+	if filters.MinSize > 0 {
+		query = fmt.Sprintf("SELECT COUNT(*) FROM (%s) WHERE size >= ?", query)
+		args = append(args, filters.MinSize)
+	}
+
+	var count int64
+	err := db.conn.QueryRow(query, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count cross-disk duplicates: %w", err)
+	}
+
+	return count, nil
 }
 
 // getFilesForDuplicateGroup retrieves all files with a given hash

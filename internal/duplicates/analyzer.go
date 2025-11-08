@@ -42,10 +42,10 @@ type ConsolidationPlan struct {
 }
 
 // AnalyzeCrossDiskDuplicates creates consolidation plans for cross-disk duplicates
-// limit parameter controls how many groups to analyze (0 = all groups)
-func (a *Analyzer) AnalyzeCrossDiskDuplicates(limit int) ([]*ConsolidationPlan, error) {
-	// Get cross-disk duplicate groups with optional limit
-	groups, err := a.db.GetCrossDiskDuplicates(limit)
+// filters parameter controls pagination, searching, and filtering of groups
+func (a *Analyzer) AnalyzeCrossDiskDuplicates(filters database.DuplicateFilters) ([]*ConsolidationPlan, error) {
+	// Get cross-disk duplicate groups with filters
+	groups, err := a.db.GetCrossDiskDuplicates(filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cross-disk duplicates: %w", err)
 	}

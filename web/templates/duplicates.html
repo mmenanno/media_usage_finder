@@ -49,9 +49,11 @@
                         <div class="flex items-center">
                             {{if gt .CrossDiskCount 0}}
                             <button
+                                id="preview-button-cross-disk"
                                 onclick="previewConsolidation('cross-disk')"
                                 class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors">
-                                Preview Consolidation
+                                <span class="preview-button-loading">Loading...</span>
+                                <span class="preview-button-text hidden">Preview All ({{.CrossDiskCount}} groups)</span>
                             </button>
                             {{end}}
                         </div>
@@ -301,9 +303,11 @@
                         <div class="flex items-center">
                             {{if gt .SameDiskCount 0}}
                             <button
+                                id="preview-button-same-disk"
                                 onclick="previewHardlinks()"
                                 class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors">
-                                Preview Hardlinks
+                                <span class="preview-button-loading">Loading...</span>
+                                <span class="preview-button-text hidden">Preview All ({{.SameDiskCount}} groups)</span>
                             </button>
                             {{end}}
                         </div>
@@ -1554,5 +1558,229 @@ document.addEventListener('click', function(e) {
         }
     }
 });
+
+// ========== FILTERED PREVIEW FUNCTIONALITY ==========
+
+// Get current filter values for a given tab
+function getCurrentFilters(tab) {
+    const search = document.getElementById(`${tab}-search`)?.value || '';
+    const hashType = document.getElementById(`${tab}-hash-filter`)?.value || 'all';
+    const minSize = parseInt(document.getElementById(`${tab}-size-filter`)?.value || '0');
+
+    return {
+        search: search.trim(),
+        hash_type: hashType,
+        min_size: minSize
+    };
+}
+
+// Check if any filters are active
+function hasActiveFilters(tab) {
+    const filters = getCurrentFilters(tab);
+    return filters.search !== '' ||
+           (filters.hash_type !== 'all' && filters.hash_type !== '') ||
+           filters.min_size > 0;
+}
+
+// Update preview button text with current group count
+async function updatePreviewButton(tab) {
+    const button = document.getElementById(`preview-button-${tab}`);
+    if (!button) return;
+
+    const loadingSpan = button.querySelector('.preview-button-loading');
+    const textSpan = button.querySelector('.preview-button-text');
+
+    if (!loadingSpan || !textSpan) return;
+
+    // Show loading
+    loadingSpan.classList.remove('hidden');
+    textSpan.classList.add('hidden');
+
+    try {
+        // Get current filters
+        const filters = getCurrentFilters(tab);
+        const hasFilters = hasActiveFilters(tab);
+
+        // Build query string
+        const params = new URLSearchParams({
+            type: tab,
+            search: filters.search,
+            hash_type: filters.hash_type
+        });
+
+        if (filters.min_size > 0) {
+            // Convert bytes to filter string
+            if (filters.min_size >= 1099511627776) params.append('min_size', '1tb');
+            else if (filters.min_size >= 107374182400) params.append('min_size', '100gb');
+            else if (filters.min_size >= 10737418240) params.append('min_size', '10gb');
+            else if (filters.min_size >= 1073741824) params.append('min_size', '1gb');
+        }
+
+        // Fetch count from API
+        const response = await fetch(`/api/duplicates/count?${params.toString()}`);
+        const data = await response.json();
+
+        // Update button text
+        const count = data.count || 0;
+        const label = hasFilters ? 'Preview Filtered' : 'Preview All';
+        textSpan.textContent = `${label} (${count} groups)`;
+
+    } catch (error) {
+        console.error('Failed to update preview button:', error);
+        textSpan.textContent = hasActiveFilters(tab) ? 'Preview Filtered' : 'Preview All';
+    } finally {
+        // Show text, hide loading
+        loadingSpan.classList.add('hidden');
+        textSpan.classList.remove('hidden');
+    }
+}
+
+// Initialize preview buttons on page load
+document.addEventListener('DOMContentLoaded', async function() {
+    // Update both buttons
+    await Promise.all([
+        updatePreviewButton('same-disk'),
+        updatePreviewButton('cross-disk')
+    ]);
+});
+
+// Add filter change listeners to update button
+document.addEventListener('DOMContentLoaded', function() {
+    // Same-disk tab listeners
+    const sameDiskSearch = document.getElementById('same-disk-search');
+    const sameDiskHashFilter = document.getElementById('same-disk-hash-filter');
+    const sameDiskSizeFilter = document.getElementById('same-disk-size-filter');
+
+    if (sameDiskSearch) {
+        sameDiskSearch.addEventListener('input', debounce(() => updatePreviewButton('same-disk'), 500));
+    }
+    if (sameDiskHashFilter) {
+        sameDiskHashFilter.addEventListener('change', () => updatePreviewButton('same-disk'));
+    }
+    if (sameDiskSizeFilter) {
+        sameDiskSizeFilter.addEventListener('change', () => updatePreviewButton('same-disk'));
+    }
+
+    // Cross-disk tab listeners
+    const crossDiskHashFilter = document.getElementById('cross-disk-hash-filter');
+    const crossDiskSizeFilter = document.getElementById('cross-disk-size-filter');
+
+    if (crossDiskHashFilter) {
+        crossDiskHashFilter.addEventListener('change', () => updatePreviewButton('cross-disk'));
+    }
+    if (crossDiskSizeFilter) {
+        crossDiskSizeFilter.addEventListener('change', () => updatePreviewButton('cross-disk'));
+    }
+});
+
+// Debounce helper for search input
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Store filter params for modal display
+let currentActiveFilters = {};
+
+// Override previewHardlinks to include filters
+const originalPreviewHardlinks = window.previewHardlinks;
+window.previewHardlinks = async function() {
+    const confirmed = await confirmDialog(
+        'This will show what would happen without actually creating hardlinks.',
+        'Run Dry Run Hardlink?'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    // Get current filters
+    const filters = getCurrentFilters('same-disk');
+    currentActiveFilters = filters;
+
+    // Show loading toast
+    showToast('Analyzing hardlinks...', 'info', {duration: 5000});
+
+    // Run dry-run hardlink with filters
+    fetch('/api/duplicates/hardlink', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            dry_run: true,
+            search_text: filters.search,
+            hash_type: filters.hash_type,
+            min_size: filters.min_size
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(async data => {
+        showToast('Analysis complete!', 'success', {duration: 2000});
+
+        if (data.status === 'success') {
+            showDryRunSummary(data, null);
+        } else {
+            showToast('Preview failed: ' + (data.message || 'Unknown error'), 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error in previewHardlinks:', error);
+        showToast('Error: ' + error.message, 'error');
+    });
+};
+
+// Override showDryRunSummary to display active filters
+const originalShowDryRunSummary = showDryRunSummary;
+window.showDryRunSummary = function(data, groupHashes = null) {
+    // Call original function
+    originalShowDryRunSummary(data, groupHashes);
+
+    // Add filter indicator if filters are active
+    const modalTitle = document.querySelector('#dryRunSummaryModal h3');
+    if (modalTitle && data.active_filters && Object.keys(data.active_filters).length > 0) {
+        // Check if filter indicator already exists
+        let filterIndicator = modalTitle.nextElementSibling;
+        if (!filterIndicator || !filterIndicator.classList.contains('filter-indicator')) {
+            filterIndicator = document.createElement('div');
+            filterIndicator.className = 'filter-indicator mt-2 text-sm text-blue-400';
+            modalTitle.parentNode.insertBefore(filterIndicator, modalTitle.nextSibling);
+        }
+
+        // Build filter description
+        const filters = [];
+        if (data.active_filters.search) {
+            filters.push(`Search: "${data.active_filters.search}"`);
+        }
+        if (data.active_filters.hash_type && data.active_filters.hash_type !== 'all') {
+            const hashLabels = {full: 'Full Hash', progressive: 'Progressive Hash', quick: 'Quick Hash'};
+            filters.push(hashLabels[data.active_filters.hash_type] || data.active_filters.hash_type);
+        }
+        if (data.active_filters.min_size) {
+            const sizeLabel = data.active_filters.min_size >= 1099511627776 ? '1TB+' :
+                            data.active_filters.min_size >= 107374182400 ? '100GB+' :
+                            data.active_filters.min_size >= 10737418240 ? '10GB+' :
+                            data.active_filters.min_size >= 1073741824 ? '1GB+' : formatBytes(data.active_filters.min_size) + '+';
+            filters.push(sizeLabel);
+        }
+
+        if (filters.length > 0) {
+            filterIndicator.innerHTML = '<strong>Filters Active:</strong> ' + filters.join(', ');
+        } else {
+            filterIndicator.innerHTML = '';
+        }
+    }
+};
+
 </script>
 {{end}}

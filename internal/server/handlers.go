@@ -4220,9 +4220,8 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	// Create analyzer
 	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
 
-	// Get cross-disk duplicates (still using old limit approach for now)
-	// TODO: Add pagination support for cross-disk tab
-	crossDiskPlans, err := analyzer.AnalyzeCrossDiskDuplicates(100)
+	// Get cross-disk duplicates with filters and pagination
+	crossDiskPlans, err := analyzer.AnalyzeCrossDiskDuplicates(filters)
 	if err != nil {
 		log.Printf("ERROR: Failed to analyze cross-disk duplicates: %v", err)
 		crossDiskPlans = []*duplicates.ConsolidationPlan{}
@@ -4235,7 +4234,7 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		sameDiskPlans = []*duplicates.ConsolidationPlan{}
 	}
 
-	// Get total count for pagination (only for same-disk tab)
+	// Get total count for pagination (both tabs now support it)
 	var total int64
 	var totalPages int
 	if activeTab == "same-disk" {
@@ -4243,6 +4242,13 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Printf("ERROR: Failed to get same-disk duplicate count: %v", err)
 			total = int64(len(sameDiskPlans))
+		}
+		totalPages = int((total + int64(filters.Limit) - 1) / int64(filters.Limit))
+	} else {
+		total, err = s.db.GetCrossDiskDuplicateCount(filters)
+		if err != nil {
+			log.Printf("ERROR: Failed to get cross-disk duplicate count: %v", err)
+			total = int64(len(crossDiskPlans))
 		}
 		totalPages = int((total + int64(filters.Limit) - 1) / int64(filters.Limit))
 	}
@@ -4311,6 +4317,59 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandleDuplicateGroupCount returns the count of duplicate groups matching the provided filters
+func (s *Server) HandleDuplicateGroupCount(w http.ResponseWriter, r *http.Request) {
+	// Parse type parameter (same-disk or cross-disk)
+	duplicateType := r.URL.Query().Get("type")
+	if duplicateType == "" {
+		duplicateType = "same-disk" // Default to same-disk
+	}
+
+	// Parse filters from URL parameters (same logic as HandleDuplicates)
+	filters := database.DuplicateFilters{
+		SearchText: r.URL.Query().Get("search"),
+		HashType:   r.URL.Query().Get("hash_type"),
+		SortBy:     r.URL.Query().Get("sort"),
+		Limit:      0, // No limit for count query
+	}
+
+	// Parse minimum size filter
+	if minSizeStr := r.URL.Query().Get("min_size"); minSizeStr != "" {
+		switch minSizeStr {
+		case "1gb":
+			filters.MinSize = 1024 * 1024 * 1024
+		case "10gb":
+			filters.MinSize = 10 * 1024 * 1024 * 1024
+		case "100gb":
+			filters.MinSize = 100 * 1024 * 1024 * 1024
+		case "1tb":
+			filters.MinSize = 1024 * 1024 * 1024 * 1024
+		}
+	}
+
+	// Get count based on type
+	var count int64
+	var err error
+
+	if duplicateType == "cross-disk" {
+		count, err = s.db.GetCrossDiskDuplicateCount(filters)
+	} else {
+		count, err = s.db.GetSameDiskDuplicateCount(filters)
+	}
+
+	if err != nil {
+		log.Printf("ERROR: Failed to get duplicate group count: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to count duplicate groups", "count_failed")
+		return
+	}
+
+	// Return count as JSON
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"type":  duplicateType,
+		"count": count,
+	})
+}
+
 // HandleConsolidateDuplicates executes cross-disk consolidation
 func (s *Server) HandleConsolidateDuplicates(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodPost) {
@@ -4343,8 +4402,11 @@ func (s *Server) HandleConsolidateDuplicates(w http.ResponseWriter, r *http.Requ
 	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm, bufferSize)
 	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
 
-	// Get all cross-disk duplicates (0 = no limit, needed for consolidation)
-	plans, err := analyzer.AnalyzeCrossDiskDuplicates(0)
+	// Get all cross-disk duplicates (large limit, needed for consolidation)
+	filters := database.DuplicateFilters{
+		Limit: 10000, // Large limit to get all groups
+	}
+	plans, err := analyzer.AnalyzeCrossDiskDuplicates(filters)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to analyze duplicates", "analysis_failed")
 		return
@@ -4397,6 +4459,10 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		DryRun      bool     `json:"dry_run"`
 		GroupHashes []string `json:"group_hashes"` // Optional: specific groups only
+		// Filter parameters (optional)
+		SearchText string `json:"search_text"`
+		HashType   string `json:"hash_type"`
+		MinSize    int64  `json:"min_size"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -4405,8 +4471,8 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Log the request details for debugging
-	log.Printf("HandleCreateHardlinks called: dry_run=%v, group_hashes=%v (count: %d)",
-		req.DryRun, req.GroupHashes, len(req.GroupHashes))
+	log.Printf("HandleCreateHardlinks called: dry_run=%v, group_hashes=%v (count: %d), filters=(search:%s, hash_type:%s, min_size:%d)",
+		req.DryRun, req.GroupHashes, len(req.GroupHashes), req.SearchText, req.HashType, req.MinSize)
 
 	// Create analyzer and consolidator
 	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
@@ -4423,18 +4489,23 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm, bufferSize)
 	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
 
-	// Get all same-disk duplicates (no limit, needed for hardlinking)
-	log.Printf("Analyzing same-disk duplicates...")
+	// Build filters from request
 	filters := database.DuplicateFilters{
-		Limit: 10000, // Large limit to get all groups
+		SearchText: req.SearchText,
+		HashType:   req.HashType,
+		MinSize:    req.MinSize,
+		Limit:      10000, // Large limit to get all matching groups
 	}
+
+	// Get same-disk duplicates with filters applied
+	log.Printf("Analyzing same-disk duplicates with filters...")
 	plans, err := analyzer.AnalyzeSameDiskDuplicates(filters)
 	if err != nil {
 		log.Printf("ERROR: Failed to analyze duplicates: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to analyze duplicates", "analysis_failed")
 		return
 	}
-	log.Printf("Found %d total plans", len(plans))
+	log.Printf("Found %d plans matching filters", len(plans))
 
 	// Filter to specific groups if requested
 	if len(req.GroupHashes) > 0 {
@@ -4590,6 +4661,18 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	// Invalidate stats cache
 	s.statsCache.Invalidate()
 
+	// Build active filters description for modal display
+	activeFilters := make(map[string]interface{})
+	if req.SearchText != "" {
+		activeFilters["search"] = req.SearchText
+	}
+	if req.HashType != "" && req.HashType != "all" {
+		activeFilters["hash_type"] = req.HashType
+	}
+	if req.MinSize > 0 {
+		activeFilters["min_size"] = req.MinSize
+	}
+
 	// Return enhanced result
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"status":                  "success",
@@ -4606,6 +4689,7 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 		"warnings":                warnings,
 		"errors":                  result.Errors,
 		"files_list":              filesToLink,
+		"active_filters":          activeFilters,
 	})
 }
 
@@ -4619,6 +4703,27 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 	consolidationType := r.URL.Query().Get("type")
 	if consolidationType == "" {
 		consolidationType = "cross-disk"
+	}
+
+	// Parse filter parameters from query string
+	filters := database.DuplicateFilters{
+		SearchText: r.URL.Query().Get("search"),
+		HashType:   r.URL.Query().Get("hash_type"),
+		Limit:      10000, // Large limit to get all matching groups for preview
+	}
+
+	// Parse minimum size filter
+	if minSizeStr := r.URL.Query().Get("min_size"); minSizeStr != "" {
+		switch minSizeStr {
+		case "1gb":
+			filters.MinSize = 1024 * 1024 * 1024
+		case "10gb":
+			filters.MinSize = 10 * 1024 * 1024 * 1024
+		case "100gb":
+			filters.MinSize = 100 * 1024 * 1024 * 1024
+		case "1tb":
+			filters.MinSize = 1024 * 1024 * 1024 * 1024
+		}
 	}
 
 	// Create analyzer
@@ -4639,13 +4744,10 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 	var plans []*duplicates.ConsolidationPlan
 	var err error
 
-	// Get all duplicates (large limit, needed for preview)
+	// Get duplicates with filters applied
 	if consolidationType == "cross-disk" {
-		plans, err = analyzer.AnalyzeCrossDiskDuplicates(0)
+		plans, err = analyzer.AnalyzeCrossDiskDuplicates(filters)
 	} else {
-		filters := database.DuplicateFilters{
-			Limit: 10000, // Large limit to get all groups for preview
-		}
 		plans, err = analyzer.AnalyzeSameDiskDuplicates(filters)
 	}
 
@@ -4657,6 +4759,18 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 	// Generate preview
 	preview := consolidator.PreviewConsolidation(plans)
 
+	// Build active filters description for response
+	activeFilters := make(map[string]interface{})
+	if filters.SearchText != "" {
+		activeFilters["search"] = filters.SearchText
+	}
+	if filters.HashType != "" && filters.HashType != "all" {
+		activeFilters["hash_type"] = filters.HashType
+	}
+	if filters.MinSize > 0 {
+		activeFilters["min_size"] = filters.MinSize
+	}
+
 	// Return preview data
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"type":                   consolidationType,
@@ -4664,6 +4778,7 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 		"total_files_to_process": preview.TotalFilesToDelete,
 		"total_space_saved":      preview.TotalSpaceSaved,
 		"disk_impacts":           preview.DiskImpacts,
+		"active_filters":         activeFilters,
 	})
 }
 
