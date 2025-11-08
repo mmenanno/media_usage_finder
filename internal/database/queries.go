@@ -2437,24 +2437,6 @@ func (db *DB) GetFilesWithMultipleDiskLocations() ([]*File, error) {
 	return files, rows.Err()
 }
 
-// GetCrossDiskDuplicateCount returns the count of files on multiple disks
-func (db *DB) GetCrossDiskDuplicateCount() (int64, error) {
-	query := `
-		SELECT COUNT(DISTINCT f.id)
-		FROM files f
-		JOIN file_disk_locations fdl ON f.id = fdl.file_id
-		GROUP BY f.id
-		HAVING COUNT(DISTINCT fdl.disk_device_id) > 1
-	`
-
-	var count int64
-	err := db.conn.QueryRow(query).Scan(&count)
-	if err == sql.ErrNoRows {
-		return 0, nil
-	}
-	return count, err
-}
-
 // DeleteDiskLocationsByDisk deletes all disk locations for a specific disk device
 func (db *DB) DeleteDiskLocationsByDisk(diskDeviceID int64) error {
 	query := `DELETE FROM file_disk_locations WHERE disk_device_id = ?`
