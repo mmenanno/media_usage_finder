@@ -4175,7 +4175,7 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		SearchText: r.URL.Query().Get("search"),
 		HashType:   r.URL.Query().Get("hash_type"),
 		SortBy:     r.URL.Query().Get("sort"),
-		Limit:      100, // Default limit
+		Limit:      25, // Default limit
 	}
 
 	// Parse minimum size filter

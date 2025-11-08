@@ -325,12 +325,12 @@
                                    class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <!-- Hash Type Filter -->
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">Hash Type</label>
                             <div class="relative" data-custom-dropdown>
-                                <input type="hidden" id="same-disk-hash-filter" value="all" data-dropdown-input>
+                                <input type="hidden" id="same-disk-hash-filter" name="hash_type" value="all" data-dropdown-input>
                                 <button
                                     type="button"
                                     data-dropdown-button
@@ -368,7 +368,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">Minimum Savings</label>
                             <div class="relative" data-custom-dropdown>
-                                <input type="hidden" id="same-disk-size-filter" value="0" data-dropdown-input>
+                                <input type="hidden" id="same-disk-size-filter" name="min_size" value="" data-dropdown-input>
                                 <button
                                     type="button"
                                     data-dropdown-button
@@ -380,11 +380,11 @@
                                     </svg>
                                 </button>
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
-                                    <div data-dropdown-option data-value="0" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">Any Size</div>
-                                    <div data-dropdown-option data-value="10485760" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">10 MB+</div>
-                                    <div data-dropdown-option data-value="104857600" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">100 MB+</div>
-                                    <div data-dropdown-option data-value="1073741824" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">1 GB+</div>
-                                    <div data-dropdown-option data-value="10737418240" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">10 GB+</div>
+                                    <div data-dropdown-option data-value="" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">Any Size</div>
+                                    <div data-dropdown-option data-value="1gb" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">1 GB+</div>
+                                    <div data-dropdown-option data-value="10gb" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">10 GB+</div>
+                                    <div data-dropdown-option data-value="100gb" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">100 GB+</div>
+                                    <div data-dropdown-option data-value="1tb" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">1 TB+</div>
                                 </div>
                             </div>
                         </div>
@@ -392,7 +392,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-400 mb-2">Sort By</label>
                             <div class="relative" data-custom-dropdown>
-                                <input type="hidden" id="same-disk-sort" value="savings" data-dropdown-input>
+                                <input type="hidden" id="same-disk-sort" name="sort" value="savings" data-dropdown-input>
                                 <button
                                     type="button"
                                     data-dropdown-button
@@ -407,6 +407,29 @@
                                     <div data-dropdown-option data-value="savings" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">Largest Savings</div>
                                     <div data-dropdown-option data-value="size" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Largest Files</div>
                                     <div data-dropdown-option data-value="copies" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Most Copies</div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Items Per Page Filter -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-400 mb-2">Items Per Page</label>
+                            <div class="relative" data-custom-dropdown>
+                                <input type="hidden" id="same-disk-limit" name="limit" value="25" data-dropdown-input>
+                                <button
+                                    type="button"
+                                    data-dropdown-button
+                                    aria-expanded="false"
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
+                                    <span data-dropdown-text>25</span>
+                                    <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                                    <div data-dropdown-option data-value="10" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">10</div>
+                                    <div data-dropdown-option data-value="25" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">25</div>
+                                    <div data-dropdown-option data-value="50" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">50</div>
+                                    <div data-dropdown-option data-value="100" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">100</div>
                                 </div>
                             </div>
                         </div>
@@ -887,31 +910,43 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Same-disk dropdown handlers
+    // Same-disk dropdown handlers - trigger server-side filtering
     const sameDiskHashFilter = document.getElementById('same-disk-hash-filter');
     const sameDiskSizeFilter = document.getElementById('same-disk-size-filter');
     const sameDiskSort = document.getElementById('same-disk-sort');
+    const sameDiskLimitFilter = document.getElementById('same-disk-limit');
 
     if (sameDiskHashFilter) {
         sameDiskHashFilter.addEventListener('change', function() {
-            applyFiltersAndSort('same-disk');
+            // Trigger form submission for server-side filtering
+            if (applyFiltersBtn) applyFiltersBtn.click();
         });
     }
 
     if (sameDiskSizeFilter) {
         sameDiskSizeFilter.addEventListener('change', function() {
-            applyFiltersAndSort('same-disk');
+            // Trigger form submission for server-side filtering
+            if (applyFiltersBtn) applyFiltersBtn.click();
         });
     }
 
     if (sameDiskSort) {
         sameDiskSort.addEventListener('change', function() {
-            applyFiltersAndSort('same-disk');
+            // Trigger form submission for server-side filtering
+            if (applyFiltersBtn) applyFiltersBtn.click();
+        });
+    }
+
+    if (sameDiskLimitFilter) {
+        sameDiskLimitFilter.addEventListener('change', function() {
+            // Trigger form submission for server-side filtering
+            if (applyFiltersBtn) applyFiltersBtn.click();
         });
     }
 });
 
-// Apply all filters and sorting for a given type
+// Apply all filters and sorting for a given type (client-side)
+// Note: Only used for cross-disk tab. Same-disk tab uses server-side filtering.
 function applyFiltersAndSort(type) {
     const hashFilter = document.getElementById(`${type}-hash-filter`);
     const sizeFilter = document.getElementById(`${type}-size-filter`);
@@ -1528,10 +1563,12 @@ if (clearFiltersBtn) {
         const hashDropdown = document.querySelector('#same-disk-hash-filter').closest('[data-custom-dropdown]');
         const sizeDropdown = document.querySelector('#same-disk-size-filter').closest('[data-custom-dropdown]');
         const sortDropdown = document.querySelector('#same-disk-sort').closest('[data-custom-dropdown]');
+        const limitDropdown = document.querySelector('#same-disk-limit').closest('[data-custom-dropdown]');
 
         setDropdownValue(hashDropdown, 'all', 'All Hashes');
         setDropdownValue(sizeDropdown, '', 'Any Size');
         setDropdownValue(sortDropdown, 'savings', 'Largest Savings');
+        setDropdownValue(limitDropdown, '25', '25');
 
         // Reload with cleared filters
         loadSameDiskGroups();
