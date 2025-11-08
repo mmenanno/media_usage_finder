@@ -1166,14 +1166,25 @@ func (db *DB) UpdateOrphanedStatus(ctx context.Context) error {
 	return err
 }
 
+// sanitizeFTS5Query escapes and quotes a search query for safe FTS5 usage.
+// This prevents FTS5 syntax errors when users search for strings containing
+// special characters like dots, hyphens, or other FTS5 operators.
+func sanitizeFTS5Query(query string) string {
+	// Escape any existing double quotes by doubling them (FTS5 convention)
+	escaped := strings.ReplaceAll(query, `"`, `""`)
+	// Wrap in double quotes to make it a phrase search (literal match)
+	return `"` + escaped + `"`
+}
+
 // SearchFiles searches for files by path using FTS
 func (db *DB) SearchFiles(searchQuery string, orphanedOnly bool, services []string, serviceFilterMode string, hardlinksOnly bool, extensions []string, deviceIDs []int64, limit, offset int, orderBy, direction string) ([]*File, int, error) {
 	var conditions []string
 	args := []interface{}{}
 
 	// FTS search condition (always required for SearchFiles)
+	// Sanitize the query to prevent FTS5 syntax errors from special characters
 	conditions = append(conditions, "f.id IN (SELECT rowid FROM files_fts WHERE files_fts MATCH ?)")
-	args = append(args, searchQuery)
+	args = append(args, sanitizeFTS5Query(searchQuery))
 
 	if orphanedOnly {
 		conditions = append(conditions, "f.is_orphaned = 1")
