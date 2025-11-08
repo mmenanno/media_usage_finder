@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/mmenanno/media-usage-finder/internal/api"
@@ -4583,6 +4584,70 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 		"total_files_to_process": preview.TotalFilesToDelete,
 		"total_space_saved":      preview.TotalSpaceSaved,
 		"disk_impacts":           preview.DiskImpacts,
+	})
+}
+
+// HandleRefreshGroupInodes refreshes inodes from the filesystem for all files in a duplicate group
+func (s *Server) HandleRefreshGroupInodes(w http.ResponseWriter, r *http.Request) {
+	// Support both GET and POST
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		respondError(w, http.StatusMethodNotAllowed, "Method not allowed", "method_not_allowed")
+		return
+	}
+
+	// Get group hash parameter
+	groupHash := r.URL.Query().Get("group_hash")
+	if groupHash == "" {
+		respondError(w, http.StatusBadRequest, "Missing group_hash parameter", "missing_parameter")
+		return
+	}
+
+	// Get all files in the duplicate group
+	files, err := s.db.GetDuplicateFilesByHash(groupHash)
+	if err != nil {
+		log.Printf("ERROR: Failed to get files for group %s: %v", groupHash, err)
+		respondError(w, http.StatusInternalServerError, "Failed to get duplicate group", "query_failed")
+		return
+	}
+
+	if len(files) == 0 {
+		respondError(w, http.StatusNotFound, "Duplicate group not found", "not_found")
+		return
+	}
+
+	// Refresh inode for each file
+	updated := 0
+	errors := []string{}
+
+	for _, file := range files {
+		// Stat the file to get current inode/device
+		var stat syscall.Stat_t
+		if err := syscall.Stat(file.Path, &stat); err != nil {
+			errMsg := fmt.Sprintf("Failed to stat %s: %v", file.Path, err)
+			log.Printf("WARNING: %s", errMsg)
+			errors = append(errors, errMsg)
+			continue
+		}
+
+		// Update database with current inode
+		if err := s.db.UpdateFileInode(file.Path, uint64(stat.Dev), uint64(stat.Ino)); err != nil {
+			errMsg := fmt.Sprintf("Failed to update database for %s: %v", file.Path, err)
+			log.Printf("WARNING: %s", errMsg)
+			errors = append(errors, errMsg)
+			continue
+		}
+
+		updated++
+	}
+
+	log.Printf("Refreshed inodes for group %s: %d updated, %d errors", groupHash, updated, len(errors))
+
+	// Return result
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"updated": updated,
+		"total":   len(files),
+		"errors":  errors,
 	})
 }
 

@@ -228,6 +228,12 @@ func (c *Consolidator) processHardlinkGroup(plan *ConsolidationPlan, dryRun bool
 			continue
 		}
 
+		// Update database with new inode to reflect filesystem state
+		if err := c.db.UpdateFileInode(dupFile.Path, uint64(primaryStat.Dev), uint64(primaryInode)); err != nil {
+			log.Printf("WARNING: Failed to update database inode for %s: %v", dupFile.Path, err)
+			// Non-fatal - continue processing
+		}
+
 		// Log hardlink creation
 		if err := c.db.LogHardlinkCreation(plan.KeepFile, dupFile, plan.ReasonToKeep); err != nil {
 			log.Printf("WARNING: Failed to log hardlink creation for %s: %v", dupFile.Path, err)

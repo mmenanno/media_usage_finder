@@ -310,6 +310,12 @@ func (db *DB) getFilesForDuplicateGroup(hash string, deviceID *int64) ([]Duplica
 	return files, nil
 }
 
+// GetDuplicateFilesByHash retrieves all files with a given hash (public wrapper)
+// This is used for refreshing inodes after hardlinking
+func (db *DB) GetDuplicateFilesByHash(hash string) ([]DuplicateFile, error) {
+	return db.getFilesForDuplicateGroup(hash, nil)
+}
+
 // getServicesUsingFile returns a list of service names that use the given file
 func (db *DB) getServicesUsingFile(fileID int64) ([]string, error) {
 	query := `SELECT DISTINCT service FROM usage WHERE file_id = ? ORDER BY service`

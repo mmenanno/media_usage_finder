@@ -2870,6 +2870,32 @@ func (db *DB) LogHardlinkCreation(primaryFile, duplicateFile *DuplicateFile, rea
 	return err
 }
 
+// UpdateFileInode updates the device_id and inode for a file after hardlinking
+// This ensures the database reflects the actual filesystem state after hardlink operations
+func (db *DB) UpdateFileInode(path string, deviceID, inode uint64) error {
+	query := `
+		UPDATE files
+		SET device_id = ?, inode = ?
+		WHERE path = ?
+	`
+
+	result, err := db.conn.Exec(query, deviceID, inode, path)
+	if err != nil {
+		return fmt.Errorf("failed to update inode for %s: %w", path, err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no file found with path: %s", path)
+	}
+
+	return nil
+}
+
 // DeleteUnverifiedFiles removes files that weren't updated during the current scan
 // This is used during full scans to clean up files that no longer exist on disk
 func (db *DB) DeleteUnverifiedFiles(ctx context.Context, scanID int64) (int64, error) {

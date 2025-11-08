@@ -61,6 +61,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/duplicates/consolidate", s.HandleConsolidateDuplicates)
 	mux.HandleFunc("/api/duplicates/hardlink", s.HandleCreateHardlinks)
 	mux.HandleFunc("/api/duplicates/preview", s.HandlePreviewConsolidation)
+	mux.HandleFunc("/api/duplicates/refresh-inodes", s.HandleRefreshGroupInodes)
 	mux.HandleFunc("/api/config/save", s.HandleSaveConfig)
 	mux.HandleFunc("/api/config/test", s.HandleTestService)
 	mux.HandleFunc("/api/config/test-scan-paths", s.HandleTestScanPaths)

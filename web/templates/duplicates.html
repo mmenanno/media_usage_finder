@@ -414,6 +414,12 @@
                                             <button onclick="linkSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors" title="Create hardlinks for this group">
                                                 Link Group
                                             </button>
+                                            <button onclick="refreshGroupInodes('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded font-medium transition-colors flex items-center space-x-1" title="Refresh inodes from filesystem">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                                </svg>
+                                                <span>Refresh</span>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -1292,6 +1298,30 @@ function executeSingleGroupHardlink(groupHash) {
     .catch(error => {
         showToast('Error: ' + error.message, 'error');
     });
+}
+
+// Refresh inodes from filesystem for a duplicate group
+async function refreshGroupInodes(groupHash) {
+    showToast('Refreshing inodes from filesystem...', 'info', {duration: 5000});
+
+    try {
+        const response = await fetch(`/api/duplicates/refresh-inodes?group_hash=${encodeURIComponent(groupHash)}`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showToast(`Successfully refreshed ${result.updated} file(s)`, 'success');
+            // Reload page to show updated state
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast(result.message || 'Failed to refresh inodes', 'error');
+        }
+    } catch (error) {
+        console.error('Error refreshing inodes:', error);
+        showToast('Failed to refresh inodes', 'error');
+    }
 }
 
 // Helper function to format bytes
