@@ -115,7 +115,7 @@ class KeyboardShortcuts {
 
         const helpModal = document.createElement('div');
         helpModal.id = 'shortcuts-help';
-        helpModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn';
+        helpModal.className = 'fixed inset-0 bg-black/75 bg-opacity-50 flex items-center justify-center z-50 animate-fadeIn';
 
         const shortcutsList = Object.entries(this.shortcuts)
             .filter(([key]) => key !== 'Escape') // Don't show Escape in list

@@ -95,7 +95,7 @@ class FileDetailsModal {
             : '';
 
         modal.innerHTML = `
-            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 animate-fadeIn" onclick="fileDetailsModal.hide()">
+            <div class="fixed inset-0 bg-black/75 bg-opacity-50 flex items-center justify-center p-4 animate-fadeIn" onclick="fileDetailsModal.hide()">
                 <div class="bg-gray-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden transform transition-all animate-scaleIn" onclick="event.stopPropagation()">
                     <!-- Header -->
                     <div class="bg-gray-700 px-6 py-4 flex justify-between items-start border-b border-gray-600">

@@ -86,7 +86,7 @@ class ScanErrorModal {
             : '<p class="text-gray-400 text-center py-8">No errors to display</p>';
 
         modal.innerHTML = `
-            <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 animate-fadeIn" onclick="scanErrorModal.hide()">
+            <div class="fixed inset-0 /75 bg-opacity-50 flex items-center justify-center p-4 animate-fadeIn" onclick="scanErrorModal.hide()">
                 <div class="bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden transform transition-all animate-scaleIn" onclick="event.stopPropagation()">
                     <!-- Header -->
                     <div class="bg-gray-700 px-6 py-4 flex justify-between items-start border-b border-gray-600">

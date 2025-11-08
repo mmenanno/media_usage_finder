@@ -92,7 +92,7 @@ Press any key to close
         if (window.toastManager) {
             // Create a custom help modal instead of toast
             const helpModal = document.createElement('div');
-            helpModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            helpModal.className = 'fixed inset-0 bg-black/75 bg-opacity-50 flex items-center justify-center z-50';
             helpModal.innerHTML = `
                 <div class="bg-gray-800 text-white rounded-lg p-6 max-w-md">
                     <h3 class="text-xl font-bold mb-4">Keyboard Shortcuts</h3>
