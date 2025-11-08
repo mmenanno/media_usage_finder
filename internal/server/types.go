@@ -201,4 +201,11 @@ type DuplicatesData struct {
 	DisplayLimit           int
 	ShowingCrossDisk       int
 	ShowingSameDisk        int
+	// Pagination fields
+	Page       int
+	TotalPages int
+	Total      int64
+	Limit      int
+	// Filter fields
+	Filters database.DuplicateFilters
 }

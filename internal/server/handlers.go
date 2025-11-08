@@ -145,6 +145,7 @@ func (s *Server) LoadTemplates(pattern string) error {
 	partials := []string{
 		"partials/validation-errors.html",
 		"logs_table.html",
+		"duplicates_table.html",
 	}
 
 	for _, partial := range partials {
@@ -4169,6 +4170,46 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse filters from URL parameters
+	filters := database.DuplicateFilters{
+		SearchText: r.URL.Query().Get("search"),
+		HashType:   r.URL.Query().Get("hash_type"),
+		SortBy:     r.URL.Query().Get("sort"),
+		Limit:      100, // Default limit
+	}
+
+	// Parse minimum size filter
+	if minSizeStr := r.URL.Query().Get("min_size"); minSizeStr != "" {
+		switch minSizeStr {
+		case "1gb":
+			filters.MinSize = 1024 * 1024 * 1024
+		case "10gb":
+			filters.MinSize = 10 * 1024 * 1024 * 1024
+		case "100gb":
+			filters.MinSize = 100 * 1024 * 1024 * 1024
+		case "1tb":
+			filters.MinSize = 1024 * 1024 * 1024 * 1024
+		}
+	}
+
+	// Parse pagination
+	page := 1
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	// Parse limit
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 1000 {
+			filters.Limit = l
+		}
+	}
+
+	// Calculate offset for pagination
+	filters.Offset = (page - 1) * filters.Limit
+
 	// Get actual totals from database (not limited)
 	duplicateStats, err := s.db.GetDuplicateStats()
 	if err != nil {
@@ -4179,22 +4220,31 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	// Create analyzer
 	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
 
-	// Limit initial load to 100 groups for performance (sorted by space savings)
-	// This provides ~40x speedup for large datasets while showing the most important duplicates
-	const duplicateGroupLimit = 100
-
-	// Get cross-disk duplicates (limited for display)
-	crossDiskPlans, err := analyzer.AnalyzeCrossDiskDuplicates(duplicateGroupLimit)
+	// Get cross-disk duplicates (still using old limit approach for now)
+	// TODO: Add pagination support for cross-disk tab
+	crossDiskPlans, err := analyzer.AnalyzeCrossDiskDuplicates(100)
 	if err != nil {
 		log.Printf("ERROR: Failed to analyze cross-disk duplicates: %v", err)
 		crossDiskPlans = []*duplicates.ConsolidationPlan{}
 	}
 
-	// Get same-disk duplicates (limited for display)
-	sameDiskPlans, err := analyzer.AnalyzeSameDiskDuplicates(duplicateGroupLimit)
+	// Get same-disk duplicates with filters and pagination
+	sameDiskPlans, err := analyzer.AnalyzeSameDiskDuplicates(filters)
 	if err != nil {
 		log.Printf("ERROR: Failed to analyze same-disk duplicates: %v", err)
 		sameDiskPlans = []*duplicates.ConsolidationPlan{}
+	}
+
+	// Get total count for pagination (only for same-disk tab)
+	var total int64
+	var totalPages int
+	if activeTab == "same-disk" {
+		total, err = s.db.GetSameDiskDuplicateCount(filters)
+		if err != nil {
+			log.Printf("ERROR: Failed to get same-disk duplicate count: %v", err)
+			total = int64(len(sameDiskPlans))
+		}
+		totalPages = int((total + int64(filters.Limit) - 1) / int64(filters.Limit))
 	}
 
 	// Count files in displayed plans
@@ -4212,8 +4262,7 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Prepare template data with ACTUAL totals from database using typed struct
-	// Using pointer to avoid any value copy issues
+	// Prepare template data
 	data := &DuplicatesData{
 		Title:                  "Duplicate Files",
 		Version:                s.version,
@@ -4228,13 +4277,38 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		CrossDiskFilesToDelete: crossDiskFilesToDelete,
 		SameDiskFilesToLink:    sameDiskFilesToLink,
 		HashScanningEnabled:    true,
-		DisplayLimit:           duplicateGroupLimit,
+		DisplayLimit:           filters.Limit,
 		ShowingCrossDisk:       len(crossDiskPlans),
 		ShowingSameDisk:        len(sameDiskPlans),
+		// Pagination fields
+		Page:       page,
+		TotalPages: totalPages,
+		Total:      total,
+		Limit:      filters.Limit,
+		Filters:    filters,
 	}
 
-	// Render template
-	s.renderTemplate(w, "duplicates.html", data)
+	// Check if this is an HTMX request (for pagination/filtering)
+	isHTMX := r.Header.Get("HX-Request") == "true"
+
+	if isHTMX {
+		// Return just the table fragment for HTMX updates
+		tmplSet, ok := s.templates["duplicates_table.html"]
+		if !ok {
+			log.Printf("ERROR: duplicates_table template not found")
+			http.Error(w, "Template not found", http.StatusInternalServerError)
+			return
+		}
+
+		if err := tmplSet.ExecuteTemplate(w, "duplicates_table.html", data); err != nil {
+			log.Printf("ERROR: Failed to render duplicates_table template: %v", err)
+			http.Error(w, "Failed to render template", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// Return full page
+		s.renderTemplate(w, "duplicates.html", data)
+	}
 }
 
 // HandleConsolidateDuplicates executes cross-disk consolidation
@@ -4349,9 +4423,12 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 	hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm, bufferSize)
 	consolidator := duplicates.NewConsolidator(s.db, &s.config.DuplicateConsolidation, hasher)
 
-	// Get all same-disk duplicates (0 = no limit, needed for hardlinking)
+	// Get all same-disk duplicates (no limit, needed for hardlinking)
 	log.Printf("Analyzing same-disk duplicates...")
-	plans, err := analyzer.AnalyzeSameDiskDuplicates(0)
+	filters := database.DuplicateFilters{
+		Limit: 10000, // Large limit to get all groups
+	}
+	plans, err := analyzer.AnalyzeSameDiskDuplicates(filters)
 	if err != nil {
 		log.Printf("ERROR: Failed to analyze duplicates: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to analyze duplicates", "analysis_failed")
@@ -4562,11 +4639,14 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 	var plans []*duplicates.ConsolidationPlan
 	var err error
 
-	// Get all duplicates (0 = no limit, needed for preview)
+	// Get all duplicates (large limit, needed for preview)
 	if consolidationType == "cross-disk" {
 		plans, err = analyzer.AnalyzeCrossDiskDuplicates(0)
 	} else {
-		plans, err = analyzer.AnalyzeSameDiskDuplicates(0)
+		filters := database.DuplicateFilters{
+			Limit: 10000, // Large limit to get all groups for preview
+		}
+		plans, err = analyzer.AnalyzeSameDiskDuplicates(filters)
 	}
 
 	if err != nil {

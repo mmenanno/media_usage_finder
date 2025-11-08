@@ -75,10 +75,10 @@ func (a *Analyzer) AnalyzeCrossDiskDuplicates(limit int) ([]*ConsolidationPlan, 
 }
 
 // AnalyzeSameDiskDuplicates creates plans for same-disk duplicates (hardlink candidates)
-// limit parameter controls how many groups to analyze (0 = all groups)
-func (a *Analyzer) AnalyzeSameDiskDuplicates(limit int) ([]*ConsolidationPlan, error) {
-	// Get same-disk duplicate groups with optional limit
-	groups, err := a.db.GetSameDiskDuplicates(limit)
+// filters parameter controls pagination, searching, and filtering of groups
+func (a *Analyzer) AnalyzeSameDiskDuplicates(filters database.DuplicateFilters) ([]*ConsolidationPlan, error) {
+	// Get same-disk duplicate groups with filters
+	groups, err := a.db.GetSameDiskDuplicates(filters)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get same-disk duplicates: %w", err)
 	}
@@ -214,6 +214,8 @@ func (a *Analyzer) createHardlinkPlan(group *database.DuplicateGroup) (*Consolid
 	}
 
 	// If only one cluster, all files are already hardlinked - nothing to do
+	// NOTE: This should rarely trigger now that the database query filters to COUNT(DISTINCT inode) > 1
+	// If this triggers frequently, it indicates a query issue
 	if len(group.HardlinkClusters) <= 1 {
 		return nil, nil
 	}

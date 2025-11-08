@@ -1,0 +1,276 @@
+{{if .SameDiskGroups}}
+<!-- Groups Summary -->
+<div class="px-6 py-4 border-b border-gray-700">
+    <p class="text-sm text-gray-400">
+        Showing {{len .SameDiskGroups}} of {{.Total}} groups
+        {{if gt .TotalPages 1}} (Page {{.Page}} of {{.TotalPages}}){{end}}
+    </p>
+</div>
+
+<!-- Duplicate Groups -->
+<div id="same-disk-groups" class="space-y-4 p-6">
+    {{range $plan := .SameDiskGroups}}
+        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{$plan.SpaceSavings}}" data-hash-type="{{if gt $plan.Group.HashLevel 0}}{{if eq $plan.Group.HashLevel 6}}full{{else if eq $plan.Group.HashLevel 1}}quick{{else}}progressive{{end}}{{else}}{{$plan.Group.HashType}}{{end}}" data-copies="{{$plan.Group.TotalCopies}}" data-file-size="{{$plan.Group.TotalSize}}">
+            <!-- Group Header -->
+            <div class="bg-gray-800 px-6 py-4 border-b border-gray-700">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3">
+                            <h3 class="text-lg font-semibold text-gray-100">
+                                {{$plan.Group.TotalSize | formatBytes}} × {{$plan.TotalFiles}} files in {{$plan.ActualCopies}} cluster(s)
+                            </h3>
+                            {{if gt $plan.Group.HashLevel 0}}
+                                {{if eq $plan.Group.HashLevel 6}}
+                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
+                                    ✓ Full Hash
+                                </span>
+                                {{else if eq $plan.Group.HashLevel 1}}
+                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
+                                    ⚠️ Quick Hash
+                                </span>
+                                {{else}}
+                                <span class="px-2 py-1 text-xs rounded bg-blue-600 text-blue-100" title="Progressive hash - level {{$plan.Group.HashLevel}}">
+                                    🔄 {{hashLevelName $plan.Group.HashLevel}}
+                                </span>
+                                {{end}}
+                            {{else}}
+                                {{if eq $plan.Group.HashType "quick"}}
+                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
+                                    ⚠️ Quick Hash
+                                </span>
+                                {{else if eq $plan.Group.HashType "full"}}
+                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
+                                    ✓ Full Hash
+                                </span>
+                                {{end}}
+                            {{end}}
+                        </div>
+                        {{if gt (len $plan.AlreadyLinked) 0}}
+                        <div class="text-sm text-blue-400 mt-1 flex items-center space-x-1">
+                            <span>ℹ️</span>
+                            <span>{{len $plan.AlreadyLinked}} cluster(s) already internally linked</span>
+                        </div>
+                        {{end}}
+                        <div class="text-sm text-gray-400 mt-1 font-mono truncate">
+                            Hash: {{$plan.Group.FileHash}}
+                        </div>
+                        <div class="text-sm text-gray-400 mt-1">
+                            Disk: {{if $plan.KeepDisk}}{{$plan.KeepDisk.Name}}{{else}}Unknown{{end}}
+                        </div>
+                    </div>
+                    <div class="text-right space-y-3">
+                        <div>
+                            <div class="text-sm text-gray-400">Actual Savings</div>
+                            <div class="text-xl font-bold text-green-400">{{$plan.SpaceSavings | formatBytes}}</div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button onclick="previewSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded font-medium transition-colors" title="Preview hardlinks for this group only">
+                                Preview
+                            </button>
+                            <button onclick="linkSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors" title="Create hardlinks for this group">
+                                Link Group
+                            </button>
+                            <button onclick="refreshGroupInodes('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded font-medium transition-colors flex items-center space-x-1" title="Refresh inodes from filesystem">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Entries Grouped by Hardlink Cluster -->
+            <div class="px-6 py-4 space-y-4">
+                <!-- Primary Cluster -->
+                {{if $plan.KeepCluster}}
+                <div class="hardlink-cluster bg-blue-900 bg-opacity-10 border border-blue-700 rounded-lg p-3">
+                    <div class="text-xs font-semibold text-blue-400 mb-2 flex items-center space-x-2">
+                        <span>PRIMARY CLUSTER (inode {{$plan.KeepCluster.Inode}})</span>
+                        {{if $plan.KeepCluster.IsLinked}}
+                        <span class="px-2 py-0.5 rounded bg-blue-600 bg-opacity-30 text-blue-300">
+                            {{$plan.KeepCluster.LinkCount}} files already linked
+                        </span>
+                        {{end}}
+                    </div>
+                    {{range $plan.KeepCluster.Files}}
+                    <div class="file-entry flex items-center justify-between p-2 rounded bg-blue-900 bg-opacity-20 mb-2">
+                        <div class="flex items-center space-x-3 flex-1 min-w-0">
+                            <div class="shrink-0 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                                ★
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium text-gray-100 truncate">{{.Path}}</div>
+                                <div class="flex items-center space-x-3 mt-1">
+                                    {{if .ServiceUsage}}
+                                    <span class="text-xs text-gray-400">
+                                        Used by: {{range $i, $svc := .ServiceUsage}}{{if $i}}, {{end}}{{$svc}}{{end}}
+                                    </span>
+                                    {{else if .IsOrphaned}}
+                                    <span class="px-2 py-0.5 text-xs rounded bg-gray-600 text-gray-300">Orphaned</span>
+                                    {{end}}
+                                    <span class="text-xs text-gray-500">Modified: {{.ModifiedTime | formatTimestamp}}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="shrink-0 ml-4 text-right">
+                            <div class="text-sm font-medium text-blue-400">PRIMARY</div>
+                            {{if eq .ID $plan.KeepFile.ID}}
+                            <div class="text-xs text-gray-400">{{$plan.ReasonToKeep}}</div>
+                            {{else}}
+                            <div class="text-xs text-gray-400">Already linked</div>
+                            {{end}}
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+
+                <!-- Already Linked Clusters (non-primary) -->
+                {{range $cluster := $plan.AlreadyLinked}}
+                    {{if ne $cluster.Inode $plan.KeepCluster.Inode}}
+                    <div class="hardlink-cluster bg-gray-700 bg-opacity-30 border border-gray-600 rounded-lg p-3">
+                        <div class="text-xs font-semibold text-gray-400 mb-2 flex items-center space-x-2">
+                            <span>LINKED CLUSTER (inode {{$cluster.Inode}})</span>
+                            <span class="px-2 py-0.5 rounded bg-gray-600 text-gray-300">
+                                {{$cluster.LinkCount}} files linked together
+                            </span>
+                            <span class="text-gray-500">→ Will link all to primary</span>
+                        </div>
+                        {{range $cluster.Files}}
+                        <div class="file-entry flex items-center justify-between p-2 rounded bg-gray-700 bg-opacity-40 mb-2">
+                            <div class="flex items-center space-x-3 flex-1 min-w-0">
+                                <div class="shrink-0 w-6 h-6 rounded-full bg-green-600 flex items-center justify-center text-white text-xs">
+                                    🔗✓
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-medium text-gray-100 truncate">{{.Path}}</div>
+                                    <div class="flex items-center space-x-3 mt-1">
+                                        {{if .ServiceUsage}}
+                                        <span class="text-xs text-gray-400">
+                                            Used by: {{range $i, $svc := .ServiceUsage}}{{if $i}}, {{end}}{{$svc}}{{end}}
+                                        </span>
+                                        {{else if .IsOrphaned}}
+                                        <span class="px-2 py-0.5 text-xs rounded bg-gray-600 text-gray-300">Orphaned</span>
+                                        {{end}}
+                                        <span class="text-xs text-gray-500">Modified: {{.ModifiedTime | formatTimestamp}}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="shrink-0 ml-4 text-right">
+                                <div class="text-sm font-medium text-gray-400">LINK TO PRIMARY</div>
+                                <div class="text-xs text-green-400">Save {{$plan.Group.TotalSize | formatBytes}}</div>
+                            </div>
+                        </div>
+                        {{end}}
+                    </div>
+                    {{end}}
+                {{end}}
+
+                <!-- Unlinked Clusters -->
+                {{range $cluster := $plan.LinkClusters}}
+                    {{$isAlreadyLinked := false}}
+                    {{range $linked := $plan.AlreadyLinked}}
+                        {{if eq $linked.Inode $cluster.Inode}}
+                            {{$isAlreadyLinked = true}}
+                        {{end}}
+                    {{end}}
+                    {{if not $isAlreadyLinked}}
+                    <div class="hardlink-cluster bg-gray-700 bg-opacity-30 border border-gray-600 rounded-lg p-3">
+                        <div class="text-xs font-semibold text-gray-400 mb-2 flex items-center space-x-2">
+                            <span>UNLINKED FILES{{if gt $cluster.LinkCount 1}} (inode {{$cluster.Inode}}){{end}}</span>
+                            {{if gt $cluster.LinkCount 1}}
+                            <span class="px-2 py-0.5 rounded bg-gray-600 text-gray-300">
+                                {{$cluster.LinkCount}} files need linking
+                            </span>
+                            {{end}}
+                        </div>
+                        {{range $cluster.Files}}
+                        <div class="file-entry flex items-center justify-between p-2 rounded bg-gray-700 bg-opacity-40 mb-2">
+                            <div class="flex items-center space-x-3 flex-1 min-w-0">
+                                <div class="shrink-0 w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center text-white text-xs">
+                                    🔗
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-medium text-gray-100 truncate">{{.Path}}</div>
+                                    <div class="flex items-center space-x-3 mt-1">
+                                        {{if .ServiceUsage}}
+                                        <span class="text-xs text-gray-400">
+                                            Used by: {{range $i, $svc := .ServiceUsage}}{{if $i}}, {{end}}{{$svc}}{{end}}
+                                        </span>
+                                        {{else if .IsOrphaned}}
+                                        <span class="px-2 py-0.5 text-xs rounded bg-gray-600 text-gray-300">Orphaned</span>
+                                        {{end}}
+                                        <span class="text-xs text-gray-500">Modified: {{.ModifiedTime | formatTimestamp}}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="shrink-0 ml-4 text-right">
+                                <div class="text-sm font-medium text-gray-400">LINK TO PRIMARY</div>
+                                <div class="text-xs text-gray-400">Save {{$plan.Group.TotalSize | formatBytes}}</div>
+                            </div>
+                        </div>
+                        {{end}}
+                    </div>
+                    {{end}}
+                {{end}}
+            </div>
+        </div>
+    {{end}}
+</div>
+
+<!-- Pagination -->
+{{if gt .TotalPages 1}}
+<div class="px-6 py-4 border-t border-gray-700 flex items-center justify-between">
+    <div class="text-sm text-gray-400">
+        Page {{.Page}} of {{.TotalPages}}
+    </div>
+    <div class="flex gap-2">
+        {{if gt .Page 1}}
+        <button data-page="{{sub .Page 1}}"
+                class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+            Previous
+        </button>
+        {{end}}
+
+        <!-- Page numbers with smart ellipsis -->
+        {{$currentPage := .Page}}
+        {{$totalPages := .TotalPages}}
+        {{range $page := (sequence 1 $totalPages)}}
+            {{if or (le $page 3) (and (ge $page (sub $currentPage 1)) (le $page (add $currentPage 1))) (ge $page (sub $totalPages 2))}}
+                {{if eq $page $currentPage}}
+                <button class="px-3 py-1 bg-blue-600 text-white rounded cursor-default">{{$page}}</button>
+                {{else}}
+                <button data-page="{{$page}}"
+                        class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+                    {{$page}}
+                </button>
+                {{end}}
+            {{else if and (eq $page 4) (gt $currentPage 5)}}
+                <span class="px-2 py-1 text-gray-500">...</span>
+            {{else if and (eq $page (sub $totalPages 3)) (lt $currentPage (sub $totalPages 4))}}
+                <span class="px-2 py-1 text-gray-500">...</span>
+            {{end}}
+        {{end}}
+
+        {{if lt .Page .TotalPages}}
+        <button data-page="{{add .Page 1}}"
+                class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+            Next
+        </button>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{else}}
+<!-- No Groups Found -->
+<div class="p-12 text-center text-gray-400">
+    <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+    </svg>
+    <p class="text-xl font-semibold mb-2">No duplicate groups found</p>
+    <p>Try adjusting your filters or run a hash scan to detect duplicates</p>
+</div>
+{{end}}
