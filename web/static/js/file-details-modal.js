@@ -166,20 +166,23 @@ class FileDetailsModal {
                         <div class="flex space-x-2">
                             <button
                                 hx-post="/api/files/mark-rescan?id=${fileData.id}"
-                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
-                                Mark for Rescan
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition flex items-center gap-2">
+                                ${Icons.get('refresh', 5)}
+                                <span>Mark for Rescan</span>
                             </button>
                             <button
                                 hx-delete="/api/files/delete?id=${fileData.id}"
                                 hx-confirm="Are you sure you want to delete this file? This action cannot be undone."
-                                class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition">
-                                Delete File
+                                class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition flex items-center gap-2">
+                                ${Icons.get('trash', 5)}
+                                <span>Delete File</span>
                             </button>
                         </div>
                         <button
                             onclick="fileDetailsModal.hide()"
-                            class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded transition">
-                            Close
+                            class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded transition flex items-center gap-2">
+                            ${Icons.get('close', 5)}
+                            <span>Close</span>
                         </button>
                     </div>
                 </div>

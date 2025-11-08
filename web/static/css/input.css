@@ -125,6 +125,12 @@
   position: relative;
 }
 
+/* Prevent opacity change on polling containers to avoid flicker */
+#progress-container.htmx-request,
+#hash-progress-container.htmx-request {
+  opacity: 1 !important;
+}
+
 .htmx-request.htmx-indicator {
   display: inline;
 }

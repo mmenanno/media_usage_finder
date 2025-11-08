@@ -84,6 +84,7 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
+                    <span class="test-paths-icon htmx-indicator-hidden"></span>
                     <span class="htmx-indicator-hidden">Test Paths</span>
                 </button>
             </div>
@@ -114,6 +115,7 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
+                    <span class="test-mappings-icon htmx-indicator-hidden"></span>
                     <span class="htmx-indicator-hidden">Test Mappings</span>
                 </button>
             </div>
@@ -161,6 +163,7 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
+                    <span class="test-connection-icon htmx-indicator-hidden"></span>
                     <span class="htmx-indicator-hidden">Test Connection</span>
                 </button>
             </div>
@@ -195,6 +198,7 @@
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
+                            <span class="fetch-libraries-icon" id="fetch-libraries-icon"></span>
                             <span id="fetch-libraries-text">Fetch Libraries</span>
                         </button>
                     </div>
@@ -228,6 +232,7 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
+                    <span class="test-connection-icon htmx-indicator-hidden"></span>
                     <span class="htmx-indicator-hidden">Test Connection</span>
                 </button>
             </div>
@@ -268,6 +273,7 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
+                    <span class="test-connection-icon htmx-indicator-hidden"></span>
                     <span class="htmx-indicator-hidden">Test Connection</span>
                 </button>
             </div>
@@ -308,6 +314,7 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
+                    <span class="test-connection-icon htmx-indicator-hidden"></span>
                     <span class="htmx-indicator-hidden">Test Connection</span>
                 </button>
             </div>
@@ -369,6 +376,7 @@
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
+                    <span class="test-connection-icon htmx-indicator-hidden"></span>
                     <span class="htmx-indicator-hidden">Test Connection</span>
                 </button>
             </div>
@@ -410,6 +418,7 @@
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
+                    <span class="test-disk-icon" id="test-disk-icon"></span>
                     <span id="test-disk-detection-text">Test Disk Detection</span>
                 </button>
             </div>
@@ -422,7 +431,10 @@
                     <input type="text" name="disk_mount_{{$i}}" value="{{$disk.MountPath}}" placeholder="/disk1"
                            class="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-blue-500 font-mono text-sm">
                     <button type="button" onclick="this.parentElement.remove()"
-                            class="px-3 py-2 bg-red-600 hover:bg-red-700 rounded text-sm transition">Remove</button>
+                            class="px-3 py-2 bg-red-600 hover:bg-red-700 rounded text-sm transition flex items-center gap-2">
+                        <span class="remove-disk-icon"></span>
+                        <span>Remove</span>
+                    </button>
                 </div>
                 {{end}}
             </div>
@@ -706,8 +718,9 @@
                 type="submit"
                 hx-target="#validation-errors"
                 hx-swap="innerHTML"
-                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded transition">
-                Save Configuration
+                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded transition flex items-center gap-2">
+                <span class="save-config-icon"></span>
+                <span>Save Configuration</span>
             </button>
         </div>
     </form>
@@ -715,6 +728,32 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ===========================
+    // Inject Icons
+    // ===========================
+    // Test buttons
+    const testPathsIcon = document.querySelector('.test-paths-icon');
+    const testMappingsIcon = document.querySelector('.test-mappings-icon');
+    const testConnectionIcons = document.querySelectorAll('.test-connection-icon');
+    const testDiskIcon = document.querySelector('.test-disk-icon');
+
+    if (testPathsIcon) testPathsIcon.innerHTML = Icons.get('checkCircle', 4);
+    if (testMappingsIcon) testMappingsIcon.innerHTML = Icons.get('checkCircle', 4);
+    testConnectionIcons.forEach(icon => icon.innerHTML = Icons.get('checkCircle', 4));
+    if (testDiskIcon) testDiskIcon.innerHTML = Icons.get('checkCircle', 4);
+
+    // Fetch Libraries icon
+    const fetchLibrariesIcon = document.querySelector('.fetch-libraries-icon');
+    if (fetchLibrariesIcon) fetchLibrariesIcon.innerHTML = Icons.get('download', 3);
+
+    // Remove disk icons (static)
+    const removeDiskIcons = document.querySelectorAll('.remove-disk-icon');
+    removeDiskIcons.forEach(icon => icon.innerHTML = Icons.get('trash', 4));
+
+    // Save Configuration icon
+    const saveConfigIcon = document.querySelector('.save-config-icon');
+    if (saveConfigIcon) saveConfigIcon.innerHTML = Icons.get('save', 5);
+
     // ===========================
     // Disk Configuration
     // ===========================
@@ -741,7 +780,10 @@ document.addEventListener('DOMContentLoaded', function() {
                    placeholder="/disk${diskCounter + 1}"
                    class="flex-1 px-3 py-2 bg-gray-600 border border-gray-500 rounded focus:outline-none focus:border-blue-500 font-mono text-sm">
             <button type="button" onclick="this.parentElement.remove()"
-                    class="px-3 py-2 bg-red-600 hover:bg-red-700 rounded text-sm transition">Remove</button>
+                    class="px-3 py-2 bg-red-600 hover:bg-red-700 rounded text-sm transition flex items-center gap-2">
+                <span class="remove-disk-icon">${Icons.get('trash', 4)}</span>
+                <span>Remove</span>
+            </button>
         `;
         disksContainer.appendChild(diskRow);
         diskCounter++;
