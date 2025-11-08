@@ -346,7 +346,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if search != "" {
-		files, total, err = s.db.SearchFiles(search, limit, offset)
+		files, total, err = s.db.SearchFiles(search, orphanedOnly, services, serviceFilterMode, hardlinksOnly, extensions, deviceIDs, limit, offset, orderBy, direction)
 	} else {
 		files, total, err = s.db.ListFiles(orphanedOnly, services, serviceFilterMode, hardlinksOnly, extensions, deviceIDs, limit, offset, orderBy, direction)
 	}
