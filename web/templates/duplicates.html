@@ -453,7 +453,17 @@
 
                 <!-- Duplicate Groups -->
                 <div id="same-disk-groups-container" class="bg-gray-750 rounded-lg border border-gray-700">
-                    <!-- Groups will be loaded here via HTMX/JavaScript -->
+                    {{if .SameDiskGroups}}
+                    <!-- Groups Summary -->
+                    <div class="px-6 py-4 border-b border-gray-700">
+                        <p class="text-sm text-gray-400">
+                            Showing {{len .SameDiskGroups}} of {{.Total}} groups
+                            {{if gt .TotalPages 1}} (Page {{.Page}} of {{.TotalPages}}){{end}}
+                        </p>
+                    </div>
+
+                    <!-- Duplicate Groups -->
+                    <div id="same-disk-groups" class="space-y-4 p-6">
                     {{range $plan := .SameDiskGroups}}
                         <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{$plan.SpaceSavings}}" data-hash-type="{{if gt $plan.Group.HashLevel 0}}{{if eq $plan.Group.HashLevel 6}}full{{else if eq $plan.Group.HashLevel 1}}quick{{else}}progressive{{end}}{{else}}{{$plan.Group.HashType}}{{end}}" data-copies="{{$plan.Group.TotalCopies}}" data-file-size="{{$plan.Group.TotalSize}}">
                             <!-- Group Header -->
@@ -685,6 +695,8 @@
                                 {{end}}
                             </div>
                         </div>
+                    {{end}}
+                    </div>
                     {{else}}
                         <div class="p-12 text-center">
                             <div class="text-gray-400 text-lg">No same-disk duplicates found</div>
@@ -883,11 +895,6 @@ function switchTab(tabName) {
     const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
     activeBtn.classList.remove('border-transparent', 'text-gray-400');
     activeBtn.classList.add('border-blue-500', 'text-blue-400');
-
-    // Load same-disk groups when switching to that tab to ensure pagination appears
-    if (tabName === 'same-disk' && typeof loadSameDiskGroups === 'function') {
-        loadSameDiskGroups();
-    }
 }
 
 // Initialize custom dropdown event handlers
@@ -920,32 +927,33 @@ document.addEventListener('DOMContentLoaded', function() {
     const sameDiskSizeFilter = document.getElementById('same-disk-size-filter');
     const sameDiskSort = document.getElementById('same-disk-sort');
     const sameDiskLimitFilter = document.getElementById('same-disk-limit');
+    const sameDiskApplyBtn = document.getElementById('apply-same-disk-filters');
 
-    if (sameDiskHashFilter) {
+    if (sameDiskHashFilter && sameDiskApplyBtn) {
         sameDiskHashFilter.addEventListener('change', function() {
             // Trigger form submission for server-side filtering
-            if (applyFiltersBtn) applyFiltersBtn.click();
+            sameDiskApplyBtn.click();
         });
     }
 
-    if (sameDiskSizeFilter) {
+    if (sameDiskSizeFilter && sameDiskApplyBtn) {
         sameDiskSizeFilter.addEventListener('change', function() {
             // Trigger form submission for server-side filtering
-            if (applyFiltersBtn) applyFiltersBtn.click();
+            sameDiskApplyBtn.click();
         });
     }
 
-    if (sameDiskSort) {
+    if (sameDiskSort && sameDiskApplyBtn) {
         sameDiskSort.addEventListener('change', function() {
             // Trigger form submission for server-side filtering
-            if (applyFiltersBtn) applyFiltersBtn.click();
+            sameDiskApplyBtn.click();
         });
     }
 
-    if (sameDiskLimitFilter) {
+    if (sameDiskLimitFilter && sameDiskApplyBtn) {
         sameDiskLimitFilter.addEventListener('change', function() {
             // Trigger form submission for server-side filtering
-            if (applyFiltersBtn) applyFiltersBtn.click();
+            sameDiskApplyBtn.click();
         });
     }
 });
@@ -1600,12 +1608,6 @@ document.addEventListener('click', function(e) {
         }
     }
 });
-
-// Initialize: Load same-disk groups on page load to ensure pagination header appears
-if (sameDiskContainer && document.querySelector('.tab-btn[data-tab="same-disk"].active')) {
-    // Only load if same-disk tab is active on initial page load
-    loadSameDiskGroups();
-}
 
 // ========== FILTERED PREVIEW FUNCTIONALITY ==========
 
