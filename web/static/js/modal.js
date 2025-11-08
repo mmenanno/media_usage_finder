@@ -110,22 +110,30 @@ class ModalManager {
                     ${buttons.map((btn, i) => `
                         <button
                             data-action="${i}"
-                            class="px-4 py-2 rounded-lg font-medium transition-colors ${this.getButtonClass(btn.class)}"
+                            class="px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${this.getButtonClass(btn.class)}"
                         >
-                            ${btn.text}
+                            <span class="button-icon-${i}"></span>
+                            <span>${btn.text}</span>
                         </button>
                     `).join('')}
                 </div>
             </div>
         `;
 
-        // Add click handlers
+        // Add click handlers and icons
         buttons.forEach((btn, i) => {
             const buttonEl = modal.querySelector(`[data-action="${i}"]`);
             buttonEl.addEventListener('click', () => {
                 this.hide();
                 btn.action();
             });
+
+            // Inject icon based on button type
+            const iconSpan = buttonEl.querySelector(`.button-icon-${i}`);
+            if (iconSpan && window.Icons) {
+                const iconType = this.getButtonIcon(btn.text, btn.class);
+                iconSpan.innerHTML = window.Icons.get(iconType, 5);
+            }
         });
 
         // Store escape handler reference for cleanup
@@ -165,6 +173,23 @@ class ModalManager {
             return 'bg-blue-600 hover:bg-blue-700 text-white';
         }
         return 'bg-gray-600 hover:bg-gray-500 text-white';
+    }
+
+    getButtonIcon(text, buttonClass) {
+        // Determine icon based on button text
+        const lowerText = text.toLowerCase();
+
+        if (lowerText.includes('cancel')) {
+            return 'xCircle';
+        } else if (lowerText.includes('confirm') || lowerText.includes('ok')) {
+            return 'checkCircle';
+        } else if (lowerText.includes('delete') || lowerText.includes('remove')) {
+            return 'trash';
+        } else if (buttonClass === 'primary') {
+            return 'checkCircle';
+        }
+
+        return 'info';
     }
 
     show(modal) {

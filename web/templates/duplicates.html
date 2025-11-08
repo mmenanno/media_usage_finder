@@ -909,11 +909,13 @@
                     This is a preview. No changes have been made yet.
                 </div>
                 <div class="flex space-x-3">
-                    <button onclick="closeDryRunSummary()" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors">
-                        Cancel
+                    <button onclick="closeDryRunSummary()" class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-medium transition-colors flex items-center gap-2">
+                        <span id="hardlink-cancel-icon"></span>
+                        <span>Cancel</span>
                     </button>
-                    <button id="confirmHardlinkBtn" onclick="confirmAndExecuteHardlinks()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors">
-                        Proceed with Hardlink Creation
+                    <button id="confirmHardlinkBtn" onclick="confirmAndExecuteHardlinks()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors flex items-center gap-2">
+                        <span id="hardlink-proceed-icon"></span>
+                        <span>Proceed with Hardlink Creation</span>
                     </button>
                 </div>
             </div>
@@ -2039,6 +2041,12 @@ document.addEventListener('DOMContentLoaded', function() {
         previewIcons.forEach(icon => {
             icon.innerHTML = Icons.get('playCircle', 5);
         });
+
+        // Inject icons for hardlink modal buttons
+        const hardlinkCancelIcon = document.getElementById('hardlink-cancel-icon');
+        const hardlinkProceedIcon = document.getElementById('hardlink-proceed-icon');
+        if (hardlinkCancelIcon) hardlinkCancelIcon.innerHTML = Icons.get('xCircle', 5);
+        if (hardlinkProceedIcon) hardlinkProceedIcon.innerHTML = Icons.get('checkCircle', 5);
     }
 });
 
