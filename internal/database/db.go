@@ -580,6 +580,39 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 13: Update audit_log table CHECK constraint to include 'cleanup'
+	// Test if migration is needed by trying to insert a test record with action='cleanup'
+	needsCleanupAuditLogMigration := false
+	tx13, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction for cleanup audit_log migration check: %w", err)
+	}
+
+	// Try to insert a test record with action='cleanup'
+	_, err = tx13.Exec(`
+		INSERT INTO audit_log (action, entity_type, entity_id, details)
+		VALUES ('cleanup', 'test', 0, 'migration test')
+	`)
+
+	if err != nil {
+		// If we get a CHECK constraint error, we need the migration
+		if strings.Contains(err.Error(), "CHECK constraint failed") {
+			needsCleanupAuditLogMigration = true
+		}
+	}
+
+	// Clean up test record if it was inserted
+	_, _ = tx13.Exec(`DELETE FROM audit_log WHERE action = 'cleanup' AND details = 'migration test'`)
+	tx13.Rollback() // Always rollback since this is just a test
+
+	// Run migration if needed
+	if needsCleanupAuditLogMigration {
+		_, err = db.conn.Exec(migrateAddCleanupToAuditLogAction)
+		if err != nil {
+			return fmt.Errorf("failed to add cleanup to audit_log action constraint: %w", err)
+		}
+	}
+
 	return nil
 }
 
