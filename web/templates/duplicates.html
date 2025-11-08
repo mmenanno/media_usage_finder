@@ -1292,11 +1292,33 @@ async function previewHardlinks() {
     // Show loading toast
     showToast('Analyzing hardlinks...', 'info', {duration: 5000}); // 5 seconds
 
-    // Run dry-run hardlink
+    // Get current filter values
+    const searchText = document.getElementById('same-disk-search')?.value || '';
+    const hashType = document.getElementById('same-disk-hash-filter')?.value || 'all';
+    const minSizeStr = document.getElementById('same-disk-size-filter')?.value || '';
+
+    // Convert min_size string to bytes (matching backend expectations)
+    let minSize = 0;
+    switch (minSizeStr) {
+        case '1gb': minSize = 1024 * 1024 * 1024; break;
+        case '10gb': minSize = 10 * 1024 * 1024 * 1024; break;
+        case '100gb': minSize = 100 * 1024 * 1024 * 1024; break;
+        case '1tb': minSize = 1024 * 1024 * 1024 * 1024; break;
+    }
+
+    // Build request body with filters
+    const requestBody = {
+        dry_run: true,
+        search_text: searchText,
+        hash_type: hashType === 'all' ? '' : hashType,
+        min_size: minSize
+    };
+
+    // Run dry-run hardlink with filters
     fetch('/api/duplicates/hardlink', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({dry_run: true})
+        body: JSON.stringify(requestBody)
     })
     .then(response => {
         console.log('Response status:', response.status);
@@ -1337,10 +1359,32 @@ async function executeHardlinks() {
     // Show loading toast with long duration for potentially long operation
     showToast('Creating hardlinks...', 'info', {duration: 60000}); // 60 seconds
 
+    // Get current filter values
+    const searchText = document.getElementById('same-disk-search')?.value || '';
+    const hashType = document.getElementById('same-disk-hash-filter')?.value || 'all';
+    const minSizeStr = document.getElementById('same-disk-size-filter')?.value || '';
+
+    // Convert min_size string to bytes (matching backend expectations)
+    let minSize = 0;
+    switch (minSizeStr) {
+        case '1gb': minSize = 1024 * 1024 * 1024; break;
+        case '10gb': minSize = 10 * 1024 * 1024 * 1024; break;
+        case '100gb': minSize = 100 * 1024 * 1024 * 1024; break;
+        case '1tb': minSize = 1024 * 1024 * 1024 * 1024; break;
+    }
+
+    // Build request body with filters
+    const requestBody = {
+        dry_run: false,
+        search_text: searchText,
+        hash_type: hashType === 'all' ? '' : hashType,
+        min_size: minSize
+    };
+
     fetch('/api/duplicates/hardlink', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({dry_run: false})
+        body: JSON.stringify(requestBody)
     })
     .then(response => response.json())
     .then(async data => {
