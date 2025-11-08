@@ -78,9 +78,24 @@
                                 </button>
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
                                     <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">All Hashes</div>
-                                    <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Full Hash Only ✓</div>
-                                    <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Progressive Hash Only 🔄</div>
-                                    <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Quick Hash Only ⚠️</div>
+                                    <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 flex items-center space-x-2" aria-selected="false">
+                                        <svg class="w-3.5 h-3.5 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        <span>Full Hash Only</span>
+                                    </div>
+                                    <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 flex items-center space-x-2" aria-selected="false">
+                                        <svg class="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        <span>Progressive Hash Only</span>
+                                    </div>
+                                    <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 flex items-center space-x-2" aria-selected="false">
+                                        <svg class="w-3.5 h-3.5 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                        </svg>
+                                        <span>Quick Hash Only</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -147,26 +162,41 @@
                                             </h3>
                                             {{if gt $plan.Group.HashLevel 0}}
                                                 {{if eq $plan.Group.HashLevel 6}}
-                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
-                                                    ✓ Full Hash
+                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100 inline-flex items-center space-x-1" title="Full hash - verified duplicate">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    <span>Full Hash</span>
                                                 </span>
                                                 {{else if eq $plan.Group.HashLevel 1}}
-                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
-                                                    ⚠️ Quick Hash
+                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100 inline-flex items-center space-x-1" title="Quick hash - verify before consolidating">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                                    </svg>
+                                                    <span>Quick Hash</span>
                                                 </span>
                                                 {{else}}
-                                                <span class="px-2 py-1 text-xs rounded bg-blue-600 text-blue-100" title="Progressive hash - level {{$plan.Group.HashLevel}}">
-                                                    🔄 {{hashLevelName $plan.Group.HashLevel}}
+                                                <span class="px-2 py-1 text-xs rounded bg-blue-600 text-blue-100 inline-flex items-center space-x-1" title="Progressive hash - level {{$plan.Group.HashLevel}}">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                                    </svg>
+                                                    <span>{{hashLevelName $plan.Group.HashLevel}}</span>
                                                 </span>
                                                 {{end}}
                                             {{else}}
                                                 {{if eq $plan.Group.HashType "quick"}}
-                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
-                                                    ⚠️ Quick Hash
+                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100 inline-flex items-center space-x-1" title="Quick hash - verify before consolidating">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                                    </svg>
+                                                    <span>Quick Hash</span>
                                                 </span>
                                                 {{else if eq $plan.Group.HashType "full"}}
-                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
-                                                    ✓ Full Hash
+                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100 inline-flex items-center space-x-1" title="Full hash - verified duplicate">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    <span>Full Hash</span>
                                                 </span>
                                                 {{end}}
                                             {{end}}
@@ -192,11 +222,15 @@
                                     <div class="flex items-center space-x-3 flex-1 min-w-0">
                                         {{if eq .ID $plan.KeepFile.ID}}
                                         <div class="shrink-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white font-bold">
-                                            ✓
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                            </svg>
                                         </div>
                                         {{else}}
                                         <div class="shrink-0 w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-white font-bold">
-                                            ✗
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                            </svg>
                                         </div>
                                         {{end}}
                                         <div class="flex-1 min-w-0">
@@ -305,9 +339,24 @@
                                 </button>
                                 <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
                                     <div data-dropdown-option data-value="all" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">All Hashes</div>
-                                    <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Full Hash Only ✓</div>
-                                    <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Progressive Hash Only 🔄</div>
-                                    <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Quick Hash Only ⚠️</div>
+                                    <div data-dropdown-option data-value="full" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 flex items-center space-x-2" aria-selected="false">
+                                        <svg class="w-3.5 h-3.5 text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        <span>Full Hash Only</span>
+                                    </div>
+                                    <div data-dropdown-option data-value="progressive" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 flex items-center space-x-2" aria-selected="false">
+                                        <svg class="w-3.5 h-3.5 text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        <span>Progressive Hash Only</span>
+                                    </div>
+                                    <div data-dropdown-option data-value="quick" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 flex items-center space-x-2" aria-selected="false">
+                                        <svg class="w-3.5 h-3.5 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                        </svg>
+                                        <span>Quick Hash Only</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -390,33 +439,50 @@
                                             </h3>
                                             {{if gt $plan.Group.HashLevel 0}}
                                                 {{if eq $plan.Group.HashLevel 6}}
-                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
-                                                    ✓ Full Hash
+                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100 inline-flex items-center space-x-1" title="Full hash - verified duplicate">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    <span>Full Hash</span>
                                                 </span>
                                                 {{else if eq $plan.Group.HashLevel 1}}
-                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
-                                                    ⚠️ Quick Hash
+                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100 inline-flex items-center space-x-1" title="Quick hash - verify before consolidating">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                                    </svg>
+                                                    <span>Quick Hash</span>
                                                 </span>
                                                 {{else}}
-                                                <span class="px-2 py-1 text-xs rounded bg-blue-600 text-blue-100" title="Progressive hash - level {{$plan.Group.HashLevel}}">
-                                                    🔄 {{hashLevelName $plan.Group.HashLevel}}
+                                                <span class="px-2 py-1 text-xs rounded bg-blue-600 text-blue-100 inline-flex items-center space-x-1" title="Progressive hash - level {{$plan.Group.HashLevel}}">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                                    </svg>
+                                                    <span>{{hashLevelName $plan.Group.HashLevel}}</span>
                                                 </span>
                                                 {{end}}
                                             {{else}}
                                                 {{if eq $plan.Group.HashType "quick"}}
-                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100" title="Quick hash - verify before consolidating">
-                                                    ⚠️ Quick Hash
+                                                <span class="px-2 py-1 text-xs rounded bg-yellow-600 text-yellow-100 inline-flex items-center space-x-1" title="Quick hash - verify before consolidating">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                                    </svg>
+                                                    <span>Quick Hash</span>
                                                 </span>
                                                 {{else if eq $plan.Group.HashType "full"}}
-                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100" title="Full hash - verified duplicate">
-                                                    ✓ Full Hash
+                                                <span class="px-2 py-1 text-xs rounded bg-green-600 text-green-100 inline-flex items-center space-x-1" title="Full hash - verified duplicate">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                    </svg>
+                                                    <span>Full Hash</span>
                                                 </span>
                                                 {{end}}
                                             {{end}}
                                         </div>
                                         {{if gt (len $plan.AlreadyLinked) 0}}
                                         <div class="text-sm text-blue-400 mt-1 flex items-center space-x-1">
-                                            <span>ℹ️</span>
+                                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
                                             <span>{{len $plan.AlreadyLinked}} cluster(s) already internally linked</span>
                                         </div>
                                         {{end}}
@@ -467,7 +533,9 @@
                                     <div class="file-entry flex items-center justify-between p-2 rounded bg-blue-900 bg-opacity-20 mb-2">
                                         <div class="flex items-center space-x-3 flex-1 min-w-0">
                                             <div class="shrink-0 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
-                                                ★
+                                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
+                                                </svg>
                                             </div>
                                             <div class="flex-1 min-w-0">
                                                 <div class="text-sm font-medium text-gray-100 truncate">{{.Path}}</div>
@@ -511,7 +579,9 @@
                                         <div class="file-entry flex items-center justify-between p-2 rounded bg-gray-700 bg-opacity-40 mb-2">
                                             <div class="flex items-center space-x-3 flex-1 min-w-0">
                                                 <div class="shrink-0 w-6 h-6 rounded-full bg-green-600 flex items-center justify-center text-white text-xs">
-                                                    🔗✓
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                                                    </svg>
                                                 </div>
                                                 <div class="flex-1 min-w-0">
                                                     <div class="text-sm font-medium text-gray-100 truncate">{{.Path}}</div>
@@ -559,7 +629,9 @@
                                         <div class="file-entry flex items-center justify-between p-2 rounded bg-gray-700 bg-opacity-40 mb-2">
                                             <div class="flex items-center space-x-3 flex-1 min-w-0">
                                                 <div class="shrink-0 w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center text-white text-xs">
-                                                    🔗
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                                                    </svg>
                                                 </div>
                                                 <div class="flex-1 min-w-0">
                                                     <div class="text-sm font-medium text-gray-100 truncate">{{.Path}}</div>
@@ -673,15 +745,30 @@
                     <h4 class="text-lg font-semibold text-gray-100 mb-3">Hash Verification Confidence</h4>
                     <div class="grid grid-cols-3 gap-4">
                         <div class="flex items-center justify-between p-3 bg-green-900 bg-opacity-20 border border-green-700 rounded">
-                            <span class="text-sm text-gray-300">✓ Full Hash</span>
+                            <span class="text-sm text-gray-300 flex items-center space-x-2">
+                                <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <span>Full Hash</span>
+                            </span>
                             <span id="summary-hash-full" class="text-lg font-bold text-green-400">-</span>
                         </div>
                         <div class="flex items-center justify-between p-3 bg-blue-900 bg-opacity-20 border border-blue-700 rounded">
-                            <span class="text-sm text-gray-300">🔄 Progressive</span>
+                            <span class="text-sm text-gray-300 flex items-center space-x-2">
+                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                                <span>Progressive</span>
+                            </span>
                             <span id="summary-hash-progressive" class="text-lg font-bold text-blue-400">-</span>
                         </div>
                         <div class="flex items-center justify-between p-3 bg-yellow-900 bg-opacity-20 border border-yellow-700 rounded">
-                            <span class="text-sm text-gray-300">⚠️ Quick Hash</span>
+                            <span class="text-sm text-gray-300 flex items-center space-x-2">
+                                <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                                <span>Quick Hash</span>
+                            </span>
                             <span id="summary-hash-quick" class="text-lg font-bold text-yellow-400">-</span>
                         </div>
                     </div>
@@ -967,7 +1054,7 @@ async function previewConsolidation(type) {
 
 async function executeConsolidation() {
     const confirmed = await confirmDialog(
-        '⚠️ WARNING: This will DELETE files!\n\nAre you absolutely sure you want to proceed?',
+        'WARNING: This will DELETE files!\n\nAre you absolutely sure you want to proceed?',
         'Confirm File Deletion'
     );
 
@@ -1209,16 +1296,16 @@ async function executeHardlinks() {
             // Dismiss loading, show success
             showToast('Hardlinks created successfully!', 'success', {duration: 3000});
 
-            let message = `HARDLINK CREATION COMPLETE\n\n`;
-            message += `Groups processed: ${data.groups_processed}\n`;
-            message += `Files hardlinked: ${data.files_linked}\n`;
-            message += `Space saved: ${formatBytes(data.space_saved)}\n`;
+            let message = `Hardlink operation completed successfully.\n\n`;
+            message += `• Groups processed: ${data.groups_processed}\n`;
+            message += `• Files hardlinked: ${data.files_linked}\n`;
+            message += `• Space saved: ${formatBytes(data.space_saved)}\n`;
 
             if (data.errors && data.errors.length > 0) {
-                message += `\nErrors encountered: ${data.errors.length}`;
+                message += `\nWarning: ${data.errors.length} error(s) encountered during operation.`;
             }
 
-            await alertDialog(message, 'Hardlink Complete', 'success');
+            await alertDialog(message, 'Hardlink Operation Complete', 'success');
             location.reload(); // Refresh to show updated data
         } else {
             showToast('Hardlink creation failed: ' + (data.message || 'Unknown error'), 'error');
@@ -1306,16 +1393,16 @@ function executeSingleGroupHardlink(groupHash) {
             // Dismiss loading, show success
             showToast('Hardlinks created successfully!', 'success', {duration: 3000});
 
-            let message = `HARDLINK CREATION COMPLETE\n\n`;
-            message += `Groups processed: ${data.groups_processed}\n`;
-            message += `Files hardlinked: ${data.files_linked}\n`;
-            message += `Space saved: ${formatBytes(data.space_saved)}\n`;
+            let message = `Hardlink operation completed successfully.\n\n`;
+            message += `• Groups processed: ${data.groups_processed}\n`;
+            message += `• Files hardlinked: ${data.files_linked}\n`;
+            message += `• Space saved: ${formatBytes(data.space_saved)}\n`;
 
             if (data.errors && data.errors.length > 0) {
-                message += `\nErrors encountered: ${data.errors.length}`;
+                message += `\nWarning: ${data.errors.length} error(s) encountered during operation.`;
             }
 
-            await alertDialog(message, 'Hardlink Complete', 'success');
+            await alertDialog(message, 'Hardlink Operation Complete', 'success');
             location.reload(); // Refresh to show updated data
         } else {
             showToast('Hardlink creation failed: ' + (data.message || 'Unknown error'), 'error');

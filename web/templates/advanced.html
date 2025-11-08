@@ -81,7 +81,7 @@
                 <p class="text-sm text-gray-400 mb-4">Remove ALL file records from database ({{.Stats.FileCount}} files)</p>
                 <button
                     hx-post="/api/admin/clear-files"
-                    hx-confirm="⚠️ Clear ALL {{.Stats.FileCount}} files? This will delete all file and usage data. This cannot be undone!"
+                    hx-confirm="Clear ALL {{.Stats.FileCount}} files? This will delete all file and usage data. This cannot be undone!"
                     hx-swap="none"
                     class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors w-full">
                     Clear All Files
@@ -120,7 +120,7 @@
                 <p class="text-sm text-gray-400 mb-4">Remove all configuration settings</p>
                 <button
                     hx-post="/api/admin/clear-config"
-                    hx-confirm="⚠️ Reset ALL configuration? You will need to reconfigure all services."
+                    hx-confirm="Reset ALL configuration? You will need to reconfigure all services."
                     hx-swap="none"
                     class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors w-full">
                     Reset Configuration
