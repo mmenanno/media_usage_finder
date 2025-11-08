@@ -114,6 +114,12 @@ func (db *DB) GetSameDiskDuplicates(filters DuplicateFilters) ([]*DuplicateGroup
 		args = append(args, filters.HashType)
 	}
 
+	// Hash level filter (specific progression level)
+	if filters.HashLevel > 0 {
+		whereConditions = append(whereConditions, "hash_level = ?")
+		args = append(args, filters.HashLevel)
+	}
+
 	// Build WHERE clause
 	whereClause := "WHERE file_hash IS NOT NULL AND hash_calculated = 1 AND hash_type IS NOT NULL"
 	if len(whereConditions) > 0 {
@@ -246,6 +252,12 @@ func (db *DB) GetSameDiskDuplicateCount(filters DuplicateFilters) (int64, error)
 		args = append(args, filters.HashType)
 	}
 
+	// Hash level filter (specific progression level)
+	if filters.HashLevel > 0 {
+		whereConditions = append(whereConditions, "hash_level = ?")
+		args = append(args, filters.HashLevel)
+	}
+
 	// Build WHERE clause
 	whereClause := "WHERE file_hash IS NOT NULL AND hash_calculated = 1 AND hash_type IS NOT NULL"
 	if len(whereConditions) > 0 {
@@ -305,6 +317,12 @@ func (db *DB) GetCrossDiskDuplicates(filters DuplicateFilters) ([]*DuplicateGrou
 	if filters.HashType != "" && filters.HashType != "all" {
 		whereConditions = append(whereConditions, "hash_type = ?")
 		args = append(args, filters.HashType)
+	}
+
+	// Hash level filter (specific progression level)
+	if filters.HashLevel > 0 {
+		whereConditions = append(whereConditions, "hash_level = ?")
+		args = append(args, filters.HashLevel)
 	}
 
 	// Build WHERE clause
@@ -423,6 +441,12 @@ func (db *DB) GetCrossDiskDuplicateCount(filters DuplicateFilters) (int64, error
 	if filters.HashType != "" && filters.HashType != "all" {
 		whereConditions = append(whereConditions, "hash_type = ?")
 		args = append(args, filters.HashType)
+	}
+
+	// Hash level filter (specific progression level)
+	if filters.HashLevel > 0 {
+		whereConditions = append(whereConditions, "hash_level = ?")
+		args = append(args, filters.HashLevel)
 	}
 
 	// Build WHERE clause
@@ -647,7 +671,8 @@ type DuplicateStats struct {
 type DuplicateFilters struct {
 	SearchText string  // Search in file paths or hash
 	MinSize    int64   // Minimum file size (in bytes)
-	HashType   string  // Filter by hash type (quick/full) - leave empty for all
+	HashType   string  // Filter by hash type (quick/full/partial) - leave empty for all
+	HashLevel  int     // Filter by specific hash level (0=any, 1=1MB, 2=10MB, 3=100MB, 4=1GB, 5=10GB, 6=full)
 	SortBy     string  // Sort order: "savings" (default), "files", "recent"
 	Limit      int     // Pagination limit (default 100)
 	Offset     int     // Pagination offset

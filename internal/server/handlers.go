@@ -4439,6 +4439,12 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		Limit:      25, // Default limit
 	}
 
+	// Map "progressive" to "partial" for database query compatibility
+	// Progressive hashes at levels 2-5 are stored as hash_type='partial' in the database
+	if filters.HashType == "progressive" {
+		filters.HashType = "partial"
+	}
+
 	// Parse minimum size filter
 	if minSizeStr := r.URL.Query().Get("min_size"); minSizeStr != "" {
 		switch minSizeStr {
@@ -4450,6 +4456,13 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 			filters.MinSize = 100 * 1024 * 1024 * 1024
 		case "1tb":
 			filters.MinSize = 1024 * 1024 * 1024 * 1024
+		}
+	}
+
+	// Parse hash level filter (specific progression level)
+	if hashLevelStr := r.URL.Query().Get("hash_level"); hashLevelStr != "" {
+		if level, err := strconv.Atoi(hashLevelStr); err == nil && level >= 0 && level <= 6 {
+			filters.HashLevel = level
 		}
 	}
 
@@ -4594,6 +4607,12 @@ func (s *Server) HandleDuplicateGroupCount(w http.ResponseWriter, r *http.Reques
 		Limit:      0, // No limit for count query
 	}
 
+	// Map "progressive" to "partial" for database query compatibility
+	// Progressive hashes at levels 2-5 are stored as hash_type='partial' in the database
+	if filters.HashType == "progressive" {
+		filters.HashType = "partial"
+	}
+
 	// Parse minimum size filter
 	if minSizeStr := r.URL.Query().Get("min_size"); minSizeStr != "" {
 		switch minSizeStr {
@@ -4605,6 +4624,13 @@ func (s *Server) HandleDuplicateGroupCount(w http.ResponseWriter, r *http.Reques
 			filters.MinSize = 100 * 1024 * 1024 * 1024
 		case "1tb":
 			filters.MinSize = 1024 * 1024 * 1024 * 1024
+		}
+	}
+
+	// Parse hash level filter (specific progression level)
+	if hashLevelStr := r.URL.Query().Get("hash_level"); hashLevelStr != "" {
+		if level, err := strconv.Atoi(hashLevelStr); err == nil && level >= 0 && level <= 6 {
+			filters.HashLevel = level
 		}
 	}
 
@@ -4756,6 +4782,12 @@ func (s *Server) HandleCreateHardlinks(w http.ResponseWriter, r *http.Request) {
 		HashType:   req.HashType,
 		MinSize:    req.MinSize,
 		Limit:      10000, // Large limit to get all matching groups
+	}
+
+	// Map "progressive" to "partial" for database query compatibility
+	// Progressive hashes at levels 2-5 are stored as hash_type='partial' in the database
+	if filters.HashType == "progressive" {
+		filters.HashType = "partial"
 	}
 
 	// Get same-disk duplicates with filters applied
@@ -4973,6 +5005,12 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 		Limit:      10000, // Large limit to get all matching groups for preview
 	}
 
+	// Map "progressive" to "partial" for database query compatibility
+	// Progressive hashes at levels 2-5 are stored as hash_type='partial' in the database
+	if filters.HashType == "progressive" {
+		filters.HashType = "partial"
+	}
+
 	// Parse minimum size filter
 	if minSizeStr := r.URL.Query().Get("min_size"); minSizeStr != "" {
 		switch minSizeStr {
@@ -4984,6 +5022,13 @@ func (s *Server) HandlePreviewConsolidation(w http.ResponseWriter, r *http.Reque
 			filters.MinSize = 100 * 1024 * 1024 * 1024
 		case "1tb":
 			filters.MinSize = 1024 * 1024 * 1024 * 1024
+		}
+	}
+
+	// Parse hash level filter (specific progression level)
+	if hashLevelStr := r.URL.Query().Get("hash_level"); hashLevelStr != "" {
+		if level, err := strconv.Atoi(hashLevelStr); err == nil && level >= 0 && level <= 6 {
+			filters.HashLevel = level
 		}
 	}
 
