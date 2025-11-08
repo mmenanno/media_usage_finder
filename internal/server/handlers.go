@@ -3744,6 +3744,33 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 			// Convert hash level to display name
 			return scanner.GetLevelName(level)
 		},
+		"maxProgressiveLevel": func(fileSize int64) int {
+			// Calculate maximum progressive level for file size
+			// Files can only be hashed up to their size:
+			// - Level 1 (1MB): files > 1MB
+			// - Level 2 (10MB): files > 10MB
+			// - Level 3 (100MB): files > 100MB
+			// - Level 4 (1GB): files > 1GB
+			// - Level 5 (10GB): files > 10GB
+			// - Level 6 (full): any size
+			const (
+				MB = 1024 * 1024
+				GB = MB * 1024
+			)
+
+			if fileSize > 10*GB {
+				return 5 // Can reach level 5 (10GB)
+			} else if fileSize > 1*GB {
+				return 4 // Can reach level 4 (1GB)
+			} else if fileSize > 100*MB {
+				return 3 // Can reach level 3 (100MB)
+			} else if fileSize > 10*MB {
+				return 2 // Can reach level 2 (10MB)
+			} else if fileSize > 1*MB {
+				return 1 // Can reach level 1 (1MB)
+			}
+			return 1 // Minimum level for very small files
+		},
 	}
 }
 
@@ -4138,6 +4165,240 @@ func (s *Server) HandleUpgradeAllHashes(w http.ResponseWriter, r *http.Request) 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "success",
 		"message": "Hash upgrade started",
+	})
+}
+
+// HandleUpgradeGroupToFullHash upgrades all files in a duplicate group to full hash (level 6)
+func (s *Server) HandleUpgradeGroupToFullHash(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.hashScanner == nil {
+		respondError(w, http.StatusBadRequest, "Hash scanning is disabled in configuration", "hash_disabled")
+		return
+	}
+
+	// Get group hash from query parameter
+	groupHash := r.URL.Query().Get("group_hash")
+	if groupHash == "" {
+		respondError(w, http.StatusBadRequest, "Missing group_hash parameter", "missing_parameter")
+		return
+	}
+
+	// Query files with hash information
+	query := `
+		SELECT id, path, size, hash_level
+		FROM files
+		WHERE file_hash = ? AND hash_level < 6
+	`
+
+	rows, err := s.db.Conn().Query(query, groupHash)
+	if err != nil {
+		log.Printf("Error querying files for group %s: %v", groupHash, err)
+		respondError(w, http.StatusInternalServerError, "Failed to get files for group", "database_error")
+		return
+	}
+	defer rows.Close()
+
+	type fileInfo struct {
+		ID        int64
+		Path      string
+		Size      int64
+		HashLevel int
+	}
+
+	var filesToUpgrade []fileInfo
+	for rows.Next() {
+		var f fileInfo
+		if err := rows.Scan(&f.ID, &f.Path, &f.Size, &f.HashLevel); err != nil {
+			log.Printf("Error scanning file row: %v", err)
+			continue
+		}
+		filesToUpgrade = append(filesToUpgrade, f)
+	}
+
+	if len(filesToUpgrade) == 0 {
+		w.Header().Set("X-Toast-Message", "All files already have full hash")
+		w.Header().Set("X-Toast-Type", "info")
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"status":   "success",
+			"message":  "All files already have full hash",
+			"upgraded": 0,
+		})
+		return
+	}
+
+	// Upgrade files in background
+	go func() {
+		// Create file hasher
+		bufferSize := 4 * 1024 * 1024 // 4MB default
+		if s.config.DuplicateDetection.HashBufferSize != "" {
+			if size, err := disk.ParseSize(s.config.DuplicateDetection.HashBufferSize); err == nil {
+				bufferSize = int(size)
+			}
+		}
+		hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm, bufferSize)
+
+		upgraded := 0
+		for _, file := range filesToUpgrade {
+			// Calculate full hash
+			hash, err := hasher.FullHash(file.Path)
+			if err != nil {
+				log.Printf("Error calculating full hash for %s: %v", file.Path, err)
+				continue
+			}
+
+			// Update database with level 6 (full hash)
+			if err := s.db.UpdateFileHashWithLevel(file.ID, hash, s.config.DuplicateDetection.HashAlgorithm, 6); err != nil {
+				log.Printf("Error updating hash for %s: %v", file.Path, err)
+				continue
+			}
+
+			upgraded++
+		}
+
+		log.Printf("Upgraded %d/%d files in group %s to full hash", upgraded, len(filesToUpgrade), groupHash)
+	}()
+
+	w.Header().Set("X-Toast-Message", fmt.Sprintf("Upgrading %d file(s) to full hash", len(filesToUpgrade)))
+	w.Header().Set("X-Toast-Type", "info")
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": fmt.Sprintf("Upgrading %d files to full hash", len(filesToUpgrade)),
+		"count":   len(filesToUpgrade),
+	})
+}
+
+// HandleUpgradeGroupProgressive upgrades all files in a duplicate group progressively through hash levels
+func (s *Server) HandleUpgradeGroupProgressive(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.hashScanner == nil {
+		respondError(w, http.StatusBadRequest, "Hash scanning is disabled in configuration", "hash_disabled")
+		return
+	}
+
+	// Get group hash from query parameter
+	groupHash := r.URL.Query().Get("group_hash")
+	if groupHash == "" {
+		respondError(w, http.StatusBadRequest, "Missing group_hash parameter", "missing_parameter")
+		return
+	}
+
+	// Query files with hash information
+	query := `
+		SELECT id, path, size, hash_level
+		FROM files
+		WHERE file_hash = ? AND hash_level < 6
+	`
+
+	rows, err := s.db.Conn().Query(query, groupHash)
+	if err != nil {
+		log.Printf("Error querying files for group %s: %v", groupHash, err)
+		respondError(w, http.StatusInternalServerError, "Failed to get files for group", "database_error")
+		return
+	}
+	defer rows.Close()
+
+	type fileInfo struct {
+		ID        int64
+		Path      string
+		Size      int64
+		HashLevel int
+	}
+
+	var filesToUpgrade []fileInfo
+	for rows.Next() {
+		var f fileInfo
+		if err := rows.Scan(&f.ID, &f.Path, &f.Size, &f.HashLevel); err != nil {
+			log.Printf("Error scanning file row: %v", err)
+			continue
+		}
+		filesToUpgrade = append(filesToUpgrade, f)
+	}
+
+	if len(filesToUpgrade) == 0 {
+		w.Header().Set("X-Toast-Message", "All files already have full hash")
+		w.Header().Set("X-Toast-Type", "info")
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"status":   "success",
+			"message":  "All files already have full hash",
+			"upgraded": 0,
+		})
+		return
+	}
+
+	// Upgrade files in background
+	go func() {
+		// Create file hasher
+		bufferSize := 4 * 1024 * 1024 // 4MB default
+		if s.config.DuplicateDetection.HashBufferSize != "" {
+			if size, err := disk.ParseSize(s.config.DuplicateDetection.HashBufferSize); err == nil {
+				bufferSize = int(size)
+			}
+		}
+		hasher := scanner.NewFileHasher(s.config.DuplicateDetection.HashAlgorithm, bufferSize)
+
+		upgraded := 0
+		for _, file := range filesToUpgrade {
+			// Determine next level for this file
+			currentLevel := file.HashLevel
+			if currentLevel >= 6 {
+				continue // Already at full hash
+			}
+
+			// Calculate next appropriate level based on file size
+			nextLevel := currentLevel + 1
+			effectiveLevel := scanner.GetEffectiveLevel(file.Size, nextLevel)
+
+			// If effective level is same as current, skip (file too small for next level)
+			if effectiveLevel <= currentLevel {
+				// Try jumping to full hash instead
+				effectiveLevel = 6
+			}
+
+			var hash string
+			var err error
+
+			if effectiveLevel == 6 {
+				// Full hash
+				hash, err = hasher.FullHash(file.Path)
+			} else {
+				// Progressive hash
+				chunkSize := scanner.GetChunkSizeForLevel(effectiveLevel)
+				hash, err = hasher.PartialHash(file.Path, file.Size, chunkSize)
+			}
+
+			if err != nil {
+				log.Printf("Error calculating progressive hash for %s: %v", file.Path, err)
+				continue
+			}
+
+			// Update database
+			if err := s.db.UpdateFileHashWithLevel(file.ID, hash, s.config.DuplicateDetection.HashAlgorithm, effectiveLevel); err != nil {
+				log.Printf("Error updating hash for %s: %v", file.Path, err)
+				continue
+			}
+
+			upgraded++
+		}
+
+		log.Printf("Upgraded %d/%d files in group %s progressively", upgraded, len(filesToUpgrade), groupHash)
+	}()
+
+	w.Header().Set("X-Toast-Message", "Upgrading group hashes progressively")
+	w.Header().Set("X-Toast-Type", "info")
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "success",
+		"message": "Progressive hash upgrade started",
+		"count":   len(filesToUpgrade),
 	})
 }
 

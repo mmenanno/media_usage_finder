@@ -210,9 +210,30 @@
                                             Algorithm: {{$plan.Group.HashAlgorithm}} | Disks: {{$plan.Group.UniqueDiskCount}}
                                         </div>
                                     </div>
-                                    <div class="text-right">
-                                        <div class="text-sm text-gray-400">Potential Savings</div>
-                                        <div class="text-xl font-bold text-green-400">{{$plan.SpaceSavings | formatBytes}}</div>
+                                    <div class="flex flex-col items-end space-y-3">
+                                        <div class="text-right">
+                                            <div class="text-sm text-gray-400">Potential Savings</div>
+                                            <div class="text-xl font-bold text-green-400">{{$plan.SpaceSavings | formatBytes}}</div>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            {{$maxLevel := maxProgressiveLevel $plan.Group.TotalSize}}
+                                            {{if lt $plan.Group.HashLevel $maxLevel}}
+                                            <button onclick="upgradeGroupProgressive('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded font-medium transition-colors flex items-center space-x-1" title="Upgrade to next progressive hash level">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path>
+                                                </svg>
+                                                <span>Upgrade Progressive</span>
+                                            </button>
+                                            {{end}}
+                                            {{if lt $plan.Group.HashLevel 6}}
+                                            <button onclick="upgradeGroupToFull('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded font-medium transition-colors flex items-center space-x-1" title="Upgrade to full hash">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                                </svg>
+                                                <span>Upgrade to Full</span>
+                                            </button>
+                                            {{end}}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -535,12 +556,19 @@
                                             <div class="text-sm text-gray-400">Actual Savings</div>
                                             <div class="text-xl font-bold text-green-400">{{$plan.SpaceSavings | formatBytes}}</div>
                                         </div>
-                                        <div class="flex space-x-2">
-                                            <button onclick="previewSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded font-medium transition-colors" title="Preview hardlinks for this group only">
-                                                Preview
+                                        <div class="flex flex-wrap gap-2">
+                                            <button onclick="previewSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded font-medium transition-colors flex items-center space-x-1" title="Preview hardlinks for this group only">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                </svg>
+                                                <span>Preview</span>
                                             </button>
-                                            <button onclick="linkSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors" title="Create hardlinks for this group">
-                                                Link Group
+                                            <button onclick="linkSingleGroup('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded font-medium transition-colors flex items-center space-x-1" title="Create hardlinks for this group">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                                                </svg>
+                                                <span>Link Group</span>
                                             </button>
                                             <button onclick="refreshGroupInodes('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded font-medium transition-colors flex items-center space-x-1" title="Refresh inodes from filesystem">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -548,6 +576,23 @@
                                                 </svg>
                                                 <span>Refresh</span>
                                             </button>
+                                            {{$maxLevel := maxProgressiveLevel $plan.Group.TotalSize}}
+                                            {{if lt $plan.Group.HashLevel $maxLevel}}
+                                            <button onclick="upgradeGroupProgressive('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded font-medium transition-colors flex items-center space-x-1" title="Upgrade to next progressive hash level">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path>
+                                                </svg>
+                                                <span>Upgrade Progressive</span>
+                                            </button>
+                                            {{end}}
+                                            {{if lt $plan.Group.HashLevel 6}}
+                                            <button onclick="upgradeGroupToFull('{{$plan.Group.FileHash}}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded font-medium transition-colors flex items-center space-x-1" title="Upgrade to full hash">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                                </svg>
+                                                <span>Upgrade to Full</span>
+                                            </button>
+                                            {{end}}
                                         </div>
                                     </div>
                                 </div>
@@ -1530,6 +1575,72 @@ async function refreshGroupInodes(groupHash) {
     } catch (error) {
         console.error('Error refreshing inodes:', error);
         showToast('Failed to refresh inodes', 'error');
+    }
+}
+
+// Upgrade group to full hash (level 6)
+async function upgradeGroupToFull(groupHash) {
+    const confirmed = await confirmDialog(
+        'Upgrade all files in this group to full hash?\n\nThis will calculate complete file hashes for verification.',
+        'Confirm Full Hash Upgrade'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    showToast('Upgrading to full hash...', 'info', {duration: 10000});
+
+    try {
+        const response = await fetch(`/api/hash/upgrade-group-full?group_hash=${encodeURIComponent(groupHash)}`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showToast(`Upgrading ${result.count} file(s) to full hash`, 'success');
+            // Reload page after a delay to show updated state
+            setTimeout(() => window.location.reload(), 2000);
+        } else {
+            showToast(result.message || 'Failed to upgrade hashes', 'error');
+        }
+    } catch (error) {
+        console.error('Error upgrading to full hash:', error);
+        showToast('Failed to upgrade hashes', 'error');
+    }
+}
+
+// Upgrade group progressively through hash levels
+async function upgradeGroupProgressive(groupHash) {
+    const confirmed = await confirmDialog(
+        'Upgrade all files in this group to the next progressive hash level?\n\nThis will incrementally improve hash accuracy.',
+        'Confirm Progressive Hash Upgrade'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    showToast('Upgrading hashes progressively...', 'info', {duration: 10000});
+
+    try {
+        const response = await fetch(`/api/hash/upgrade-group-progressive?group_hash=${encodeURIComponent(groupHash)}`, {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showToast(`Upgrading ${result.count} file(s) progressively`, 'success');
+            // Reload page after a delay to show updated state
+            setTimeout(() => window.location.reload(), 2000);
+        } else {
+            showToast(result.message || 'Failed to upgrade hashes', 'error');
+        }
+    } catch (error) {
+        console.error('Error upgrading progressively:', error);
+        showToast('Failed to upgrade hashes', 'error');
     }
 }
 

@@ -58,6 +58,8 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/hash/verify-progressive", s.HandleVerifyDuplicatesProgressive)
 	mux.HandleFunc("/api/hash/level-stats", s.HandleGetHashLevelStats)
 	mux.HandleFunc("/api/hash/upgrade-all", s.HandleUpgradeAllHashes)
+	mux.HandleFunc("/api/hash/upgrade-group-full", s.HandleUpgradeGroupToFullHash)
+	mux.HandleFunc("/api/hash/upgrade-group-progressive", s.HandleUpgradeGroupProgressive)
 	mux.HandleFunc("/api/duplicates/consolidate", s.HandleConsolidateDuplicates)
 	mux.HandleFunc("/api/duplicates/hardlink", s.HandleCreateHardlinks)
 	mux.HandleFunc("/api/duplicates/preview", s.HandlePreviewConsolidation)
