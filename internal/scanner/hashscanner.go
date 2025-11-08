@@ -573,7 +573,7 @@ func (hs *HashScanner) verifyFileHash(ctx context.Context, file database.File) e
 	}
 
 	// Update database with full hash (replacing quick hash)
-	if err := hs.db.UpdateFileHash(file.ID, hash, hs.hasher.GetAlgorithm(), "full"); err != nil {
+	if err := hs.db.UpdateFileHashWithLevel(file.ID, hash, hs.hasher.GetAlgorithm(), 6); err != nil {
 		return fmt.Errorf("failed to update database: %w", err)
 	}
 
