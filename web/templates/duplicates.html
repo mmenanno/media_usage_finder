@@ -883,6 +883,11 @@ function switchTab(tabName) {
     const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
     activeBtn.classList.remove('border-transparent', 'text-gray-400');
     activeBtn.classList.add('border-blue-500', 'text-blue-400');
+
+    // Load same-disk groups when switching to that tab to ensure pagination appears
+    if (tabName === 'same-disk' && typeof loadSameDiskGroups === 'function') {
+        loadSameDiskGroups();
+    }
 }
 
 // Initialize custom dropdown event handlers
@@ -1595,6 +1600,12 @@ document.addEventListener('click', function(e) {
         }
     }
 });
+
+// Initialize: Load same-disk groups on page load to ensure pagination header appears
+if (sameDiskContainer && document.querySelector('.tab-btn[data-tab="same-disk"].active')) {
+    // Only load if same-disk tab is active on initial page load
+    loadSameDiskGroups();
+}
 
 // ========== FILTERED PREVIEW FUNCTIONALITY ==========
 
