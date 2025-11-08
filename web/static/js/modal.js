@@ -92,6 +92,9 @@ class ModalManager {
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 flex items-center justify-center animate-fadeIn';
 
+        // Convert newlines to <br> tags for proper rendering
+        const formattedMessage = message.replace(/\n/g, '<br>');
+
         modal.innerHTML = `
             <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all animate-scaleIn">
                 <div class="p-6">
@@ -99,7 +102,7 @@ class ModalManager {
                         ${this.getIcon(type, color)}
                         <div class="flex-1">
                             <h3 class="text-lg font-semibold text-white mb-2">${title}</h3>
-                            <p class="text-gray-300">${message}</p>
+                            <p class="text-gray-300">${formattedMessage}</p>
                         </div>
                     </div>
                 </div>
