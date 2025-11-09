@@ -613,6 +613,26 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 14: Add scan_id column to audit_log table if it doesn't exist
+	var hasScanIdInAuditLog int
+	err = db.conn.QueryRow(`
+		SELECT COUNT(*)
+		FROM pragma_table_info('audit_log')
+		WHERE name = 'scan_id'
+	`).Scan(&hasScanIdInAuditLog)
+
+	if err != nil {
+		return fmt.Errorf("failed to check for scan_id column in audit_log: %w", err)
+	}
+
+	// If scan_id column doesn't exist, add it
+	if hasScanIdInAuditLog == 0 {
+		_, err = db.conn.Exec(migrateAddScanIdToAuditLog)
+		if err != nil {
+			return fmt.Errorf("failed to add scan_id column to audit_log: %w", err)
+		}
+	}
+
 	return nil
 }
 

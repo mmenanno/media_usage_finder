@@ -42,6 +42,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/scan/progress-html", s.HandleScanProgressHTML)
 	mux.HandleFunc("/api/scan/logs", s.HandleScanLogs)
 	mux.HandleFunc("/api/logs", s.HandleGetScanLogs)
+	mux.HandleFunc("/api/audit-logs", s.HandleGetAuditLogs)
 	mux.HandleFunc("/api/scan/update-services", s.HandleUpdateAllServices)
 	mux.HandleFunc("/api/scan/update-service", s.HandleUpdateSingleService)
 	mux.HandleFunc("/api/scan/recalculate-orphaned", s.HandleRecalculateOrphaned)

@@ -145,6 +145,16 @@ type LogFilters struct {
 	Offset     int
 }
 
+// AuditLogFilters contains filters for querying audit log entries
+type AuditLogFilters struct {
+	Action     string
+	EntityType string
+	SearchText string
+	ScanID     *int64
+	Limit      int
+	Offset     int
+}
+
 // UpsertFile inserts or updates a file record
 func (db *DB) UpsertFile(file *File) error {
 	query := `
@@ -2163,28 +2173,63 @@ type AuditLogEntry struct {
 	Action     string
 	EntityType string
 	EntityID   *int64
+	ScanID     *int64
 	Details    string
 	CreatedAt  time.Time
 }
 
-// GetAuditLog retrieves paginated audit log entries
-func (db *DB) GetAuditLog(limit, offset int) ([]*AuditLogEntry, int, error) {
-	// Count total
+// GetAuditLog retrieves paginated audit log entries with optional filters
+func (db *DB) GetAuditLog(filters AuditLogFilters) ([]*AuditLogEntry, int, error) {
+	// Build WHERE clause based on filters
+	var conditions []string
+	var args []interface{}
+
+	if filters.Action != "" {
+		conditions = append(conditions, "action = ?")
+		args = append(args, filters.Action)
+	}
+
+	if filters.EntityType != "" {
+		conditions = append(conditions, "entity_type = ?")
+		args = append(args, filters.EntityType)
+	}
+
+	if filters.ScanID != nil {
+		conditions = append(conditions, "scan_id = ?")
+		args = append(args, *filters.ScanID)
+	}
+
+	if filters.SearchText != "" {
+		conditions = append(conditions, "details LIKE ?")
+		args = append(args, "%"+filters.SearchText+"%")
+	}
+
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = "WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	// Count total with filters
+	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM audit_log %s", whereClause)
 	var total int
-	err := db.conn.QueryRow(`SELECT COUNT(*) FROM audit_log`).Scan(&total)
+	err := db.conn.QueryRow(countQuery, args...).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// Get entries
-	query := `
-		SELECT id, action, entity_type, entity_id, details, created_at
+	// Get entries with filters
+	query := fmt.Sprintf(`
+		SELECT id, action, entity_type, entity_id, scan_id, details, created_at
 		FROM audit_log
+		%s
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-	`
+	`, whereClause)
 
-	rows, err := db.conn.Query(query, limit, offset)
+	// Add limit and offset to args
+	queryArgs := append(args, filters.Limit, filters.Offset)
+
+	rows, err := db.conn.Query(query, queryArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -2195,12 +2240,14 @@ func (db *DB) GetAuditLog(limit, offset int) ([]*AuditLogEntry, int, error) {
 		entry := &AuditLogEntry{}
 		var createdAt int64
 		var entityID sql.NullInt64
+		var scanID sql.NullInt64
 
 		err := rows.Scan(
 			&entry.ID,
 			&entry.Action,
 			&entry.EntityType,
 			&entityID,
+			&scanID,
 			&entry.Details,
 			&createdAt,
 		)
@@ -2210,6 +2257,9 @@ func (db *DB) GetAuditLog(limit, offset int) ([]*AuditLogEntry, int, error) {
 
 		if entityID.Valid {
 			entry.EntityID = &entityID.Int64
+		}
+		if scanID.Valid {
+			entry.ScanID = &scanID.Int64
 		}
 		entry.CreatedAt = time.Unix(createdAt, 0)
 

@@ -145,6 +145,7 @@ func (s *Server) LoadTemplates(pattern string) error {
 	partials := []string{
 		"partials/validation-errors.html",
 		"logs_table.html",
+		"audit_logs_table.html",
 		"duplicates_table.html",
 	}
 
@@ -663,10 +664,26 @@ func (s *Server) HandleScanLogsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get tab parameter (default to "scan")
+	tab := r.URL.Query().Get("tab")
+	if tab == "" {
+		tab = "scan"
+	}
+
+	// Get scan_id parameter for deep linking
+	var scanID *int64
+	if scanIDStr := r.URL.Query().Get("scan_id"); scanIDStr != "" {
+		if id, err := strconv.ParseInt(scanIDStr, 10, 64); err == nil {
+			scanID = &id
+		}
+	}
+
 	data := map[string]interface{}{
-		"Title":   "Scan Logs",
+		"Title":   "Logs",
 		"Version": s.version,
 		"Scans":   scans,
+		"Tab":     tab,
+		"ScanID":  scanID,
 	}
 
 	s.renderTemplate(w, "logs.html", data)
@@ -763,6 +780,85 @@ func (s *Server) HandleGetScanLogs(w http.ResponseWriter, r *http.Request) {
 		if err := tmplSet.ExecuteTemplate(w, "logs_table.html", data); err != nil {
 			log.Printf("ERROR: Failed to execute template: %v", err)
 			http.Error(w, "Failed to render logs", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// Return JSON for API requests
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(data)
+	}
+}
+
+// HandleGetAuditLogs handles requests for filtered audit log entries
+func (s *Server) HandleGetAuditLogs(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters for filtering
+	filters := database.AuditLogFilters{
+		Action:     r.URL.Query().Get("action"),
+		EntityType: r.URL.Query().Get("entity_type"),
+		SearchText: r.URL.Query().Get("search"),
+		Limit:      100, // Default limit
+		Offset:     0,
+	}
+
+	// Parse scan_id filter
+	if scanIDStr := r.URL.Query().Get("scan_id"); scanIDStr != "" {
+		scanID, err := strconv.ParseInt(scanIDStr, 10, 64)
+		if err == nil {
+			filters.ScanID = &scanID
+		}
+	}
+
+	// Parse pagination
+	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
+		page, _ := strconv.Atoi(pageStr)
+		if page > 0 {
+			filters.Offset = (page - 1) * filters.Limit
+		}
+	}
+
+	// Parse limit
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		limit, _ := strconv.Atoi(limitStr)
+		if limit > 0 && limit <= 1000 {
+			filters.Limit = limit
+		}
+	}
+
+	// Get audit logs with filters
+	entries, total, err := s.db.GetAuditLog(filters)
+	if err != nil {
+		log.Printf("ERROR: Failed to get audit logs: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to retrieve audit logs", "database_error")
+		return
+	}
+
+	// Calculate pagination info
+	currentPage := (filters.Offset / filters.Limit) + 1
+	totalPages := (total + filters.Limit - 1) / filters.Limit
+
+	// Check if this is an HTMX request
+	isHTMX := r.Header.Get("HX-Request") == "true"
+
+	data := map[string]interface{}{
+		"Entries":    entries,
+		"Total":      total,
+		"Page":       currentPage,
+		"TotalPages": totalPages,
+		"Filters":    filters,
+		"IsHTMX":     isHTMX,
+	}
+
+	if isHTMX {
+		// Return just the audit logs table fragment for HTMX updates
+		tmplSet, ok := s.templates["audit_logs_table.html"]
+		if !ok {
+			http.Error(w, "audit_logs_table template not found", http.StatusInternalServerError)
+			return
+		}
+
+		if err := tmplSet.ExecuteTemplate(w, "audit_logs_table.html", data); err != nil {
+			log.Printf("ERROR: Failed to execute template: %v", err)
+			http.Error(w, "Failed to render audit logs", http.StatusInternalServerError)
 			return
 		}
 	} else {
@@ -3522,7 +3618,13 @@ func (s *Server) HandleAdminAuditLog(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	entries, total, err := s.db.GetAuditLog(limit, offset)
+	// Create filters for audit log query
+	filters := database.AuditLogFilters{
+		Limit:  limit,
+		Offset: offset,
+	}
+
+	entries, total, err := s.db.GetAuditLog(filters)
 	if err != nil {
 		log.Printf("Failed to get audit log: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to get audit log", "audit_failed")

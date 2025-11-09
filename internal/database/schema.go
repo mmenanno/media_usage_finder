@@ -99,12 +99,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
 	action TEXT NOT NULL CHECK(action IN ('delete', 'mark_rescan', 'config_change', 'consolidate', 'hardlink', 'cleanup', 'delete_failed')),
 	entity_type TEXT NOT NULL,
 	entity_id INTEGER,
+	scan_id INTEGER,
 	details TEXT,
-	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (scan_id) REFERENCES scans(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_log_scan_id ON audit_log(scan_id);
 
 -- Scan logs table for persistent logging of scan activity
 CREATE TABLE IF NOT EXISTS scan_logs (
@@ -608,4 +611,40 @@ ALTER TABLE scans_new RENAME TO scans;
 -- Recreate indexes
 CREATE INDEX idx_scans_status ON scans(status);
 CREATE INDEX idx_scans_started_at ON scans(started_at);
+`
+
+// Migration to add scan_id column to audit_log table
+const migrateAddScanIdToAuditLog = `
+-- Drop audit_log_new if it exists from a previous failed migration
+DROP TABLE IF EXISTS audit_log_new;
+
+-- Create new audit_log table with scan_id column
+CREATE TABLE audit_log_new (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	action TEXT NOT NULL CHECK(action IN ('delete', 'mark_rescan', 'config_change', 'consolidate', 'hardlink', 'cleanup', 'delete_failed')),
+	entity_type TEXT NOT NULL,
+	entity_id INTEGER,
+	scan_id INTEGER,
+	details TEXT,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (scan_id) REFERENCES scans(id)
+);
+
+-- Copy data from old table
+INSERT INTO audit_log_new (id, action, entity_type, entity_id, details, created_at)
+SELECT id, action, entity_type, entity_id, details, created_at
+FROM audit_log;
+
+-- Drop old table and indexes
+DROP INDEX IF EXISTS idx_audit_log_created_at;
+DROP INDEX IF EXISTS idx_audit_log_action;
+DROP TABLE audit_log;
+
+-- Rename new table
+ALTER TABLE audit_log_new RENAME TO audit_log;
+
+-- Recreate indexes
+CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
+CREATE INDEX idx_audit_log_action ON audit_log(action);
+CREATE INDEX idx_audit_log_scan_id ON audit_log(scan_id);
 `

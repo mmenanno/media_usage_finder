@@ -1,0 +1,144 @@
+{{if .Entries}}
+<!-- Audit Logs Summary -->
+<div class="px-6 py-4 border-b border-gray-700">
+    <p class="text-sm text-gray-400">
+        Showing {{len .Entries}} of {{.Total}} audit log entries
+        {{if gt .TotalPages 1}} (Page {{.Page}} of {{.TotalPages}}){{end}}
+    </p>
+</div>
+
+<!-- Audit Logs Table -->
+<div class="overflow-x-auto">
+    <table class="w-full">
+        <thead class="bg-gray-750 border-b border-gray-700">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-40">Timestamp</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-32">Action</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-32">Entity Type</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Details</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider w-24">Scan</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+            {{range .Entries}}
+            <tr class="hover:bg-gray-750 transition">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                    {{formatTimestamp .CreatedAt}}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    {{if eq .Action "delete"}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-red-900/30 text-red-400 border border-red-800">
+                        DELETE
+                    </span>
+                    {{else if eq .Action "delete_failed"}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-orange-900/30 text-orange-400 border border-orange-800">
+                        DELETE FAILED
+                    </span>
+                    {{else if eq .Action "mark_rescan"}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-blue-900/30 text-blue-400 border border-blue-800">
+                        MARK RESCAN
+                    </span>
+                    {{else if eq .Action "config_change"}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-purple-900/30 text-purple-400 border border-purple-800">
+                        CONFIG CHANGE
+                    </span>
+                    {{else if eq .Action "consolidate"}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-green-900/30 text-green-400 border border-green-800">
+                        CONSOLIDATE
+                    </span>
+                    {{else if eq .Action "hardlink"}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-indigo-900/30 text-indigo-400 border border-indigo-800">
+                        HARDLINK
+                    </span>
+                    {{else if eq .Action "cleanup"}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-300 border border-gray-600">
+                        CLEANUP
+                    </span>
+                    {{else}}
+                    <span class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-300 border border-gray-600">
+                        {{.Action}}
+                    </span>
+                    {{end}}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                    {{.EntityType}}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-300">
+                    <div class="max-w-3xl wrap-break-word">{{.Details}}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    {{if .ScanID}}
+                    <a href="/logs?tab=scan&scan_id={{.ScanID}}" class="text-blue-400 hover:text-blue-300 hover:underline">
+                        #{{.ScanID}}
+                    </a>
+                    {{else}}
+                    <span class="text-gray-500">-</span>
+                    {{end}}
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{{if gt .TotalPages 1}}
+<div class="px-6 py-4 border-t border-gray-700 flex items-center justify-between">
+    <div class="text-sm text-gray-400">
+        Page {{.Page}} of {{.TotalPages}}
+    </div>
+    <div class="flex gap-2">
+        {{if gt .Page 1}}
+        <button data-page="{{sub .Page 1}}"
+                class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+            Previous
+        </button>
+        {{end}}
+
+        <!-- Page numbers -->
+        {{$currentPage := .Page}}
+        {{$totalPages := .TotalPages}}
+        {{range $page := (sequence 1 $totalPages)}}
+            {{if or (le $page 3) (and (ge $page (sub $currentPage 1)) (le $page (add $currentPage 1))) (ge $page (sub $totalPages 2))}}
+                {{if eq $page $currentPage}}
+                <button class="px-3 py-1 bg-blue-600 text-white rounded cursor-default">{{$page}}</button>
+                {{else}}
+                <button data-page="{{$page}}"
+                        class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+                    {{$page}}
+                </button>
+                {{end}}
+            {{else if and (eq $page 4) (gt $currentPage 5)}}
+                <span class="px-2 py-1 text-gray-500">...</span>
+            {{else if and (eq $page (sub $totalPages 3)) (lt $currentPage (sub $totalPages 4))}}
+                <span class="px-2 py-1 text-gray-500">...</span>
+            {{end}}
+        {{end}}
+
+        {{if lt .Page .TotalPages}}
+        <button data-page="{{add .Page 1}}"
+                class="pagination-btn px-3 py-1 bg-gray-700 hover:bg-gray-600 text-white rounded transition">
+            Next
+        </button>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{else}}
+<!-- No Audit Logs Found -->
+<div class="p-12 text-center text-gray-400">
+    <div id="audit-logs-empty-icon" class="mx-auto mb-4 text-gray-600"></div>
+    <p class="text-xl font-semibold mb-2">No audit logs found</p>
+    <p>Try adjusting your filters</p>
+</div>
+<script>
+    // Inject clipboard-list icon from centralized Icons object
+    if (typeof Icons !== 'undefined') {
+        const iconElement = document.getElementById('audit-logs-empty-icon');
+        if (iconElement) {
+            iconElement.innerHTML = Icons.get('clipboardList', 16);
+        }
+    }
+</script>
+{{end}}
