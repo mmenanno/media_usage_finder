@@ -387,7 +387,8 @@ class BatchSelection {
 
         try {
             // Use true batch mode - single HTTP request with all file IDs
-            const fileIds = Array.from(this.selectedFiles);
+            // Convert string IDs to numbers (Go expects int64)
+            const fileIds = Array.from(this.selectedFiles).map(id => parseInt(id, 10));
 
             const response = await fetch('/api/files/batch-delete', {
                 method: 'POST',
