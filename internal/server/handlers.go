@@ -3131,6 +3131,9 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.db.DeleteFile(id, "UI deletion", deleteFromFilesystem); err != nil {
+			// Log the error for debugging
+			log.Printf("ERROR: Failed to delete file ID %d: %v", id, err)
+
 			// Provide specific error message for filesystem failures
 			if deleteFromFilesystem && strings.Contains(err.Error(), "failed to delete file from filesystem") {
 				respondError(w, http.StatusInternalServerError, err.Error(), "filesystem_delete_failed")
@@ -3179,10 +3182,8 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 			for _, file := range files {
 				if err := s.db.DeleteFile(file.ID, "Bulk orphaned cleanup", deleteFromFilesystem); err != nil {
 					totalErrors++
-					// Log failed deletion to audit_log
-					if logErr := s.db.LogDeletionError(file.ID, file.Path, err); logErr != nil {
-						log.Printf("Failed to log deletion error for %s: %v", file.Path, logErr)
-					}
+					// Log the error for debugging
+					log.Printf("ERROR: Failed to delete file ID %d (%s): %v", file.ID, file.Path, err)
 					continue
 				}
 				totalDeleted++
