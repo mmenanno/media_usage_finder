@@ -85,6 +85,7 @@ func (a *Analyzer) AnalyzeSameDiskDuplicates(filters database.DuplicateFilters) 
 
 	var plans []*ConsolidationPlan
 	errorCount := 0
+	skippedCount := 0
 	for i, group := range groups {
 		plan, err := a.createHardlinkPlan(group)
 		if err != nil {
@@ -96,7 +97,15 @@ func (a *Analyzer) AnalyzeSameDiskDuplicates(filters database.DuplicateFilters) 
 
 		if plan != nil {
 			plans = append(plans, plan)
+		} else {
+			// Plan was skipped (likely due to missing disk locations)
+			skippedCount++
 		}
+	}
+
+	// Log if any groups were skipped
+	if skippedCount > 0 {
+		fmt.Printf("INFO: Skipped %d same-disk duplicate group(s) due to missing disk location data\n", skippedCount)
 	}
 
 	// Sort plans by space savings (descending)
@@ -206,6 +215,16 @@ func (a *Analyzer) createHardlinkPlan(group *database.DuplicateGroup) (*Consolid
 	// Enrich files with disk information
 	if err := a.enrichFilesWithDiskInfo(group.Files); err != nil {
 		return nil, fmt.Errorf("failed to enrich files with disk info: %w", err)
+	}
+
+	// Check if all files have disk location data
+	// If any file is missing disk locations, skip this group
+	for i := range group.Files {
+		locations, err := a.db.GetDiskLocationsForFile(group.Files[i].ID)
+		if err != nil || len(locations) == 0 {
+			// Skip this group - files need disk location scan
+			return nil, nil
+		}
 	}
 
 	// If no clusters yet (backwards compat), create them now

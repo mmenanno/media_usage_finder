@@ -4491,6 +4491,13 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 		duplicateStats = &database.DuplicateStats{}
 	}
 
+	// Count files missing disk location data
+	filesMissingDiskLocations, err := s.db.CountFilesMissingDiskLocations()
+	if err != nil {
+		log.Printf("ERROR: Failed to count files missing disk locations: %v", err)
+		filesMissingDiskLocations = 0
+	}
+
 	// Create analyzer
 	analyzer := duplicates.NewAnalyzer(s.db, s.diskDetector, &s.config.DuplicateConsolidation)
 
@@ -4506,6 +4513,12 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("ERROR: Failed to analyze same-disk duplicates: %v", err)
 		sameDiskPlans = []*duplicates.ConsolidationPlan{}
+	}
+
+	// Calculate skipped same-disk groups (total groups - displayed groups)
+	sameDiskGroupsSkipped := int(duplicateStats.SameDiskGroups) - len(sameDiskPlans)
+	if sameDiskGroupsSkipped < 0 {
+		sameDiskGroupsSkipped = 0
 	}
 
 	// Get total count for pagination (both tabs now support it)
@@ -4544,22 +4557,24 @@ func (s *Server) HandleDuplicates(w http.ResponseWriter, r *http.Request) {
 
 	// Prepare template data
 	data := &DuplicatesData{
-		Title:                  "Duplicate Files",
-		Version:                s.version,
-		ActiveTab:              activeTab,
-		CrossDiskGroups:        crossDiskPlans,
-		SameDiskGroups:         sameDiskPlans,
-		CrossDiskCount:         duplicateStats.CrossDiskGroups,
-		SameDiskCount:          duplicateStats.SameDiskGroups,
-		TotalSavings:           duplicateStats.TotalPotentialSavings,
-		CrossDiskSavings:       duplicateStats.CrossDiskPotentialSavings,
-		SameDiskSavings:        duplicateStats.SameDiskPotentialSavings,
-		CrossDiskFilesToDelete: crossDiskFilesToDelete,
-		SameDiskFilesToLink:    sameDiskFilesToLink,
-		HashScanningEnabled:    true,
-		DisplayLimit:           filters.Limit,
-		ShowingCrossDisk:       len(crossDiskPlans),
-		ShowingSameDisk:        len(sameDiskPlans),
+		Title:                     "Duplicate Files",
+		Version:                   s.version,
+		ActiveTab:                 activeTab,
+		CrossDiskGroups:           crossDiskPlans,
+		SameDiskGroups:            sameDiskPlans,
+		CrossDiskCount:            duplicateStats.CrossDiskGroups,
+		SameDiskCount:             duplicateStats.SameDiskGroups,
+		TotalSavings:              duplicateStats.TotalPotentialSavings,
+		CrossDiskSavings:          duplicateStats.CrossDiskPotentialSavings,
+		SameDiskSavings:           duplicateStats.SameDiskPotentialSavings,
+		CrossDiskFilesToDelete:    crossDiskFilesToDelete,
+		SameDiskFilesToLink:       sameDiskFilesToLink,
+		HashScanningEnabled:       true,
+		DisplayLimit:              filters.Limit,
+		ShowingCrossDisk:          len(crossDiskPlans),
+		ShowingSameDisk:           len(sameDiskPlans),
+		FilesMissingDiskLocations: filesMissingDiskLocations,
+		SameDiskGroupsSkipped:     sameDiskGroupsSkipped,
 		// Pagination fields
 		Page:       page,
 		TotalPages: totalPages,

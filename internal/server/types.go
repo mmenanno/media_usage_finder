@@ -208,4 +208,7 @@ type DuplicatesData struct {
 	Limit      int
 	// Filter fields
 	Filters database.DuplicateFilters
+	// Disk location tracking
+	FilesMissingDiskLocations int64 // Count of files missing disk location data
+	SameDiskGroupsSkipped     int   // Count of same-disk groups skipped due to missing disk locations
 }

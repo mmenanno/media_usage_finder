@@ -9,6 +9,32 @@
         </div>
     </div>
 
+    <!-- Warning Banner for Missing Disk Locations -->
+    {{if and (gt .FilesMissingDiskLocations 0) (gt .SameDiskGroupsSkipped 0)}}
+    <div class="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4">
+        <div class="flex items-start gap-3">
+            <svg class="w-6 h-6 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <div class="flex-1">
+                <h3 class="text-yellow-400 font-semibold mb-1">Missing Disk Location Data</h3>
+                <p class="text-gray-300 text-sm mb-3">
+                    <strong>{{.FilesMissingDiskLocations}}</strong> file(s) are missing disk location data.
+                    <strong>{{.SameDiskGroupsSkipped}}</strong> same-disk duplicate group(s) could not be displayed because their files need disk location scanning.
+                </p>
+                <button
+                    onclick="startDiskLocationScan()"
+                    class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded font-medium transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Scan Disk Locations
+                </button>
+            </div>
+        </div>
+    </div>
+    {{end}}
+
     <!-- Tab Navigation -->
     <div class="bg-gray-800 rounded-lg">
         <div class="flex border-b border-gray-700">
@@ -948,6 +974,48 @@ function switchTab(tabName) {
     const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
     activeBtn.classList.remove('border-transparent', 'text-gray-400');
     activeBtn.classList.add('border-blue-500', 'text-blue-400');
+}
+
+// Start disk location scan
+async function startDiskLocationScan() {
+    const confirmed = await confirmDialog(
+        'This will scan all configured disks to map files to their physical disk locations. This may take some time depending on the number of files.',
+        'Start Disk Location Scan'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/scan/disk-locations', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            await alertDialog(
+                'Disk location scan started successfully. The page will refresh when the scan completes.',
+                'Scan Started',
+                'success'
+            );
+
+            // Redirect to dashboard to show scan progress
+            window.location.href = '/';
+        } else {
+            const error = await response.text();
+            await alertDialog(
+                `Failed to start disk location scan: ${error}`,
+                'Error',
+                'error'
+            );
+        }
+    } catch (error) {
+        await alertDialog(
+            `Failed to start disk location scan: ${error.message}`,
+            'Error',
+            'error'
+        );
+    }
 }
 
 // Initialize custom dropdown event handlers
