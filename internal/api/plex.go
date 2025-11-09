@@ -20,8 +20,10 @@ type PlexClient struct {
 
 // PlexFile represents a file tracked by Plex
 type PlexFile struct {
-	Path string
-	Size int64
+	Path        string
+	Size        int64
+	LibraryName string
+	Title       string
 }
 
 // PlexLibrarySection represents a Plex library section
@@ -109,7 +111,7 @@ func (p *PlexClient) GetAllFiles(ctx context.Context, libraryKeys []string) ([]P
 		}
 
 		log.Printf("Processing Plex section: %s (type: %s, key: %s)", section.Title, section.Type, section.Key)
-		files, err := p.getFilesForSection(ctx, section.Key, section.Type)
+		files, err := p.getFilesForSection(ctx, section.Key, section.Type, section.Title)
 		if err != nil {
 			log.Printf("ERROR: Failed to get files for section %s: %v", section.Title, err)
 			return nil, fmt.Errorf("failed to get files for section %s: %w", section.Title, err)
@@ -230,6 +232,7 @@ func (p *PlexClient) getLibrarySections(ctx context.Context) ([]struct {
 
 type mediaContainerResponse struct {
 	Video []struct {
+		Title string `xml:"title,attr"`
 		Media []struct {
 			Part []struct {
 				File string `xml:"file,attr"`
@@ -238,6 +241,7 @@ type mediaContainerResponse struct {
 		} `xml:"Media"`
 	} `xml:"Video"`
 	Track []struct {
+		Title string `xml:"title,attr"`
 		Media []struct {
 			Part []struct {
 				File string `xml:"file,attr"`
@@ -246,6 +250,7 @@ type mediaContainerResponse struct {
 		} `xml:"Media"`
 	} `xml:"Track"`
 	Photo []struct {
+		Title string `xml:"title,attr"`
 		Media []struct {
 			Part []struct {
 				File string `xml:"file,attr"`
@@ -255,10 +260,10 @@ type mediaContainerResponse struct {
 	} `xml:"Photo"`
 }
 
-func (p *PlexClient) getFilesForSection(ctx context.Context, sectionKey, sectionType string) ([]PlexFile, error) {
+func (p *PlexClient) getFilesForSection(ctx context.Context, sectionKey, sectionType, sectionTitle string) ([]PlexFile, error) {
 	// For TV shows, we need to get episodes using a different endpoint
 	if sectionType == "show" {
-		return p.getFilesForTVSection(ctx, sectionKey)
+		return p.getFilesForTVSection(ctx, sectionKey, sectionTitle)
 	}
 
 	// Build URL with all items in section
@@ -300,8 +305,10 @@ func (p *PlexClient) getFilesForSection(ctx context.Context, sectionKey, section
 			for _, part := range media.Part {
 				if part.File != "" {
 					files = append(files, PlexFile{
-						Path: part.File,
-						Size: part.Size,
+						Path:        part.File,
+						Size:        part.Size,
+						LibraryName: sectionTitle,
+						Title:       video.Title,
 					})
 				}
 			}
@@ -314,8 +321,10 @@ func (p *PlexClient) getFilesForSection(ctx context.Context, sectionKey, section
 			for _, part := range media.Part {
 				if part.File != "" {
 					files = append(files, PlexFile{
-						Path: part.File,
-						Size: part.Size,
+						Path:        part.File,
+						Size:        part.Size,
+						LibraryName: sectionTitle,
+						Title:       track.Title,
 					})
 				}
 			}
@@ -328,8 +337,10 @@ func (p *PlexClient) getFilesForSection(ctx context.Context, sectionKey, section
 			for _, part := range media.Part {
 				if part.File != "" {
 					files = append(files, PlexFile{
-						Path: part.File,
-						Size: part.Size,
+						Path:        part.File,
+						Size:        part.Size,
+						LibraryName: sectionTitle,
+						Title:       photo.Title,
 					})
 				}
 			}
@@ -343,7 +354,7 @@ func (p *PlexClient) getFilesForSection(ctx context.Context, sectionKey, section
 }
 
 // getFilesForTVSection gets all episode files for a TV show library section
-func (p *PlexClient) getFilesForTVSection(ctx context.Context, sectionKey string) ([]PlexFile, error) {
+func (p *PlexClient) getFilesForTVSection(ctx context.Context, sectionKey, sectionTitle string) ([]PlexFile, error) {
 	// For TV shows, we need to query all episodes using type=4 (episodes)
 	u, err := url.Parse(p.baseURL + "/library/sections/" + sectionKey + "/all")
 	if err != nil {
@@ -388,8 +399,10 @@ func (p *PlexClient) getFilesForTVSection(ctx context.Context, sectionKey string
 			for _, part := range media.Part {
 				if part.File != "" {
 					files = append(files, PlexFile{
-						Path: part.File,
-						Size: part.Size,
+						Path:        part.File,
+						Size:        part.Size,
+						LibraryName: sectionTitle,
+						Title:       video.Title,
 					})
 				}
 			}

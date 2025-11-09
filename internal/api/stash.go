@@ -20,13 +20,11 @@ type StashClient struct {
 
 // StashFile represents a file tracked by Stash
 type StashFile struct {
-	Path     string
-	Size     int64
-	SceneID  string
-	Title    string
-	Studio   string
-	Tags     []string
-	PlayCount int
+	Path    string
+	Size    int64
+	SceneID string
+	Title   string
+	Studio  string
 }
 
 // NewStashClient creates a new Stash API client
@@ -165,11 +163,7 @@ func (s *StashClient) getFilesPage(ctx context.Context, page, perPage int) ([]St
 				scenes {
 					id
 					title
-					play_count
 					studio {
-						name
-					}
-					tags {
 						name
 					}
 					files {
@@ -198,15 +192,11 @@ func (s *StashClient) getFilesPage(ctx context.Context, page, perPage int) ([]St
 			FindScenes struct {
 				Count  int `json:"count"`
 				Scenes []struct {
-					ID        string `json:"id"`
-					Title     string `json:"title"`
-					PlayCount int    `json:"play_count"`
-					Studio    *struct {
+					ID     string `json:"id"`
+					Title  string `json:"title"`
+					Studio *struct {
 						Name string `json:"name"`
 					} `json:"studio"`
-					Tags []struct {
-						Name string `json:"name"`
-					} `json:"tags"`
 					Files []struct {
 						Path string `json:"path"`
 						Size int64  `json:"size"`
@@ -229,12 +219,6 @@ func (s *StashClient) getFilesPage(ctx context.Context, page, perPage int) ([]St
 
 	// Process each scene
 	for _, scene := range resp.Data.FindScenes.Scenes {
-		// Collect tag names
-		var tagNames []string
-		for _, tag := range scene.Tags {
-			tagNames = append(tagNames, tag.Name)
-		}
-
 		// Get studio name (if present)
 		studioName := ""
 		if scene.Studio != nil {
@@ -245,13 +229,11 @@ func (s *StashClient) getFilesPage(ctx context.Context, page, perPage int) ([]St
 		for _, file := range scene.Files {
 			if file.Path != "" {
 				files = append(files, StashFile{
-					Path:      file.Path,
-					Size:      file.Size,
-					SceneID:   scene.ID,
-					Title:     scene.Title,
-					Studio:    studioName,
-					Tags:      tagNames,
-					PlayCount: scene.PlayCount,
+					Path:    file.Path,
+					Size:    file.Size,
+					SceneID: scene.ID,
+					Title:   scene.Title,
+					Studio:  studioName,
 				})
 			}
 		}

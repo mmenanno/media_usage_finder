@@ -588,7 +588,11 @@ type plexServiceFile struct{ api.PlexFile }
 
 func (f plexServiceFile) GetPath() string { return f.Path }
 func (f plexServiceFile) GetMetadata() map[string]interface{} {
-	return map[string]interface{}{"size": f.Size}
+	return map[string]interface{}{
+		"size":         f.Size,
+		"library_name": f.LibraryName,
+		"title":        f.Title,
+	}
 }
 
 type sonarrServiceFile struct{ api.SonarrFile }
@@ -596,9 +600,10 @@ type sonarrServiceFile struct{ api.SonarrFile }
 func (f sonarrServiceFile) GetPath() string { return f.Path }
 func (f sonarrServiceFile) GetMetadata() map[string]interface{} {
 	return map[string]interface{}{
-		"series_title":  f.SeriesTitle,
-		"season_number": f.SeasonNumber,
-		"episode_id":    f.EpisodeID,
+		"series_title":   f.SeriesTitle,
+		"season_number":  f.SeasonNumber,
+		"episode_number": f.EpisodeNumber,
+		"episode_id":     f.EpisodeID,
 	}
 }
 
@@ -620,6 +625,8 @@ func (f qbittorrentServiceFile) GetMetadata() map[string]interface{} {
 	return map[string]interface{}{
 		"torrent_hash": f.TorrentHash,
 		"torrent_name": f.TorrentName,
+		"category":     f.Category,
+		"tags":         f.Tags,
 	}
 }
 
@@ -628,11 +635,9 @@ type stashServiceFile struct{ api.StashFile }
 func (f stashServiceFile) GetPath() string { return f.Path }
 func (f stashServiceFile) GetMetadata() map[string]interface{} {
 	return map[string]interface{}{
-		"scene_id":   f.SceneID,
-		"title":      f.Title,
-		"studio":     f.Studio,
-		"tags":       f.Tags,
-		"play_count": f.PlayCount,
+		"scene_id": f.SceneID,
+		"title":    f.Title,
+		"studio":   f.Studio,
 	}
 }
 

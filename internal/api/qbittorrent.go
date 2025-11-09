@@ -32,6 +32,8 @@ type QBittorrentFile struct {
 	Size        int64
 	TorrentHash string
 	TorrentName string
+	Category    string
+	Tags        string
 }
 
 // NewQBittorrentClient creates a new qBittorrent API client
@@ -231,6 +233,8 @@ func (q *QBittorrentClient) GetAllFiles(ctx context.Context) ([]QBittorrentFile,
 						Size:        f.Size,
 						TorrentHash: t.Hash,
 						TorrentName: t.Name,
+						Category:    t.Category,
+						Tags:        t.Tags,
 					})
 				}
 
@@ -291,8 +295,10 @@ func (q *QBittorrentClient) GetSampleFile(pathPrefix string) (string, error) {
 }
 
 type torrentInfo struct {
-	Hash string `json:"hash"`
-	Name string `json:"name"`
+	Hash     string `json:"hash"`
+	Name     string `json:"name"`
+	Category string `json:"category"`
+	Tags     string `json:"tags"`
 }
 
 func (q *QBittorrentClient) getTorrents(ctx context.Context) ([]torrentInfo, error) {

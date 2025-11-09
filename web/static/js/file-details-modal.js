@@ -209,15 +209,59 @@ class FileDetailsModal {
         }
 
         return Object.entries(metadata).map(([key, value]) => {
-            // Format size values (from Plex metadata) as human-readable
-            const displayValue = key === 'size' ? this.formatSize(value) : value;
+            // Format the label with proper capitalization
+            const label = this.formatMetadataLabel(key);
+
+            // Format the value based on type
+            let displayValue;
+            if (key === 'size') {
+                // Format size values as human-readable
+                displayValue = this.formatSize(value);
+            } else if (Array.isArray(value)) {
+                // Format arrays as badge pills
+                if (value.length === 0) {
+                    displayValue = '<span class="text-gray-500 text-xs">None</span>';
+                } else {
+                    displayValue = value.map(item =>
+                        `<span class="px-2 py-1 bg-gray-600 text-gray-200 rounded-full text-xs">${item}</span>`
+                    ).join(' ');
+                }
+            } else if (typeof value === 'string' && value.includes(',')) {
+                // Handle comma-separated strings (like qBittorrent tags) as badges
+                const items = value.split(',').map(s => s.trim()).filter(s => s);
+                if (items.length === 0) {
+                    displayValue = '<span class="text-gray-500 text-xs">None</span>';
+                } else {
+                    displayValue = items.map(item =>
+                        `<span class="px-2 py-1 bg-gray-600 text-gray-200 rounded-full text-xs">${item}</span>`
+                    ).join(' ');
+                }
+            } else if (value === '' || value === null || value === undefined) {
+                // Handle empty values
+                displayValue = '<span class="text-gray-500 text-xs">Not set</span>';
+            } else if (typeof value === 'number' && value === 0 && key.includes('count')) {
+                // Handle zero counts
+                displayValue = '0';
+            } else {
+                // Default string representation
+                displayValue = value;
+            }
+
             return `
-                <div class="flex justify-between">
-                    <span class="text-gray-400 capitalize">${key.replace(/_/g, ' ')}:</span>
-                    <span class="text-gray-200">${displayValue}</span>
+                <div class="flex justify-between items-center gap-4">
+                    <span class="text-gray-400 text-sm flex-shrink-0">${label}:</span>
+                    <span class="text-gray-200 text-sm text-right flex-wrap flex gap-1 justify-end">${displayValue}</span>
                 </div>
             `;
         }).join('');
+    }
+
+    formatMetadataLabel(key) {
+        // Convert snake_case to Title Case with proper handling
+        return key
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
     }
 
     formatServiceName(service) {

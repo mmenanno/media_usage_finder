@@ -14,11 +14,12 @@ type SonarrClient struct {
 
 // SonarrFile represents a file tracked by Sonarr
 type SonarrFile struct {
-	Path         string
-	Size         int64
-	SeriesTitle  string
-	SeasonNumber int
-	EpisodeID    int64
+	Path          string
+	Size          int64
+	SeriesTitle   string
+	SeasonNumber  int
+	EpisodeNumber int
+	EpisodeID     int64
 }
 
 // NewSonarrClient creates a new Sonarr API client
@@ -46,6 +47,25 @@ func (s *SonarrClient) GetAllFiles(ctx context.Context) ([]SonarrFile, error) {
 		default:
 		}
 
+		// Get all episodes for this series to map episode file IDs to episode numbers
+		var episodes []struct {
+			EpisodeFileID int64 `json:"episodeFileId"`
+			EpisodeNumber int   `json:"episodeNumber"`
+		}
+
+		episodesEndpoint := fmt.Sprintf("/api/v3/episode?seriesId=%d", seriesID)
+		if err := s.doRequest(ctx, episodesEndpoint, &episodes); err != nil {
+			return nil, fmt.Errorf("failed to get episodes for series %d: %w", seriesID, err)
+		}
+
+		// Create map of episode file ID to episode number
+		episodeFileToNumber := make(map[int64]int)
+		for _, ep := range episodes {
+			if ep.EpisodeFileID > 0 {
+				episodeFileToNumber[ep.EpisodeFileID] = ep.EpisodeNumber
+			}
+		}
+
 		var episodeFiles []struct {
 			ID           int64  `json:"id"`
 			SeriesID     int64  `json:"seriesId"`
@@ -63,11 +83,12 @@ func (s *SonarrClient) GetAllFiles(ctx context.Context) ([]SonarrFile, error) {
 		// Add all episode files for this series
 		for _, ef := range episodeFiles {
 			files = append(files, SonarrFile{
-				Path:         ef.Path,
-				Size:         ef.Size,
-				SeriesTitle:  seriesTitle,
-				SeasonNumber: ef.SeasonNumber,
-				EpisodeID:    ef.ID,
+				Path:          ef.Path,
+				Size:          ef.Size,
+				SeriesTitle:   seriesTitle,
+				SeasonNumber:  ef.SeasonNumber,
+				EpisodeNumber: episodeFileToNumber[ef.ID], // Will be 0 if not found
+				EpisodeID:     ef.ID,
 			})
 		}
 	}
