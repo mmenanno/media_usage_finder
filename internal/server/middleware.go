@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,18 +26,9 @@ func Logger(next http.Handler) http.Handler {
 
 		next.ServeHTTP(wrapped, r)
 
-		// Skip logging successful health checks to reduce log noise
-		if r.RequestURI == "/health" && wrapped.statusCode == http.StatusOK {
-			return
-		}
-
-		// Skip logging successful progress polling endpoints to reduce log noise
-		if (r.RequestURI == "/api/scan/progress-html" || r.RequestURI == "/api/hash/progress-html") && wrapped.statusCode == http.StatusOK {
-			return
-		}
-
-		// Skip logging successful static asset requests to reduce log noise
-		if strings.HasPrefix(r.RequestURI, "/static/") && wrapped.statusCode >= 200 && wrapped.statusCode < 400 {
+		// Skip logging successful responses (2xx and 3xx) to reduce log noise
+		// Only log client errors (4xx) and server errors (5xx) for debugging
+		if wrapped.statusCode >= 200 && wrapped.statusCode < 400 {
 			return
 		}
 
