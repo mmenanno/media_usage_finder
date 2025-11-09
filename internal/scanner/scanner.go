@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/mmenanno/media-usage-finder/internal/api"
 	"github.com/mmenanno/media-usage-finder/internal/config"
@@ -93,6 +94,149 @@ func (s *Scanner) ForceStop() bool {
 		return true
 	}
 	return false
+}
+
+// RescanFiles rescans specific files immediately
+// This checks if files still exist, updates their metadata, queries all services, and recalculates orphaned status
+func (s *Scanner) RescanFiles(ctx context.Context, paths []string) error {
+	if len(paths) == 0 {
+		return fmt.Errorf("no paths provided for rescan")
+	}
+
+	// Create scan record
+	scan, err := s.db.CreateScan("file_rescan")
+	if err != nil {
+		return fmt.Errorf("failed to create scan record: %w", err)
+	}
+
+	// Create progress tracker
+	s.progress = NewProgress(scan.ID, s.db)
+	s.progress.SetPhase("Validating Files")
+	s.progress.SetTotalFiles(int64(len(paths)))
+	s.progress.Log(fmt.Sprintf("Rescanning %d file(s)...", len(paths)))
+
+	// Track context for cancellation
+	s.scanCtx = ctx
+	defer func() { s.scanCtx = nil }()
+
+	// Store errors
+	var errors []string
+
+	// Validate files and update metadata
+	validPaths := make(map[string]bool)
+	var filesToUpdate []*database.File
+	deletedCount := 0
+
+	for i, path := range paths {
+		s.progress.IncrementFiles(0) // Size will be added when we get file info
+
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			s.progress.Log("Rescan cancelled")
+			s.db.UpdateScanStatus(scan.ID, "interrupted", "")
+			return ctx.Err()
+		default:
+		}
+
+		// Check if file exists and get metadata
+		fileInfo, err := GetFileInfo(path)
+		if err != nil {
+			// File doesn't exist - delete from database
+			s.progress.Log(fmt.Sprintf("File not found, removing from database: %s", path))
+			if delErr := s.db.DeleteFileByPath(path, "File no longer exists", false); delErr != nil {
+				errMsg := fmt.Sprintf("Failed to delete missing file %s: %v", path, delErr)
+				errors = append(errors, errMsg)
+				s.progress.Log(errMsg)
+			} else {
+				deletedCount++
+			}
+			continue
+		}
+
+		// File exists - mark for update
+		validPaths[path] = true
+
+		file := &database.File{
+			Path:         path,
+			Size:         fileInfo.Size,
+			Inode:        fileInfo.Inode,
+			DeviceID:     fileInfo.DeviceID,
+			ModifiedTime: time.Unix(fileInfo.ModifiedTime, 0),
+			ScanID:       scan.ID,
+			Extension:    database.ExtractExtension(path),
+		}
+		filesToUpdate = append(filesToUpdate, file)
+
+		if i < 3 || (i+1)%100 == 0 {
+			s.progress.Log(fmt.Sprintf("Validated %d/%d files", i+1, len(paths)))
+		}
+	}
+
+	s.progress.Log(fmt.Sprintf("Validated files: %d exist, %d removed", len(filesToUpdate), deletedCount))
+
+	// Update files in database
+	if len(filesToUpdate) > 0 {
+		s.progress.SetPhase("Updating File Metadata")
+		if err := s.db.BatchUpsertFiles(ctx, filesToUpdate); err != nil {
+			errMsg := fmt.Sprintf("Failed to update file metadata: %v", err)
+			errors = append(errors, errMsg)
+			s.progress.Log(errMsg)
+		} else {
+			s.progress.Log(fmt.Sprintf("Updated metadata for %d files", len(filesToUpdate)))
+		}
+	}
+
+	// Query all configured services
+	if len(validPaths) > 0 {
+		if err := s.updateAllServicesForPaths(ctx, scan.ID, validPaths); err != nil {
+			errMsg := fmt.Sprintf("Failed to update service usage: %v", err)
+			errors = append(errors, errMsg)
+			s.progress.Log(errMsg)
+		}
+	}
+
+	// Recalculate orphaned status
+	s.progress.SetPhase("Recalculating Orphaned Status")
+	s.progress.Log("Recalculating orphaned file status...")
+	if err := s.db.UpdateOrphanedStatus(ctx); err != nil {
+		errMsg := fmt.Sprintf("Failed to update orphaned status: %v", err)
+		errors = append(errors, errMsg)
+		s.progress.Log(errMsg)
+	} else {
+		s.progress.Log("Orphaned status recalculated")
+	}
+
+	// Update scan status
+	status := "completed"
+	if len(errors) > 0 {
+		status = "completed_with_errors"
+	}
+
+	var errorStr string
+	if len(errors) > 0 {
+		errorStr = serializeErrors(errors)
+	}
+
+	if err := s.db.UpdateScanStatus(scan.ID, status, errorStr); err != nil {
+		log.Printf("Warning: Failed to update scan status: %v", err)
+	}
+
+	if deletedCount > 0 {
+		if err := s.db.UpdateScanDeletedCount(scan.ID, int64(deletedCount)); err != nil {
+			log.Printf("Warning: Failed to update deleted files count: %v", err)
+		}
+	}
+
+	s.progress.SetPhase("Completed")
+	s.progress.Log(fmt.Sprintf("Rescan complete: %d files processed, %d deleted", len(paths), deletedCount))
+
+	// Call completion callback if set
+	if s.onScanComplete != nil {
+		s.onScanComplete()
+	}
+
+	return nil
 }
 
 // Scan performs a full or incremental scan
@@ -812,6 +956,256 @@ func (s *Scanner) updateServiceUsage(ctx context.Context, serviceName string, fi
 	total := len(files)
 	s.progress.Log(fmt.Sprintf("%s: matched %d of %d files (%d not found in filesystem)",
 		serviceName, matched, total, total-matched))
+	return nil
+}
+
+// updateServiceUsageForPaths updates usage for a service, filtering to only specified paths
+// This is used by RescanFiles to update only the rescanned files
+func (s *Scanner) updateServiceUsageForPaths(ctx context.Context, serviceName string, files []serviceFile, pathFilter map[string]bool) error {
+	if len(files) == 0 {
+		log.Printf("%s: No files returned from service", serviceName)
+		return nil
+	}
+
+	log.Printf("%s: Starting filtered update with %d files from service", serviceName, len(files))
+
+	// Delete usage records only for the filtered paths
+	// We need to get file IDs for the paths first
+	paths := make([]string, 0, len(pathFilter))
+	for path := range pathFilter {
+		paths = append(paths, path)
+	}
+
+	dbFilesMap, err := s.db.GetFilesByPaths(ctx, paths)
+	if err != nil {
+		return fmt.Errorf("failed to get files for deletion: %w", err)
+	}
+
+	// Delete existing usage records for these specific files and service
+	for _, dbFile := range dbFilesMap {
+		// Delete only for this service and file
+		if _, err := s.db.Conn().Exec("DELETE FROM usage WHERE file_id = ? AND service = ?", dbFile.ID, serviceName); err != nil {
+			log.Printf("Warning: Failed to delete usage for file ID %d: %v", dbFile.ID, err)
+		}
+	}
+
+	log.Printf("%s: Cleared old usage records for %d files", serviceName, len(dbFilesMap))
+
+	// Translate all paths and collect for batch lookup - filter to only paths we care about
+	hostPaths := make([]string, 0)
+	pathToFile := make(map[string]serviceFile)
+
+	for _, file := range files {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		originalPath := file.GetPath()
+		hostPath := s.config.TranslatePathToHost(originalPath, serviceName)
+
+		// Only include if this path is in our filter
+		if pathFilter[hostPath] {
+			hostPaths = append(hostPaths, hostPath)
+			pathToFile[hostPath] = file
+		}
+	}
+
+	if len(hostPaths) == 0 {
+		log.Printf("%s: No files matched the path filter", serviceName)
+		return nil
+	}
+
+	log.Printf("%s: Filtered to %d paths, querying database...", serviceName, len(hostPaths))
+
+	// Batch load filtered files from database
+	dbFiles, err := s.db.GetFilesByPaths(ctx, hostPaths)
+	if err != nil {
+		return fmt.Errorf("failed to batch load files: %w", err)
+	}
+
+	log.Printf("%s: Found %d files in database out of %d filtered", serviceName, len(dbFiles), len(hostPaths))
+
+	// Collect usage records
+	var usages []*database.Usage
+	notFoundCount := 0
+	for hostPath, file := range pathToFile {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		dbFile, ok := dbFiles[hostPath]
+		if !ok {
+			log.Printf("%s: File not in database (may have been deleted): %s", serviceName, hostPath)
+			notFoundCount++
+			continue
+		}
+
+		usages = append(usages, &database.Usage{
+			FileID:        dbFile.ID,
+			Service:       serviceName,
+			ReferencePath: file.GetPath(),
+			Metadata:      file.GetMetadata(),
+		})
+	}
+
+	log.Printf("%s: Created %d usage records (%d files not found in database)", serviceName, len(usages), notFoundCount)
+
+	// Batch insert all usage records
+	if len(usages) > 0 {
+		if err := s.db.BatchUpsertUsage(ctx, usages); err != nil {
+			return fmt.Errorf("failed to batch insert %s usage: %w", serviceName, err)
+		}
+		log.Printf("%s: Successfully inserted %d usage records", serviceName, len(usages))
+	}
+
+	matched := len(usages)
+	total := len(pathToFile)
+	s.progress.Log(fmt.Sprintf("%s: matched %d of %d filtered files",
+		serviceName, matched, total))
+	return nil
+}
+
+// updateAllServicesForPaths queries all configured services and updates usage for specific paths only
+// This is used by RescanFiles to avoid querying all files from services
+func (s *Scanner) updateAllServicesForPaths(ctx context.Context, scanID int64, pathFilter map[string]bool) error {
+	// Count configured services for progress tracking
+	totalServices := 0
+	if s.config.Services.Plex.URL != "" {
+		totalServices++
+	}
+	if s.config.Services.Sonarr.URL != "" {
+		totalServices++
+	}
+	if s.config.Services.Radarr.URL != "" {
+		totalServices++
+	}
+	if s.config.Services.QBittorrent.URL != "" || s.config.Services.QBittorrent.QuiProxyURL != "" {
+		totalServices++
+	}
+	if s.config.Services.Stash.URL != "" {
+		totalServices++
+	}
+
+	if totalServices == 0 {
+		s.progress.Log("No services configured, skipping service updates")
+		return nil
+	}
+
+	currentService := 0
+	s.progress.SetPhase(fmt.Sprintf("Querying %d Services", totalServices))
+
+	// Update Plex if configured
+	if s.config.Services.Plex.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.progress.Log("Querying Plex for tracked files...")
+
+		client := api.NewPlexClient(s.config.Services.Plex.URL, s.config.Services.Plex.Token, s.config.APITimeout)
+		plexFiles, err := client.GetAllFiles(ctx, s.config.Services.Plex.Libraries)
+		if err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to query Plex: %v", err))
+		} else {
+			wrappedFiles := make([]serviceFile, len(plexFiles))
+			for i, f := range plexFiles {
+				wrappedFiles[i] = plexServiceFile{f}
+			}
+			if err := s.updateServiceUsageForPaths(ctx, "plex", wrappedFiles, pathFilter); err != nil {
+				s.progress.Log(fmt.Sprintf("Warning: Failed to update Plex usage: %v", err))
+			}
+		}
+	}
+
+	// Update Sonarr if configured
+	if s.config.Services.Sonarr.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.progress.Log("Querying Sonarr for tracked files...")
+
+		client := api.NewSonarrClient(s.config.Services.Sonarr.URL, s.config.Services.Sonarr.APIKey, s.config.APITimeout)
+		sonarrFiles, err := client.GetAllFiles(ctx)
+		if err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to query Sonarr: %v", err))
+		} else {
+			wrappedFiles := make([]serviceFile, len(sonarrFiles))
+			for i, f := range sonarrFiles {
+				wrappedFiles[i] = sonarrServiceFile{f}
+			}
+			if err := s.updateServiceUsageForPaths(ctx, "sonarr", wrappedFiles, pathFilter); err != nil {
+				s.progress.Log(fmt.Sprintf("Warning: Failed to update Sonarr usage: %v", err))
+			}
+		}
+	}
+
+	// Update Radarr if configured
+	if s.config.Services.Radarr.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.progress.Log("Querying Radarr for tracked files...")
+
+		client := api.NewRadarrClient(s.config.Services.Radarr.URL, s.config.Services.Radarr.APIKey, s.config.APITimeout)
+		radarrFiles, err := client.GetAllFiles(ctx)
+		if err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to query Radarr: %v", err))
+		} else {
+			wrappedFiles := make([]serviceFile, len(radarrFiles))
+			for i, f := range radarrFiles {
+				wrappedFiles[i] = radarrServiceFile{f}
+			}
+			if err := s.updateServiceUsageForPaths(ctx, "radarr", wrappedFiles, pathFilter); err != nil {
+				s.progress.Log(fmt.Sprintf("Warning: Failed to update Radarr usage: %v", err))
+			}
+		}
+	}
+
+	// Update qBittorrent if configured
+	if s.config.Services.QBittorrent.URL != "" || s.config.Services.QBittorrent.QuiProxyURL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.progress.Log("Querying qBittorrent for tracked files...")
+
+		client := api.NewQBittorrentClient(s.config.Services.QBittorrent.URL, s.config.Services.QBittorrent.QuiProxyURL, s.config.Services.QBittorrent.Username, s.config.Services.QBittorrent.Password, s.config.APITimeout)
+		qbtFiles, err := client.GetAllFiles(ctx)
+		if err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to query qBittorrent: %v", err))
+		} else {
+			wrappedFiles := make([]serviceFile, len(qbtFiles))
+			for i, f := range qbtFiles {
+				wrappedFiles[i] = qbittorrentServiceFile{f}
+			}
+			if err := s.updateServiceUsageForPaths(ctx, "qbittorrent", wrappedFiles, pathFilter); err != nil {
+				s.progress.Log(fmt.Sprintf("Warning: Failed to update qBittorrent usage: %v", err))
+			}
+		}
+	}
+
+	// Update Stash if configured
+	if s.config.Services.Stash.URL != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.progress.Log("Querying Stash for tracked files...")
+
+		client := api.NewStashClient(s.config.Services.Stash.URL, s.config.Services.Stash.APIKey, s.config.APITimeout)
+		stashFiles, err := client.GetAllFiles(ctx)
+		if err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to query Stash: %v", err))
+		} else {
+			wrappedFiles := make([]serviceFile, len(stashFiles))
+			for i, f := range stashFiles {
+				wrappedFiles[i] = stashServiceFile{f}
+			}
+			if err := s.updateServiceUsageForPaths(ctx, "stash", wrappedFiles, pathFilter); err != nil {
+				s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+			}
+		}
+	}
+
+	s.progress.Log(fmt.Sprintf("Completed querying %d services", totalServices))
 	return nil
 }
 

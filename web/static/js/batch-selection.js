@@ -254,11 +254,11 @@ class BatchSelection {
                     <div class="flex space-x-3">
                         <button
                             id="bulk-rescan-btn"
-                            onclick="batchSelection.markSelectedForRescan()"
-                            aria-label="Mark selected files for rescan"
+                            onclick="batchSelection.rescanSelected()"
+                            aria-label="Rescan selected files now"
                             class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-2">
                             <span class="bulk-rescan-icon"></span>
-                            <span>Mark for Rescan</span>
+                            <span>Rescan Selected</span>
                         </button>
                         <button
                             id="bulk-delete-btn"
@@ -321,12 +321,12 @@ class BatchSelection {
         this.updateUI();
     }
 
-    async markSelectedForRescan() {
+    async rescanSelected() {
         if (this.selectedFiles.size === 0) return;
 
         const confirmed = await window.confirmDialog(
-            `Mark ${this.selectedFiles.size} files for rescan?`,
-            'Mark for Rescan'
+            `Rescan ${this.selectedFiles.size} selected file(s) now?`,
+            'Rescan Files'
         );
 
         if (!confirmed) {
@@ -334,22 +334,22 @@ class BatchSelection {
         }
 
         // Show loading state and disable buttons
-        this.setLoadingState(true, 'Marking files for rescan...');
+        this.setLoadingState(true, 'Rescanning files...');
         this.setButtonsDisabled(true);
-        window.showToast && window.showToast('Marking files for rescan...', 'info');
+        window.showToast && window.showToast('Rescanning files...', 'info');
 
         try {
             // Use batched concurrent requests to avoid overwhelming the server
             const fileIds = Array.from(this.selectedFiles);
             await this.batchOperation(fileIds, async (fileId) => {
-                const response = await fetch(`/api/files/mark-rescan?id=${fileId}`, { method: 'POST' });
+                const response = await fetch(`/api/files/rescan?id=${fileId}`, { method: 'POST' });
                 if (!response.ok) throw new Error(`Failed for file ${fileId}`);
             }, 10); // Process 10 at a time
 
-            window.showToast && window.showToast(`Marked ${this.selectedFiles.size} files for rescan`, 'success');
+            window.showToast && window.showToast(`Rescanning ${this.selectedFiles.size} file(s)`, 'success');
             this.clearSelection();
         } catch (error) {
-            window.showToast && window.showToast('Failed to mark some files for rescan', 'error');
+            window.showToast && window.showToast('Failed to rescan some files', 'error');
         } finally {
             this.setLoadingState(false);
             this.setButtonsDisabled(false);

@@ -165,11 +165,11 @@ class FileDetailsModal {
                     <div class="bg-gray-700 px-6 py-4 flex justify-between items-center border-t border-gray-600">
                         <div class="flex space-x-2">
                             <button
-                                hx-post="/api/files/mark-rescan?id=${fileData.id}"
+                                hx-post="/api/files/rescan?id=${fileData.id}"
                                 hx-swap="none"
                                 class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition flex items-center gap-2">
                                 ${Icons.get('refresh', 5)}
-                                <span>Mark for Rescan</span>
+                                <span>Rescan Now</span>
                             </button>
                             <button
                                 hx-delete="/api/files/delete?id=${fileData.id}"

@@ -127,14 +127,7 @@ orphaned files and optimizes storage through hardlink detection.`,
 	exportCmd.Flags().StringP("format", "f", "json", "Output format (json, csv)")
 	exportCmd.Flags().StringP("output", "O", "", "Output file (default: stdout)")
 
-	// Mark-rescan command
-	markRescanCmd := &cobra.Command{
-		Use:   "mark-rescan",
-		Short: "Mark files for rescan",
-		RunE:  runMarkRescan,
-	}
-	markRescanCmd.Flags().StringP("filter", "f", "", "SQL WHERE clause filter (e.g., \"path LIKE '%season%'\")")
-	markRescanCmd.Flags().BoolP("orphaned", "o", false, "Mark all orphaned files for rescan")
+	// Note: mark-rescan command removed in v0.58.0 - use web UI for file rescans
 
 	// Delete command
 	deleteCmd := &cobra.Command{
@@ -166,7 +159,7 @@ orphaned files and optimizes storage through hardlink detection.`,
 
 	configCmd.AddCommand(configValidateCmd, configShowCmd)
 
-	rootCmd.AddCommand(serveCmd, scanCmd, diskScanCmd, statsCmd, exportCmd, markRescanCmd, deleteCmd, configCmd)
+	rootCmd.AddCommand(serveCmd, scanCmd, diskScanCmd, statsCmd, exportCmd, deleteCmd, configCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -331,33 +324,9 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runMarkRescan(cmd *cobra.Command, args []string) error {
-	filter, _ := cmd.Flags().GetString("filter")
-	orphaned, _ := cmd.Flags().GetBool("orphaned")
-
-	if filter == "" && !orphaned {
-		return fmt.Errorf("must specify either --filter or --orphaned")
-	}
-
-	var filterType string
-	if orphaned {
-		filterType = "orphaned"
-	} else if filter == "" {
-		return fmt.Errorf("filter is required when --orphaned is not specified")
-	} else {
-		// For CLI, we only support predefined filters for safety
-		// Could extend this with more specific filter types if needed
-		return fmt.Errorf("custom filters not supported via CLI for security. Use --orphaned flag")
-	}
-
-	count, err := db.MarkFilesForRescan(filterType)
-	if err != nil {
-		return fmt.Errorf("failed to mark files for rescan: %w", err)
-	}
-
-	log.Printf("Marked %d files for rescan", count)
-	return nil
-}
+// Note: mark-rescan CLI command was removed in v0.58.0
+// The feature was changed to an active "rescan now" feature accessible via the web UI
+// Files are no longer marked for rescan but are instead rescanned immediately
 
 func runDelete(cmd *cobra.Command, args []string) error {
 	path, _ := cmd.Flags().GetString("path")

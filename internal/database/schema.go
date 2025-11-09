@@ -645,3 +645,43 @@ CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
 CREATE INDEX idx_audit_log_action ON audit_log(action);
 CREATE INDEX idx_audit_log_scan_id ON audit_log(scan_id);
 `
+
+// Migration to add 'file_rescan' scan type to scans table CHECK constraint
+const migrateAddFileRescanToScanType = `
+-- Drop scans_new if it exists from a previous failed migration
+DROP TABLE IF EXISTS scans_new;
+
+-- Create new scans table with updated CHECK constraint
+CREATE TABLE scans_new (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	started_at INTEGER NOT NULL,
+	completed_at INTEGER,
+	status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed', 'interrupted', 'completed_with_errors')),
+	files_scanned INTEGER NOT NULL DEFAULT 0,
+	errors TEXT,
+	scan_type TEXT NOT NULL DEFAULT 'full' CHECK(scan_type IN ('full', 'incremental', 'disk_location', 'service_update_all', 'service_update_plex', 'service_update_sonarr', 'service_update_radarr', 'service_update_qbittorrent', 'service_update_stash', 'hash_scan', 'cleanup', 'file_rescan')),
+	current_phase TEXT,
+	last_processed_path TEXT,
+	resume_from_scan_id INTEGER,
+	deleted_files_count INTEGER DEFAULT 0,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (resume_from_scan_id) REFERENCES scans(id)
+);
+
+-- Copy data from old table (use COALESCE to handle NULL values)
+INSERT INTO scans_new (id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, last_processed_path, resume_from_scan_id, deleted_files_count, created_at)
+SELECT id, started_at, completed_at, status, files_scanned, errors, scan_type, current_phase, last_processed_path, resume_from_scan_id, COALESCE(deleted_files_count, 0), COALESCE(created_at, started_at)
+FROM scans;
+
+-- Drop old table and indexes
+DROP INDEX IF EXISTS idx_scans_status;
+DROP INDEX IF EXISTS idx_scans_started_at;
+DROP TABLE scans;
+
+-- Rename new table
+ALTER TABLE scans_new RENAME TO scans;
+
+-- Recreate indexes
+CREATE INDEX idx_scans_status ON scans(status);
+CREATE INDEX idx_scans_started_at ON scans(started_at);
+`

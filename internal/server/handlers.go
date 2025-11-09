@@ -3401,8 +3401,8 @@ func (s *Server) HandleFileDetails(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// HandleMarkRescan marks files for rescan
-func (s *Server) HandleMarkRescan(w http.ResponseWriter, r *http.Request) {
+// HandleRescanFiles rescans specific files immediately
+func (s *Server) HandleRescanFiles(w http.ResponseWriter, r *http.Request) {
 	if !requireMethod(w, r, http.MethodPost) {
 		return
 	}
@@ -3410,7 +3410,10 @@ func (s *Server) HandleMarkRescan(w http.ResponseWriter, r *http.Request) {
 	fileIDStr := r.URL.Query().Get("id")
 	orphaned := r.URL.Query().Get("orphaned") == "true"
 
-	// Single file by ID (safe from SQL injection)
+	var paths []string
+	var count int64
+
+	// Single file by ID
 	if fileIDStr != "" {
 		fileID, err := strconv.ParseInt(fileIDStr, 10, 64)
 		if err != nil {
@@ -3418,44 +3421,78 @@ func (s *Server) HandleMarkRescan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if err := s.db.MarkFileForRescan(fileID); err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to mark file for rescan", "rescan_failed")
-			return
-		}
-
-		w.Header().Set("X-Toast-Message", "Marked for rescan")
-		w.Header().Set("X-Toast-Type", "success")
-
-		response := BulkRescanResponse{
-			Status:  "success",
-			Message: "File marked for rescan",
-			Count:   1,
-		}
-		respondJSON(w, http.StatusOK, response)
-		return
-	}
-
-	// Bulk orphaned files
-	if orphaned {
-		count, err := s.db.MarkFilesForRescan("orphaned")
+		// Get file path from database
+		file, err := s.db.GetFileByID(fileID)
 		if err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to mark files for rescan", "rescan_failed")
+			respondError(w, http.StatusInternalServerError, "Failed to get file", "file_not_found")
 			return
 		}
 
-		w.Header().Set("X-Toast-Message", fmt.Sprintf("Marked %d files for rescan", count))
-		w.Header().Set("X-Toast-Type", "success")
-
-		response := BulkRescanResponse{
-			Status:  "success",
-			Message: "Files marked for rescan",
-			Count:   count,
+		paths = []string{file.Path}
+		count = 1
+	} else if orphaned {
+		// Query orphaned file paths directly
+		rows, err := s.db.Conn().Query("SELECT path FROM files WHERE is_orphaned = 1")
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to get orphaned files", "query_failed")
+			return
 		}
-		respondJSON(w, http.StatusOK, response)
+		defer rows.Close()
+
+		for rows.Next() {
+			var path string
+			if err := rows.Scan(&path); err != nil {
+				log.Printf("Warning: Failed to scan orphaned file path: %v", err)
+				continue
+			}
+			paths = append(paths, path)
+		}
+
+		if err := rows.Err(); err != nil {
+			respondError(w, http.StatusInternalServerError, "Failed to read orphaned files", "query_failed")
+			return
+		}
+
+		count = int64(len(paths))
+
+		if count == 0 {
+			w.Header().Set("X-Toast-Message", "No orphaned files to rescan")
+			w.Header().Set("X-Toast-Type", "info")
+			response := BulkRescanResponse{
+				Status:  "success",
+				Message: "No orphaned files to rescan",
+				Count:   0,
+			}
+			respondJSON(w, http.StatusOK, response)
+			return
+		}
+	} else {
+		respondError(w, http.StatusBadRequest, "Must specify file ID or orphaned flag", "missing_parameter")
 		return
 	}
 
-	respondError(w, http.StatusBadRequest, "Must specify file ID or orphaned flag", "missing_parameter")
+	// Launch rescan in background goroutine
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Hour)
+		defer cancel()
+
+		if err := s.scanner.RescanFiles(ctx, paths); err != nil {
+			log.Printf("ERROR: Rescan failed: %v", err)
+		} else {
+			log.Printf("INFO: Rescan completed successfully for %d file(s)", len(paths))
+		}
+	}()
+
+	// Return immediately
+	w.Header().Set("X-Toast-Message", fmt.Sprintf("Rescanning %d file(s)...", count))
+	w.Header().Set("X-Toast-Type", "info")
+
+	response := BulkRescanResponse{
+		Status:  "success",
+		Message: fmt.Sprintf("Rescan started for %d file(s)", count),
+		Count:   count,
+	}
+	respondJSON(w, http.StatusOK, response)
 }
 
 // Admin/Advanced page handlers

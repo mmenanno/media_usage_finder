@@ -633,6 +633,58 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 15: Update scans table CHECK constraint to include 'file_rescan'
+	// Test if migration is needed by trying to insert a test record with scan_type='file_rescan'
+	needsFileRescanScanTypeMigration := false
+
+	// Start a transaction for the test
+	tx15, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction for file_rescan scan_type migration check: %w", err)
+	}
+	defer tx15.Rollback()
+
+	// Try to insert a test record with scan_type='file_rescan'
+	_, err = tx15.Exec(`
+		INSERT INTO scans (started_at, status, scan_type)
+		VALUES (?, 'completed', 'file_rescan')
+	`, time.Now().Unix())
+
+	if err != nil {
+		// Check if the error is a CHECK constraint failure
+		if strings.Contains(err.Error(), "CHECK constraint failed") {
+			needsFileRescanScanTypeMigration = true
+		}
+	} else {
+		// If insert succeeded, delete the test record
+		_, _ = tx15.Exec(`DELETE FROM scans WHERE scan_type = 'file_rescan'`)
+	}
+
+	// Rollback the test transaction
+	tx15.Rollback()
+
+	// Run migration if needed
+	if needsFileRescanScanTypeMigration {
+		// Disable foreign key constraints for migration
+		_, err = db.conn.Exec("PRAGMA foreign_keys = OFF")
+		if err != nil {
+			return fmt.Errorf("failed to disable foreign keys for file_rescan scan_type migration: %w", err)
+		}
+
+		_, err = db.conn.Exec(migrateAddFileRescanToScanType)
+		if err != nil {
+			// Re-enable foreign keys before returning error
+			db.conn.Exec("PRAGMA foreign_keys = ON")
+			return fmt.Errorf("failed to update scans table CHECK constraint for file_rescan: %w", err)
+		}
+
+		// Re-enable foreign key constraints
+		_, err = db.conn.Exec("PRAGMA foreign_keys = ON")
+		if err != nil {
+			return fmt.Errorf("failed to re-enable foreign keys after file_rescan scan_type migration: %w", err)
+		}
+	}
+
 	return nil
 }
 

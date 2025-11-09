@@ -78,7 +78,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/files/extensions", s.HandleGetFileExtensions)
 	mux.HandleFunc("/api/files/delete", s.HandleDeleteFile)
 	mux.HandleFunc("/api/files/batch-delete", s.HandleBatchDeleteFiles)
-	mux.HandleFunc("/api/files/mark-rescan", s.HandleMarkRescan)
+	mux.HandleFunc("/api/files/rescan", s.HandleRescanFiles)
 
 	// Admin API routes
 	mux.HandleFunc("/api/admin/clear-files", s.HandleAdminClearFiles)
