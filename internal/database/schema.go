@@ -99,15 +99,12 @@ CREATE TABLE IF NOT EXISTS audit_log (
 	action TEXT NOT NULL CHECK(action IN ('delete', 'mark_rescan', 'config_change', 'consolidate', 'hardlink', 'cleanup', 'delete_failed')),
 	entity_type TEXT NOT NULL,
 	entity_id INTEGER,
-	scan_id INTEGER,
 	details TEXT,
-	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-	FOREIGN KEY (scan_id) REFERENCES scans(id)
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
-CREATE INDEX IF NOT EXISTS idx_audit_log_scan_id ON audit_log(scan_id);
 
 -- Scan logs table for persistent logging of scan activity
 CREATE TABLE IF NOT EXISTS scan_logs (
