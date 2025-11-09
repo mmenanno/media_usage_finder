@@ -2531,6 +2531,19 @@ func (db *DB) CountFilesMissingDiskLocations() (int64, error) {
 	return count, nil
 }
 
+// CountFileDiskLocations returns the total count of file disk location records
+func (db *DB) CountFileDiskLocations() (int64, error) {
+	query := `SELECT COUNT(*) FROM file_disk_locations`
+
+	var count int64
+	err := db.conn.QueryRow(query).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 // GetFilesWithMultipleDiskLocations returns files that exist on multiple disks (cross-disk duplicates)
 func (db *DB) GetFilesWithMultipleDiskLocations() ([]*File, error) {
 	query := `

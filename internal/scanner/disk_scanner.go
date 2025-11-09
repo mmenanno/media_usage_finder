@@ -58,8 +58,19 @@ func (ds *DiskScanner) ScanDiskLocations() error {
 		return fmt.Errorf("failed to load file cache: %w", err)
 	}
 
-	// Set total files for progress tracking
-	ds.progress.SetTotalFiles(int64(ds.fileCacheSize))
+	// Set total files for progress tracking based on existing disk locations
+	// This gives a more accurate estimate for re-scans
+	// Fall back to file count if no disk locations exist yet (first scan)
+	existingLocations, err := ds.db.CountFileDiskLocations()
+	if err != nil {
+		return fmt.Errorf("failed to count existing disk locations: %w", err)
+	}
+	if existingLocations > 0 {
+		ds.progress.SetTotalFiles(existingLocations)
+	} else {
+		// First scan - use total file count as estimate
+		ds.progress.SetTotalFiles(int64(ds.fileCacheSize))
+	}
 
 	// Get worker count from config (default: 5)
 	workers := 5
