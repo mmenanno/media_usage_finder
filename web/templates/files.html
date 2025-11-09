@@ -282,20 +282,20 @@
                     <tr role="row">
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             {{if and (eq .OrderBy "path") (eq .Direction "asc")}}
-                            <a href="/files?order=path&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200"
+                            <a href="/files?order=path&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Devices}}&devices={{range $i, $dev := .Devices}}{{if $i}},{{end}}{{$dev}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                               class="inline-block hover:text-gray-200"
                                aria-label="Sort by path descending">
                                 Path ↑
                             </a>
                             {{else if and (eq .OrderBy "path") (eq .Direction "desc")}}
-                            <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200"
+                            <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Devices}}&devices={{range $i, $dev := .Devices}}{{if $i}},{{end}}{{$dev}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                               class="inline-block hover:text-gray-200"
                                aria-label="Sort by path ascending">
                                 Path ↓
                             </a>
                             {{else}}
-                            <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200"
+                            <a href="/files?order=path&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Devices}}&devices={{range $i, $dev := .Devices}}{{if $i}},{{end}}{{$dev}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                               class="inline-block hover:text-gray-200"
                                aria-label="Sort by path">
                                 Path
                             </a>
@@ -303,20 +303,20 @@
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                             {{if and (eq .OrderBy "size") (eq .Direction "asc")}}
-                            <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200"
+                            <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Devices}}&devices={{range $i, $dev := .Devices}}{{if $i}},{{end}}{{$dev}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                               class="inline-block hover:text-gray-200"
                                aria-label="Sort by size descending">
                                 Size ↑
                             </a>
                             {{else if and (eq .OrderBy "size") (eq .Direction "desc")}}
-                            <a href="/files?order=size&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200"
+                            <a href="/files?order=size&direction=asc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Devices}}&devices={{range $i, $dev := .Devices}}{{if $i}},{{end}}{{$dev}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                               class="inline-block hover:text-gray-200"
                                aria-label="Sort by size ascending">
                                 Size ↓
                             </a>
                             {{else}}
-                            <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}"
-                               class="hover:text-gray-200"
+                            <a href="/files?order=size&direction=desc&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Devices}}&devices={{range $i, $dev := .Devices}}{{if $i}},{{end}}{{$dev}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}"
+                               class="inline-block hover:text-gray-200"
                                aria-label="Sort by size">
                                 Size
                             </a>
