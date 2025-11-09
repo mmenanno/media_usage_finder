@@ -560,6 +560,11 @@
                     clonedRows.forEach(row => htmx.process(row));
                 }
 
+                // Re-inject icons for new rows
+                if (window.injectFileIcons) {
+                    window.injectFileIcons();
+                }
+
                 // Update current page
                 currentPage = nextPage;
                 updatePageDisplay();
@@ -1051,7 +1056,7 @@
 
     <script>
         // Inject icons from centralized Icons object
-        document.addEventListener('DOMContentLoaded', function() {
+        window.injectFileIcons = function() {
             // Filter buttons
             const applyIcon = document.getElementById('apply-filters-icon');
             const clearIcon = document.getElementById('clear-filters-icon');
@@ -1072,6 +1077,17 @@
             const exportCsvIcon = document.getElementById('export-csv-icon');
             if (exportJsonIcon) exportJsonIcon.innerHTML = Icons.get('download', 5);
             if (exportCsvIcon) exportCsvIcon.innerHTML = Icons.get('download', 5);
+        };
+
+        // Initial icon injection on page load
+        document.addEventListener('DOMContentLoaded', window.injectFileIcons);
+
+        // Re-inject icons after HTMX swaps content (for search/filter updates)
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            // Only re-inject if the swap target is the files table
+            if (evt.detail.target.id === 'files-table') {
+                window.injectFileIcons();
+            }
         });
     </script>
 </div>
