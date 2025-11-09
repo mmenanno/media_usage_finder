@@ -3408,6 +3408,7 @@ func (s *Server) HandleRescanFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fileIDStr := r.URL.Query().Get("id")
+	fileIDsStr := r.URL.Query().Get("ids")
 	orphaned := r.URL.Query().Get("orphaned") == "true"
 
 	var paths []string
@@ -3430,6 +3431,36 @@ func (s *Server) HandleRescanFiles(w http.ResponseWriter, r *http.Request) {
 
 		paths = []string{file.Path}
 		count = 1
+	} else if fileIDsStr != "" {
+		// Multiple files by IDs (comma-separated)
+		idStrings := strings.Split(fileIDsStr, ",")
+		for _, idStr := range idStrings {
+			idStr = strings.TrimSpace(idStr)
+			if idStr == "" {
+				continue
+			}
+
+			fileID, err := strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid file ID: %s", idStr), "invalid_file_id")
+				return
+			}
+
+			file, err := s.db.GetFileByID(fileID)
+			if err != nil {
+				log.Printf("Warning: Failed to get file ID %d: %v", fileID, err)
+				continue
+			}
+
+			paths = append(paths, file.Path)
+		}
+
+		count = int64(len(paths))
+
+		if count == 0 {
+			respondError(w, http.StatusBadRequest, "No valid file IDs provided", "no_files")
+			return
+		}
 	} else if orphaned {
 		// Query orphaned file paths directly
 		rows, err := s.db.Conn().Query("SELECT path FROM files WHERE is_orphaned = 1")
@@ -3467,7 +3498,7 @@ func (s *Server) HandleRescanFiles(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		respondError(w, http.StatusBadRequest, "Must specify file ID or orphaned flag", "missing_parameter")
+		respondError(w, http.StatusBadRequest, "Must specify file ID(s) or orphaned flag", "missing_parameter")
 		return
 	}
 

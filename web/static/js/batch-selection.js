@@ -339,17 +339,22 @@ class BatchSelection {
         window.showToast && window.showToast('Rescanning files...', 'info');
 
         try {
-            // Use batched concurrent requests to avoid overwhelming the server
+            // Send all file IDs in a single bulk request
             const fileIds = Array.from(this.selectedFiles);
-            await this.batchOperation(fileIds, async (fileId) => {
-                const response = await fetch(`/api/files/rescan?id=${fileId}`, { method: 'POST' });
-                if (!response.ok) throw new Error(`Failed for file ${fileId}`);
-            }, 10); // Process 10 at a time
+            const idsParam = fileIds.join(',');
 
-            window.showToast && window.showToast(`Rescanning ${this.selectedFiles.size} file(s)`, 'success');
+            const response = await fetch(`/api/files/rescan?ids=${encodeURIComponent(idsParam)}`, {
+                method: 'POST'
+            });
+
+            if (!response.ok) {
+                throw new Error('Rescan request failed');
+            }
+
+            window.showToast && window.showToast(`Rescanning ${this.selectedFiles.size} file(s)...`, 'success');
             this.clearSelection();
         } catch (error) {
-            window.showToast && window.showToast('Failed to rescan some files', 'error');
+            window.showToast && window.showToast('Failed to start rescan', 'error');
         } finally {
             this.setLoadingState(false);
             this.setButtonsDisabled(false);
