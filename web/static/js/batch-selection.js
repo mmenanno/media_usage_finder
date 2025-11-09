@@ -9,9 +9,15 @@ class BatchSelection {
     }
 
     setupEventListeners() {
-        document.addEventListener('DOMContentLoaded', () => {
+        // Initialize immediately if DOM is already loaded, otherwise wait for event
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.init();
+            });
+        } else {
+            // DOM is already loaded (since this script loads at end of body)
             this.init();
-        });
+        }
 
         // Listen for table updates (HTMX swaps)
         document.body.addEventListener('htmx:afterSwap', (event) => {
@@ -247,16 +253,20 @@ class BatchSelection {
                     </div>
                     <div class="flex space-x-3">
                         <button
+                            id="bulk-rescan-btn"
                             onclick="batchSelection.markSelectedForRescan()"
                             aria-label="Mark selected files for rescan"
-                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            Mark for Rescan
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center space-x-2">
+                            <span class="bulk-rescan-icon"></span>
+                            <span>Mark for Rescan</span>
                         </button>
                         <button
+                            id="bulk-delete-btn"
                             onclick="batchSelection.deleteSelected()"
                             aria-label="Delete selected files"
-                            class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition focus:outline-none focus:ring-2 focus:ring-red-500">
-                            Delete Selected
+                            class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition focus:outline-none focus:ring-2 focus:ring-red-500 flex items-center space-x-2">
+                            <span class="bulk-delete-icon"></span>
+                            <span>Delete Selected</span>
                         </button>
                     </div>
                 </div>
@@ -264,6 +274,14 @@ class BatchSelection {
         `;
 
         document.body.appendChild(toolbar);
+
+        // Inject icons after toolbar is in DOM
+        if (window.Icons) {
+            const rescanIcon = toolbar.querySelector('.bulk-rescan-icon');
+            const deleteIcon = toolbar.querySelector('.bulk-delete-icon');
+            if (rescanIcon) rescanIcon.innerHTML = Icons.get('refresh', 5);
+            if (deleteIcon) deleteIcon.innerHTML = Icons.get('trash', 5);
+        }
     }
 
     updateUI() {
@@ -288,9 +306,9 @@ class BatchSelection {
             }
 
             if (count > 0) {
-                toolbar.style.transform = 'translateY(0)';
+                toolbar.style.translate = '0 0';
             } else {
-                toolbar.style.transform = 'translateY(100%)';
+                toolbar.style.translate = '0 100%';
             }
         }
     }
@@ -306,7 +324,7 @@ class BatchSelection {
     async markSelectedForRescan() {
         if (this.selectedFiles.size === 0) return;
 
-        const confirmed = await window.showConfirm(
+        const confirmed = await window.confirmDialog(
             `Mark ${this.selectedFiles.size} files for rescan?`,
             'Mark for Rescan'
         );
@@ -341,7 +359,7 @@ class BatchSelection {
     async deleteSelected() {
         if (this.selectedFiles.size === 0) return;
 
-        const confirmed = await window.showConfirm(
+        const confirmed = await window.confirmDialog(
             `Are you ABSOLUTELY SURE you want to delete ${this.selectedFiles.size} files? This CANNOT be undone!`,
             'Delete Files'
         );
