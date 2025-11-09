@@ -1,11 +1,9 @@
-// Search Enhancements - Loading Indicators and History
+// Search Enhancements - Loading Indicators
 
 class SearchManager {
     constructor() {
         this.searchInput = null;
         this.spinner = null;
-        this.historyKey = 'media-finder-search-history';
-        this.maxHistoryItems = 10;
         this.init();
     }
 
@@ -14,9 +12,11 @@ class SearchManager {
             this.searchInput = document.getElementById('search-input');
             this.spinner = document.getElementById('search-spinner');
 
+            // Clean up any old search history from localStorage
+            localStorage.removeItem('media-finder-search-history');
+
             if (this.searchInput) {
                 this.setupSearchListeners();
-                this.setupSearchHistory();
             }
         });
     }
@@ -34,67 +34,10 @@ class SearchManager {
             if (this.spinner) {
                 this.spinner.classList.add('hidden');
             }
-
-            // Save to history if search was successful
-            const searchValue = this.searchInput.value.trim();
-            if (searchValue) {
-                this.addToHistory(searchValue);
-            }
         });
 
-        // Add datalist for search suggestions
+        // Add help text for advanced search syntax
         this.addSearchSuggestions();
-    }
-
-    setupSearchHistory() {
-        // Create datalist for autocomplete
-        const datalist = document.createElement('datalist');
-        datalist.id = 'search-history';
-        document.body.appendChild(datalist);
-
-        this.searchInput.setAttribute('list', 'search-history');
-        this.updateSuggestions();
-    }
-
-    addToHistory(searchTerm) {
-        let history = this.getHistory();
-
-        // Remove if already exists
-        history = history.filter(item => item !== searchTerm);
-
-        // Add to beginning
-        history.unshift(searchTerm);
-
-        // Limit size
-        if (history.length > this.maxHistoryItems) {
-            history = history.slice(0, this.maxHistoryItems);
-        }
-
-        localStorage.setItem(this.historyKey, JSON.stringify(history));
-        this.updateSuggestions();
-    }
-
-    getHistory() {
-        try {
-            const history = localStorage.getItem(this.historyKey);
-            return history ? JSON.parse(history) : [];
-        } catch {
-            return [];
-        }
-    }
-
-    updateSuggestions() {
-        const datalist = document.getElementById('search-history');
-        if (!datalist) return;
-
-        const history = this.getHistory();
-        datalist.innerHTML = '';
-
-        history.forEach(term => {
-            const option = document.createElement('option');
-            option.value = term;
-            datalist.appendChild(option);
-        });
     }
 
     addSearchSuggestions() {
@@ -115,11 +58,6 @@ class SearchManager {
         if (this.searchInput && this.searchInput.parentElement && this.searchInput.parentElement.parentElement) {
             this.searchInput.parentElement.parentElement.appendChild(helpText);
         }
-    }
-
-    clearHistory() {
-        localStorage.removeItem(this.historyKey);
-        this.updateSuggestions();
     }
 }
 

@@ -21,7 +21,7 @@
 
     <!-- Search and Filters -->
     <div class="bg-gray-800 rounded-lg p-6">
-        <form hx-get="/files" hx-target="#files-table" hx-select="#files-table" hx-push-url="true" class="space-y-4">
+        <form hx-get="/files" hx-target="#files-table" hx-select="#files-table" hx-push-url="true" class="space-y-4" autocomplete="off">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Search -->
                 <div class="md:col-span-3">
@@ -33,6 +33,10 @@
                             id="search-input"
                             value="{{.Search}}"
                             placeholder="Search by path..."
+                            autocomplete="off"
+                            autocorrect="off"
+                            autocapitalize="off"
+                            spellcheck="false"
                             hx-get="/files"
                             hx-trigger="keyup changed delay:500ms, search"
                             hx-target="#files-table"
