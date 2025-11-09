@@ -3240,9 +3240,12 @@ func (s *Server) HandleBatchDeleteFiles(w http.ResponseWriter, r *http.Request) 
 	// Parse request body
 	var req BatchDeleteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body", "invalid_request")
+		log.Printf("ERROR: HandleBatchDeleteFiles - failed to decode JSON body: %v", err)
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err), "invalid_request")
 		return
 	}
+
+	log.Printf("INFO: HandleBatchDeleteFiles - received %d file IDs for batch deletion", len(req.FileIDs))
 
 	if len(req.FileIDs) == 0 {
 		respondError(w, http.StatusBadRequest, "No file IDs provided", "empty_request")
