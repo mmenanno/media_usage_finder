@@ -354,7 +354,7 @@
             {{range $service, $stats := .Stats.ServiceBreakdown}}
             {{if eq $service "plex"}}
             <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
-                <div class="p-3 bg-orange-500/20 rounded-full flex-shrink-0">
+                <div class="p-3 bg-orange-500/20 rounded-full shrink-0">
                     <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                     </svg>
@@ -371,7 +371,7 @@
             </div>
             {{else if eq $service "sonarr"}}
             <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
-                <div class="p-3 bg-cyan-500/20 rounded-full flex-shrink-0">
+                <div class="p-3 bg-cyan-500/20 rounded-full shrink-0">
                     <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                     </svg>
@@ -388,7 +388,7 @@
             </div>
             {{else if eq $service "radarr"}}
             <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
-                <div class="p-3 bg-amber-500/20 rounded-full flex-shrink-0">
+                <div class="p-3 bg-amber-500/20 rounded-full shrink-0">
                     <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                     </svg>
@@ -405,7 +405,7 @@
             </div>
             {{else if eq $service "qbittorrent"}}
             <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
-                <div class="p-3 bg-blue-500/20 rounded-full flex-shrink-0">
+                <div class="p-3 bg-blue-500/20 rounded-full shrink-0">
                     <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                     </svg>
@@ -422,7 +422,7 @@
             </div>
             {{else if eq $service "stash"}}
             <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
-                <div class="p-3 bg-red-500/20 rounded-full flex-shrink-0">
+                <div class="p-3 bg-red-500/20 rounded-full shrink-0">
                     <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                     </svg>
@@ -484,7 +484,7 @@
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
                 class="p-4 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-200 text-left flex items-center gap-4 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="p-3 bg-blue-500/20 rounded-full flex-shrink-0 transition-colors group-hover:bg-blue-500/30">
+                <div class="p-3 bg-blue-500/20 rounded-full shrink-0 transition-colors group-hover:bg-blue-500/30">
                     <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
@@ -499,7 +499,7 @@
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
                 class="p-4 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-amber-500/50 hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-200 text-left flex items-center gap-4 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="p-3 bg-amber-500/20 rounded-full flex-shrink-0 transition-colors group-hover:bg-amber-500/30">
+                <div class="p-3 bg-amber-500/20 rounded-full shrink-0 transition-colors group-hover:bg-amber-500/30">
                     <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
                     </svg>
@@ -515,7 +515,7 @@
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
                 class="p-4 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-red-500/50 hover:shadow-lg hover:shadow-red-500/10 transition-all duration-200 text-left flex items-center gap-4 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="p-3 bg-red-500/20 rounded-full flex-shrink-0 transition-colors group-hover:bg-red-500/30">
+                <div class="p-3 bg-red-500/20 rounded-full shrink-0 transition-colors group-hover:bg-red-500/30">
                     <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                     </svg>
@@ -534,7 +534,7 @@
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
                 class="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-orange-500/50 hover:shadow-md hover:shadow-orange-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="p-2 bg-orange-500/20 rounded-full flex-shrink-0">
+                <div class="p-2 bg-orange-500/20 rounded-full shrink-0">
                     <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                     </svg>
@@ -549,7 +549,7 @@
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
                 class="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-cyan-500/50 hover:shadow-md hover:shadow-cyan-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="p-2 bg-cyan-500/20 rounded-full flex-shrink-0">
+                <div class="p-2 bg-cyan-500/20 rounded-full shrink-0">
                     <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                     </svg>
@@ -564,7 +564,7 @@
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
                 class="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-amber-500/50 hover:shadow-md hover:shadow-amber-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="p-2 bg-amber-500/20 rounded-full flex-shrink-0">
+                <div class="p-2 bg-amber-500/20 rounded-full shrink-0">
                     <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                     </svg>
@@ -579,7 +579,7 @@
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
                 class="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-blue-500/50 hover:shadow-md hover:shadow-blue-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="p-2 bg-blue-500/20 rounded-full flex-shrink-0">
+                <div class="p-2 bg-blue-500/20 rounded-full shrink-0">
                     <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                     </svg>
@@ -594,7 +594,7 @@
                 hx-swap="none"
                 {{if .HasActiveScan}}disabled{{end}}
                 class="p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-red-500/50 hover:shadow-md hover:shadow-red-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
-                <div class="p-2 bg-red-500/20 rounded-full flex-shrink-0">
+                <div class="p-2 bg-red-500/20 rounded-full shrink-0">
                     <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>
                     </svg>

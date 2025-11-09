@@ -360,7 +360,7 @@ class BatchSelection {
         if (this.selectedFiles.size === 0) return;
 
         const confirmed = await window.confirmDialog(
-            `Are you ABSOLUTELY SURE you want to delete ${this.selectedFiles.size} files? This CANNOT be undone!`,
+            `You are about to permanently delete ${this.selectedFiles.size} files. This action cannot be undone.`,
             'Delete Files'
         );
 
