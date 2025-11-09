@@ -1746,6 +1746,7 @@ func (db *DB) GetHardlinksByInodeDevice(inode, deviceID int64) ([]*File, error) 
 func (db *DB) DeleteFile(fileID int64, details string, deleteFromFilesystem bool) error {
 	tx, err := db.BeginTx()
 	if err != nil {
+		log.Printf("ERROR: DeleteFile - failed to begin transaction for file ID %d: %v", fileID, err)
 		return err
 	}
 	defer tx.Rollback()
@@ -1754,6 +1755,7 @@ func (db *DB) DeleteFile(fileID int64, details string, deleteFromFilesystem bool
 	var filePath string
 	err = tx.QueryRow(`SELECT path FROM files WHERE id = ?`, fileID).Scan(&filePath)
 	if err != nil {
+		log.Printf("ERROR: DeleteFile - failed to get file path for ID %d: %v", fileID, err)
 		return fmt.Errorf("failed to get file path: %w", err)
 	}
 

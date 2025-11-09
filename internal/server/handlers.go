@@ -3231,6 +3231,81 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	respondError(w, http.StatusBadRequest, "Must specify file ID or orphaned flag", "missing_parameter")
 }
 
+// HandleBatchDeleteFiles deletes multiple files in a single request
+func (s *Server) HandleBatchDeleteFiles(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodPost) {
+		return
+	}
+
+	// Parse request body
+	var req BatchDeleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid request body", "invalid_request")
+		return
+	}
+
+	if len(req.FileIDs) == 0 {
+		respondError(w, http.StatusBadRequest, "No file IDs provided", "empty_request")
+		return
+	}
+
+	// Limit batch size to prevent abuse
+	if len(req.FileIDs) > 1000 {
+		respondError(w, http.StatusBadRequest, "Batch size too large (max 1000)", "batch_too_large")
+		return
+	}
+
+	// Get config setting for filesystem deletion
+	deleteFromFilesystem := s.config.DeleteFilesFromFilesystem
+
+	// Process deletions
+	deleted := 0
+	failed := 0
+	results := make([]BatchDeleteFileResult, 0, len(req.FileIDs))
+
+	for _, fileID := range req.FileIDs {
+		if err := s.db.DeleteFile(fileID, "Batch deletion", deleteFromFilesystem); err != nil {
+			failed++
+			results = append(results, BatchDeleteFileResult{
+				FileID:  fileID,
+				Success: false,
+				Error:   err.Error(),
+			})
+		} else {
+			deleted++
+			results = append(results, BatchDeleteFileResult{
+				FileID:  fileID,
+				Success: true,
+			})
+		}
+	}
+
+	// Build response
+	var msg string
+	if deleteFromFilesystem {
+		msg = fmt.Sprintf("Deleted %d files from filesystem, %d failed", deleted, failed)
+	} else {
+		msg = fmt.Sprintf("Removed %d files from database, %d failed", deleted, failed)
+	}
+
+	response := BatchDeleteResponse{
+		Status:  "success",
+		Message: msg,
+		Deleted: deleted,
+		Failed:  failed,
+		Results: results,
+	}
+
+	w.Header().Set("X-Toast-Message", msg)
+	if failed > 0 {
+		w.Header().Set("X-Toast-Type", "warning")
+	} else {
+		w.Header().Set("X-Toast-Type", "success")
+	}
+
+	respondJSON(w, http.StatusOK, response)
+}
+
 // HandleFileDetails returns detailed information about a specific file
 func (s *Server) HandleFileDetails(w http.ResponseWriter, r *http.Request) {
 	fileIDStr := r.URL.Query().Get("id")

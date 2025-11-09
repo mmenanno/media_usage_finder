@@ -74,6 +74,27 @@ type BulkDeleteResponse struct {
 	Errors  int    `json:"errors,omitempty"`
 }
 
+// BatchDeleteRequest represents a batch delete request with multiple file IDs
+type BatchDeleteRequest struct {
+	FileIDs []int64 `json:"file_ids"`
+}
+
+// BatchDeleteResponse represents the response from a batch delete operation
+type BatchDeleteResponse struct {
+	Status   string                  `json:"status"`
+	Message  string                  `json:"message"`
+	Deleted  int                     `json:"deleted"`
+	Failed   int                     `json:"failed"`
+	Results  []BatchDeleteFileResult `json:"results,omitempty"`
+}
+
+// BatchDeleteFileResult represents the result of deleting a single file in a batch
+type BatchDeleteFileResult struct {
+	FileID  int64  `json:"file_id"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
 // BulkRescanResponse represents the result of a bulk rescan marking
 type BulkRescanResponse struct {
 	Status  string `json:"status"`

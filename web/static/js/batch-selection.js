@@ -386,34 +386,64 @@ class BatchSelection {
         window.showToast && window.showToast(loadingMsg, 'info');
 
         try {
-            // Use batched concurrent requests to avoid overwhelming the server
+            // Use true batch mode - single HTTP request with all file IDs
             const fileIds = Array.from(this.selectedFiles);
-            let deletedCount = 0;
 
-            await this.batchOperation(fileIds, async (fileId) => {
-                const response = await fetch(`/api/files/delete?id=${fileId}`, { method: 'DELETE' });
-                if (!response.ok) throw new Error(`Failed for file ${fileId}`);
+            const response = await fetch('/api/files/batch-delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ file_ids: fileIds })
+            });
 
-                // Remove deleted row from UI
-                const checkbox = document.querySelector(`.file-checkbox[data-file-id="${fileId}"]`);
-                if (checkbox) {
-                    const row = checkbox.closest('tr');
-                    if (row) row.remove();
-                }
-                deletedCount++;
-            }, 10); // Process 10 at a time
+            if (!response.ok) {
+                throw new Error(`Batch delete request failed: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            // Remove successfully deleted rows from UI
+            if (result.results) {
+                result.results.forEach(fileResult => {
+                    if (fileResult.success) {
+                        const checkbox = document.querySelector(`.file-checkbox[data-file-id="${fileResult.file_id}"]`);
+                        if (checkbox) {
+                            const row = checkbox.closest('tr');
+                            if (row) row.remove();
+                        }
+                    }
+                });
+            }
 
             // Show appropriate success message
             const successMsg = deleteFromFilesystem
-                ? `Deleted ${deletedCount} files from filesystem`
-                : `Removed ${deletedCount} files from database`;
-            window.showToast && window.showToast(successMsg, 'success');
+                ? `Deleted ${result.deleted} files from filesystem`
+                : `Removed ${result.deleted} files from database`;
+
+            // Include failure info if any
+            if (result.failed > 0) {
+                const failureMsg = `${result.failed} files failed to delete`;
+                window.showToast && window.showToast(`${successMsg}. ${failureMsg}`, 'warning');
+                // Log detailed errors for debugging
+                if (result.results) {
+                    result.results.forEach(fileResult => {
+                        if (!fileResult.success) {
+                            console.error(`Failed to delete file ${fileResult.file_id}: ${fileResult.error}`);
+                        }
+                    });
+                }
+            } else {
+                window.showToast && window.showToast(successMsg, 'success');
+            }
+
             this.clearSelection();
         } catch (error) {
             const errorMsg = deleteFromFilesystem
-                ? 'Failed to delete some files from filesystem'
-                : 'Failed to remove some files from database';
+                ? 'Failed to delete files from filesystem'
+                : 'Failed to remove files from database';
             window.showToast && window.showToast(errorMsg, 'error');
+            console.error('Batch delete error:', error);
         } finally {
             this.setLoadingState(false);
             this.setButtonsDisabled(false);
