@@ -406,7 +406,10 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: { 'HX-Request': 'true' }
         })
         .then(response => response.text())
-        .then(html => { auditContainer.innerHTML = html; })
+        .then(html => {
+            auditContainer.innerHTML = html;
+            formatAuditDetails();
+        })
         .catch(error => {
             auditContainer.innerHTML = '<div class="p-8 text-center text-red-400">Error loading audit logs: ' + error.message + '</div>';
         });
@@ -424,7 +427,10 @@ document.addEventListener('DOMContentLoaded', function() {
             headers: { 'HX-Request': 'true' }
         })
         .then(response => response.text())
-        .then(html => { auditContainer.innerHTML = html; })
+        .then(html => {
+            auditContainer.innerHTML = html;
+            formatAuditDetails();
+        })
         .catch(error => {
             auditContainer.innerHTML = '<div class="p-8 text-center text-red-400">Error loading audit logs: ' + error.message + '</div>';
         });
@@ -522,6 +528,233 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    // ========== AUDIT LOG JSON FORMATTING ==========
+    function formatAuditDetails() {
+        const elements = document.querySelectorAll('.audit-details');
+
+        elements.forEach(function(element) {
+            const details = element.textContent.trim();
+            if (!details) return;
+
+            // Try to parse as JSON
+            try {
+                const parsed = JSON.parse(details);
+
+                // Create wrapper container
+                const wrapper = document.createElement('div');
+                wrapper.className = 'bg-gray-750 border border-gray-600 rounded overflow-hidden';
+
+                // Create header with toggle button
+                const header = document.createElement('div');
+                header.className = 'flex items-center justify-between px-3 py-2 bg-gray-700 border-b border-gray-600';
+
+                const toggleBtn = document.createElement('button');
+                toggleBtn.className = 'text-xs text-gray-400 hover:text-blue-400 transition flex items-center gap-1';
+                toggleBtn.innerHTML = Icons.get('eye', 4) + '<span>Show Raw JSON</span>';
+                toggleBtn.title = 'Toggle raw JSON view';
+
+                const copyJsonBtn = document.createElement('button');
+                copyJsonBtn.className = 'text-xs text-gray-400 hover:text-blue-400 transition flex items-center gap-1';
+                copyJsonBtn.innerHTML = Icons.get('clipboardCopy', 4) + '<span>Copy JSON</span>';
+                copyJsonBtn.title = 'Copy entire JSON';
+                copyJsonBtn.onclick = function(e) {
+                    e.preventDefault();
+                    navigator.clipboard.writeText(JSON.stringify(parsed, null, 2)).then(function() {
+                        const originalHTML = copyJsonBtn.innerHTML;
+                        copyJsonBtn.innerHTML = Icons.get('check', 4) + '<span>Copied!</span>';
+                        copyJsonBtn.className = 'text-xs text-green-400 flex items-center gap-1';
+                        setTimeout(function() {
+                            copyJsonBtn.innerHTML = originalHTML;
+                            copyJsonBtn.className = 'text-xs text-gray-400 hover:text-blue-400 transition flex items-center gap-1';
+                        }, 1500);
+                    });
+                };
+
+                header.appendChild(toggleBtn);
+                header.appendChild(copyJsonBtn);
+
+                // Create formatted view container
+                const formattedContainer = document.createElement('div');
+                formattedContainer.className = 'p-3 space-y-2';
+                formatJsonObject(parsed, formattedContainer);
+
+                // Create raw JSON view (hidden by default)
+                const rawContainer = document.createElement('pre');
+                rawContainer.className = 'hidden p-3 text-xs font-mono text-gray-300 overflow-x-auto bg-gray-800';
+                rawContainer.textContent = JSON.stringify(parsed, null, 2);
+
+                // Toggle functionality
+                let showingRaw = false;
+                toggleBtn.onclick = function() {
+                    showingRaw = !showingRaw;
+                    if (showingRaw) {
+                        formattedContainer.classList.add('hidden');
+                        rawContainer.classList.remove('hidden');
+                        toggleBtn.innerHTML = Icons.get('eye', 4) + '<span>Show Formatted</span>';
+                    } else {
+                        formattedContainer.classList.remove('hidden');
+                        rawContainer.classList.add('hidden');
+                        toggleBtn.innerHTML = Icons.get('eye', 4) + '<span>Show Raw JSON</span>';
+                    }
+                };
+
+                wrapper.appendChild(header);
+                wrapper.appendChild(formattedContainer);
+                wrapper.appendChild(rawContainer);
+
+                // Replace content
+                element.innerHTML = '';
+                element.appendChild(wrapper);
+            } catch (e) {
+                // Not JSON or invalid JSON, leave as-is
+                return;
+            }
+        });
+    }
+
+    function formatJsonObject(obj, container, depth = 0) {
+        const indent = depth * 12; // 12px per level
+
+        for (const [key, value] of Object.entries(obj)) {
+            const row = document.createElement('div');
+            row.className = 'flex gap-3 items-start';
+            row.style.paddingLeft = indent + 'px';
+
+            // Key
+            const keyEl = document.createElement('span');
+            keyEl.className = 'font-semibold text-blue-400 whitespace-nowrap text-xs';
+            keyEl.textContent = formatKey(key) + ':';
+
+            // Value container
+            const valueContainer = document.createElement('span');
+            valueContainer.className = 'flex-1 min-w-0';
+
+            if (typeof value === 'object' && value !== null) {
+                // Nested object - add collapsible wrapper
+                const nestedContainer = document.createElement('div');
+                nestedContainer.className = 'mt-1 space-y-1';
+
+                row.appendChild(keyEl);
+                container.appendChild(row);
+                formatJsonObject(value, container, depth + 1);
+            } else {
+                // Simple value
+                const valueEl = formatValueElement(key, value);
+                valueContainer.appendChild(valueEl);
+
+                row.appendChild(keyEl);
+                row.appendChild(valueContainer);
+                container.appendChild(row);
+            }
+        }
+    }
+
+    function formatKey(key) {
+        // Convert snake_case to Title Case
+        return key
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    }
+
+    function formatValueElement(key, value) {
+        const container = document.createElement('div');
+        container.className = 'flex items-center gap-2';
+
+        // Check if this is a file path
+        const isPath = typeof value === 'string' && value.includes('/');
+
+        if (isPath) {
+            // File path - show filename with full path on hover
+            const pathWrapper = document.createElement('div');
+            pathWrapper.className = 'flex items-center gap-1 flex-1 min-w-0';
+
+            const filename = value.split('/').pop();
+            const pathEl = document.createElement('span');
+            pathEl.className = 'font-mono text-xs text-gray-300 truncate cursor-help';
+            pathEl.textContent = filename;
+            pathEl.title = value; // Show full path on hover
+
+            // Copy button for paths
+            const copyBtn = createCopyButton(value);
+
+            // Show full path button
+            const expandBtn = document.createElement('button');
+            expandBtn.className = 'text-gray-500 hover:text-blue-400 text-xs transition';
+            expandBtn.textContent = '...';
+            expandBtn.title = 'Show full path';
+            expandBtn.onclick = function() {
+                if (pathEl.textContent === filename) {
+                    pathEl.textContent = value;
+                    pathEl.classList.remove('truncate');
+                    expandBtn.textContent = '←';
+                    expandBtn.title = 'Show filename only';
+                } else {
+                    pathEl.textContent = filename;
+                    pathEl.classList.add('truncate');
+                    expandBtn.textContent = '...';
+                    expandBtn.title = 'Show full path';
+                }
+            };
+
+            pathWrapper.appendChild(pathEl);
+            pathWrapper.appendChild(expandBtn);
+            pathWrapper.appendChild(copyBtn);
+            container.appendChild(pathWrapper);
+        } else {
+            // Regular value
+            const valueEl = document.createElement('span');
+            valueEl.className = 'text-xs text-gray-300';
+
+            if (value === null || value === undefined || value === '') {
+                valueEl.textContent = '—';
+                valueEl.className = 'text-xs text-gray-500';
+            } else if (typeof value === 'number' && value > 1000000) {
+                // Format file sizes
+                valueEl.textContent = formatBytes(value);
+                valueEl.className = 'text-xs text-green-400 font-semibold';
+            } else {
+                valueEl.textContent = String(value);
+            }
+
+            container.appendChild(valueEl);
+
+            // Add copy button for non-empty values
+            if (value && String(value).length > 10) {
+                container.appendChild(createCopyButton(String(value)));
+            }
+        }
+
+        return container;
+    }
+
+    function createCopyButton(text) {
+        const btn = document.createElement('button');
+        btn.className = 'text-gray-500 hover:text-blue-400 transition shrink-0';
+        btn.innerHTML = Icons.get('clipboardCopy', 4);
+        btn.title = 'Copy to clipboard';
+        btn.onclick = function(e) {
+            e.preventDefault();
+            navigator.clipboard.writeText(text).then(function() {
+                btn.innerHTML = Icons.get('check', 4);
+                btn.className = 'text-green-400 shrink-0';
+                setTimeout(function() {
+                    btn.innerHTML = Icons.get('clipboardCopy', 4);
+                    btn.className = 'text-gray-500 hover:text-blue-400 transition shrink-0';
+                }, 1500);
+            });
+        };
+        return btn;
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
 });
 </script>
 

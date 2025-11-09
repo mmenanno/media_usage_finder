@@ -792,9 +792,19 @@ func (s *Server) HandleGetScanLogs(w http.ResponseWriter, r *http.Request) {
 // HandleGetAuditLogs handles requests for filtered audit log entries
 func (s *Server) HandleGetAuditLogs(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters for filtering
+	action := r.URL.Query().Get("action")
+	if action == "all" {
+		action = ""
+	}
+
+	entityType := r.URL.Query().Get("entity_type")
+	if entityType == "all" {
+		entityType = ""
+	}
+
 	filters := database.AuditLogFilters{
-		Action:     r.URL.Query().Get("action"),
-		EntityType: r.URL.Query().Get("entity_type"),
+		Action:     action,
+		EntityType: entityType,
 		SearchText: r.URL.Query().Get("search"),
 		Limit:      100, // Default limit
 		Offset:     0,
