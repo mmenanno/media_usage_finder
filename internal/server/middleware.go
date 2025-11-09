@@ -31,6 +31,11 @@ func Logger(next http.Handler) http.Handler {
 			return
 		}
 
+		// Skip logging successful progress polling endpoints to reduce log noise
+		if (r.RequestURI == "/api/scan/progress-html" || r.RequestURI == "/api/hash/progress-html") && wrapped.statusCode == http.StatusOK {
+			return
+		}
+
 		requestID := GetRequestID(r.Context())
 		log.Printf(
 			"[%s] %s %s %d %s",
