@@ -382,6 +382,7 @@
                                 </button>
                                 <button
                                     hx-post="/api/files/mark-rescan?id={{.File.ID}}"
+                                    hx-swap="none"
                                     aria-label="Mark file for rescan"
                                     class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm transition whitespace-nowrap flex items-center gap-1.5">
                                     <span class="file-rescan-icon"></span>
@@ -1056,6 +1057,7 @@
                 <div class="flex space-x-4">
                     <button
                         hx-post="/api/files/mark-rescan?orphaned=true"
+                        hx-swap="none"
                         hx-confirm="Mark all {{.Total}} orphaned files for rescan?"
                         class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded transition">
                         Mark All for Rescan
