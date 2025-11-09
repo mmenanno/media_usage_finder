@@ -5,7 +5,7 @@
     <div class="flex justify-between items-center">
         <h2 class="text-3xl font-bold">Scan History</h2>
         <div class="text-gray-400">
-            Total: {{.Total}} scans
+            Total: {{formatNumber (toInt64 .Total)}} scans
         </div>
     </div>
 
@@ -65,9 +65,9 @@
                             {{end}}
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-400">
-                            <div>{{.ActualFileCount}}</div>
+                            <div>{{formatNumber (toInt64 .ActualFileCount)}}</div>
                             {{if and (eq .ScanType "cleanup") (gt .DeletedFilesCount 0)}}
-                                <div class="text-xs text-red-400 mt-1">{{.DeletedFilesCount}} deleted</div>
+                                <div class="text-xs text-red-400 mt-1">{{formatNumber (toInt64 .DeletedFilesCount)}} deleted</div>
                             {{end}}
                         </td>
                         <td class="px-6 py-4 text-sm">

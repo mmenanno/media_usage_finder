@@ -1058,16 +1058,16 @@
                     <button
                         hx-post="/api/files/rescan?orphaned=true"
                         hx-swap="none"
-                        hx-confirm="Rescan all {{.Total}} orphaned files now?"
+                        hx-confirm="Rescan all {{formatNumber .Total}} orphaned files now?"
                         class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded transition">
                         Rescan All Orphaned
                     </button>
                     <button
                         hx-delete="/api/files/delete?orphaned=true"
                         {{if .DeleteFilesFromFilesystem}}
-                        hx-confirm="⚠️  WARNING: You are about to PERMANENTLY DELETE ALL {{.Total}} orphaned files from the FILESYSTEM.\n\nThis will remove the actual files from disk and CANNOT BE UNDONE.\n\nAre you absolutely sure?"
+                        hx-confirm="⚠️  WARNING: You are about to PERMANENTLY DELETE ALL {{formatNumber .Total}} orphaned files from the FILESYSTEM.\n\nThis will remove the actual files from disk and CANNOT BE UNDONE.\n\nAre you absolutely sure?"
                         {{else}}
-                        hx-confirm="Remove all {{.Total}} orphaned files from the database?\n\nThe actual files will remain on disk. You can re-scan to add them back.\n\nContinue?"
+                        hx-confirm="Remove all {{formatNumber .Total}} orphaned files from the database?\n\nThe actual files will remain on disk. You can re-scan to add them back.\n\nContinue?"
                         {{end}}
                         class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition">
                         {{if .DeleteFilesFromFilesystem}}Delete All Orphaned{{else}}Remove All Orphaned{{end}}

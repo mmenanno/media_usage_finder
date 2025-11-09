@@ -25,27 +25,27 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="bg-gray-700 rounded-lg p-4">
                 <div class="text-gray-400 text-sm">Total Files</div>
-                <div class="text-2xl font-bold mt-1">{{.Stats.FileCount}}</div>
+                <div class="text-2xl font-bold mt-1">{{formatNumber .Stats.FileCount}}</div>
             </div>
             <div class="bg-gray-700 rounded-lg p-4">
                 <div class="text-gray-400 text-sm">Orphaned Files</div>
-                <div class="text-2xl font-bold mt-1 text-yellow-400">{{.Stats.OrphanedCount}}</div>
+                <div class="text-2xl font-bold mt-1 text-yellow-400">{{formatNumber .Stats.OrphanedCount}}</div>
             </div>
             <div class="bg-gray-700 rounded-lg p-4">
                 <div class="text-gray-400 text-sm">Usage Records</div>
-                <div class="text-2xl font-bold mt-1">{{.Stats.UsageCount}}</div>
+                <div class="text-2xl font-bold mt-1">{{formatNumber .Stats.UsageCount}}</div>
             </div>
             <div class="bg-gray-700 rounded-lg p-4">
                 <div class="text-gray-400 text-sm">Scan History</div>
-                <div class="text-2xl font-bold mt-1">{{.Stats.ScanCount}}</div>
+                <div class="text-2xl font-bold mt-1">{{formatNumber .Stats.ScanCount}}</div>
             </div>
             <div class="bg-gray-700 rounded-lg p-4">
                 <div class="text-gray-400 text-sm">Hardlink Groups</div>
-                <div class="text-2xl font-bold mt-1 text-blue-400">{{.Stats.HardlinkGroups}}</div>
+                <div class="text-2xl font-bold mt-1 text-blue-400">{{formatNumber .Stats.HardlinkGroups}}</div>
             </div>
             <div class="bg-gray-700 rounded-lg p-4">
                 <div class="text-gray-400 text-sm">Audit Log Entries</div>
-                <div class="text-2xl font-bold mt-1">{{.Stats.AuditLogCount}}</div>
+                <div class="text-2xl font-bold mt-1">{{formatNumber .Stats.AuditLogCount}}</div>
             </div>
             <div class="bg-gray-700 rounded-lg p-4">
                 <div class="text-gray-400 text-sm">Database Size</div>
@@ -65,10 +65,10 @@
             <!-- Clear Orphaned Files -->
             <div class="bg-gray-700 rounded-lg p-4">
                 <h4 class="font-medium mb-2">Clear Orphaned Files</h4>
-                <p class="text-sm text-gray-400 mb-4">Remove all files marked as orphaned ({{.Stats.OrphanedCount}} files)</p>
+                <p class="text-sm text-gray-400 mb-4">Remove all files marked as orphaned ({{formatNumber .Stats.OrphanedCount}} files)</p>
                 <button
                     hx-post="/api/admin/clear-files?orphaned=true"
-                    hx-confirm="Clear {{.Stats.OrphanedCount}} orphaned files? This cannot be undone."
+                    hx-confirm="Clear {{formatNumber .Stats.OrphanedCount}} orphaned files? This cannot be undone."
                     hx-swap="none"
                     class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors w-full flex items-center justify-center gap-2">
                     <span class="clear-orphaned-icon"></span>
@@ -79,10 +79,10 @@
             <!-- Clear All Files -->
             <div class="bg-gray-700 rounded-lg p-4">
                 <h4 class="font-medium mb-2 text-red-400">Clear All Files</h4>
-                <p class="text-sm text-gray-400 mb-4">Remove ALL file records from database ({{.Stats.FileCount}} files)</p>
+                <p class="text-sm text-gray-400 mb-4">Remove ALL file records from database ({{formatNumber .Stats.FileCount}} files)</p>
                 <button
                     hx-post="/api/admin/clear-files"
-                    hx-confirm="Clear ALL {{.Stats.FileCount}} files? This will delete all file and usage data. This cannot be undone!"
+                    hx-confirm="Clear ALL {{formatNumber .Stats.FileCount}} files? This will delete all file and usage data. This cannot be undone!"
                     hx-swap="none"
                     class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors w-full flex items-center justify-center gap-2">
                     <span class="clear-all-files-icon"></span>
@@ -93,10 +93,10 @@
             <!-- Clear Scan History -->
             <div class="bg-gray-700 rounded-lg p-4">
                 <h4 class="font-medium mb-2">Clear Scan History</h4>
-                <p class="text-sm text-gray-400 mb-4">Remove completed scan records ({{.Stats.ScanCount}} scans)</p>
+                <p class="text-sm text-gray-400 mb-4">Remove completed scan records ({{formatNumber .Stats.ScanCount}} scans)</p>
                 <button
                     hx-post="/api/admin/clear-scans"
-                    hx-confirm="Clear scan history? This will delete {{.Stats.ScanCount}} scan records."
+                    hx-confirm="Clear scan history? This will delete {{formatNumber .Stats.ScanCount}} scan records."
                     hx-swap="none"
                     class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors w-full flex items-center justify-center gap-2">
                     <span class="clear-scans-icon"></span>
@@ -107,7 +107,7 @@
             <!-- Clear All Usage -->
             <div class="bg-gray-700 rounded-lg p-4">
                 <h4 class="font-medium mb-2">Clear Service Usage</h4>
-                <p class="text-sm text-gray-400 mb-4">Remove all usage tracking data ({{.Stats.UsageCount}} records)</p>
+                <p class="text-sm text-gray-400 mb-4">Remove all usage tracking data ({{formatNumber .Stats.UsageCount}} records)</p>
                 <button
                     hx-post="/api/admin/clear-usage"
                     hx-confirm="Clear all usage records? Files will be marked orphaned until next scan."

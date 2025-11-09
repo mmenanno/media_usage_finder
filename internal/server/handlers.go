@@ -679,7 +679,7 @@ func (s *Server) HandleScanLogsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]interface{}{
-		"Title":   "Logs",
+		"Title":   "Scan Logs",
 		"Version": s.version,
 		"Scans":   scans,
 		"Tab":     tab,

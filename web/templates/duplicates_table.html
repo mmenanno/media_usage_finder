@@ -2,7 +2,7 @@
 <!-- Groups Summary -->
 <div class="px-6 py-4 border-b border-gray-700">
     <p class="text-sm text-gray-400">
-        Showing {{len .SameDiskGroups}} of {{.Total}} groups
+        Showing {{len .SameDiskGroups}} of {{formatNumber (toInt64 .Total)}} groups
         {{if gt .TotalPages 1}} (Page {{.Page}} of {{.TotalPages}}){{end}}
     </p>
 </div>
@@ -17,7 +17,7 @@
                     <div class="flex-1">
                         <div class="flex items-center space-x-3">
                             <h3 class="text-lg font-semibold text-gray-100">
-                                {{$plan.Group.TotalSize | formatBytes}} × {{$plan.TotalFiles}} files in {{$plan.ActualCopies}} cluster(s)
+                                {{$plan.Group.TotalSize | formatBytes}} × {{formatNumber (toInt64 $plan.TotalFiles)}} files in {{formatNumber (toInt64 $plan.ActualCopies)}} cluster(s)
                             </h3>
                             {{if gt $plan.Group.HashLevel 0}}
                                 {{if eq $plan.Group.HashLevel 6}}
@@ -107,7 +107,7 @@
                         <span>PRIMARY CLUSTER (inode {{$plan.KeepCluster.Inode}})</span>
                         {{if $plan.KeepCluster.IsLinked}}
                         <span class="px-2 py-0.5 rounded bg-blue-600 bg-opacity-30 text-blue-300">
-                            {{$plan.KeepCluster.LinkCount}} files already linked
+                            {{formatNumber (toInt64 $plan.KeepCluster.LinkCount)}} files already linked
                         </span>
                         {{end}}
                     </div>
@@ -153,7 +153,7 @@
                         <div class="text-xs font-semibold text-gray-400 mb-2 flex items-center space-x-2">
                             <span>LINKED CLUSTER (inode {{$cluster.Inode}})</span>
                             <span class="px-2 py-0.5 rounded bg-gray-600 text-gray-300">
-                                {{$cluster.LinkCount}} files linked together
+                                {{formatNumber (toInt64 $cluster.LinkCount)}} files linked together
                             </span>
                             <span class="text-gray-500">→ Will link all to primary</span>
                         </div>
@@ -203,7 +203,7 @@
                             <span>UNLINKED FILES{{if gt $cluster.LinkCount 1}} (inode {{$cluster.Inode}}){{end}}</span>
                             {{if gt $cluster.LinkCount 1}}
                             <span class="px-2 py-0.5 rounded bg-gray-600 text-gray-300">
-                                {{$cluster.LinkCount}} files need linking
+                                {{formatNumber (toInt64 $cluster.LinkCount)}} files need linking
                             </span>
                             {{end}}
                         </div>

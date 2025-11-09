@@ -2,8 +2,8 @@
 <!-- Logs Summary -->
 <div class="px-6 py-4 border-b border-gray-700">
     <p class="text-sm text-gray-400">
-        Showing {{len .Logs}} of {{.Total}} logs
-        {{if gt .TotalPages 1}} (Page {{.Page}} of {{.TotalPages}}){{end}}
+        Showing {{len .Logs}} of {{formatNumber (toInt64 .Total)}} logs
+        {{if gt .TotalPages 1}} (Page {{.Page}} of {{formatNumber (toInt64 .TotalPages)}}){{end}}
     </p>
 </div>
 
@@ -65,7 +65,7 @@
 {{if gt .TotalPages 1}}
 <div class="px-6 py-4 border-t border-gray-700 flex items-center justify-between">
     <div class="text-sm text-gray-400">
-        Page {{.Page}} of {{.TotalPages}}
+        Page {{.Page}} of {{formatNumber (toInt64 .TotalPages)}}
     </div>
     <div class="flex gap-2">
         {{if gt .Page 1}}

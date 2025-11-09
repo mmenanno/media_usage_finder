@@ -10,13 +10,13 @@
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div class="bg-gray-800 rounded-lg p-6">
             <div class="text-gray-400 text-sm font-medium">Total Files</div>
-            <div class="text-3xl font-bold mt-2">{{.Stats.TotalFiles}}</div>
+            <div class="text-3xl font-bold mt-2">{{formatNumber .Stats.TotalFiles}}</div>
             <div class="text-gray-500 text-sm mt-1">{{formatSize .Stats.TotalSize}}</div>
         </div>
 
         <div class="bg-gray-800 rounded-lg p-6">
             <div class="text-gray-400 text-sm font-medium">Orphaned Files</div>
-            <div class="text-3xl font-bold mt-2 text-yellow-400">{{.Stats.OrphanedFiles}}</div>
+            <div class="text-3xl font-bold mt-2 text-yellow-400">{{formatNumber .Stats.OrphanedFiles}}</div>
             <div class="text-gray-500 text-sm mt-1">{{formatSize .Stats.OrphanedSize}}</div>
             <div class="mt-2 text-xs text-gray-500">
                 {{if gt .Stats.TotalFiles 0}}
@@ -27,7 +27,7 @@
 
         <div class="bg-gray-800 rounded-lg p-6">
             <div class="text-gray-400 text-sm font-medium">Hardlink Groups</div>
-            <div class="text-3xl font-bold mt-2 text-blue-400">{{.Stats.HardlinkGroups}}</div>
+            <div class="text-3xl font-bold mt-2 text-blue-400">{{formatNumber .Stats.HardlinkGroups}}</div>
             <div class="text-gray-500 text-sm mt-1">Saving {{formatSize .Stats.HardlinkSavings}}</div>
         </div>
 
@@ -51,7 +51,7 @@
             <div>
                 <div class="text-gray-400 text-sm font-medium">Cross-Disk Duplicates</div>
                 <div class="text-3xl font-bold mt-2 {{if gt .CrossDiskDuplicates 0}}text-purple-400{{else}}text-gray-400{{end}}">
-                    {{.CrossDiskDuplicates}}
+                    {{formatNumber .CrossDiskDuplicates}}
                 </div>
                 <div class="text-gray-500 text-sm mt-1">
                     {{if gt .CrossDiskDuplicates 0}}
@@ -87,7 +87,7 @@
             <div>
                 <div class="text-gray-400 text-sm font-medium">Same-Disk Duplicates</div>
                 <div class="text-3xl font-bold mt-2 {{if gt .SameDiskDuplicates 0}}text-blue-400{{else}}text-gray-400{{end}}">
-                    {{.SameDiskDuplicates}}
+                    {{formatNumber .SameDiskDuplicates}}
                 </div>
                 <div class="text-gray-500 text-sm mt-1">
                     {{if gt .SameDiskDuplicates 0}}
@@ -148,7 +148,7 @@
             <div class="bg-gray-700 {{serviceClass $service "bg-gradient"}} rounded-lg p-4 border-l-4 {{serviceClass $service "border"}}">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-lg font-medium text-white">{{formatServiceName $service}}</span>
-                    <span class="text-gray-200">{{$stats.FileCount}} files</span>
+                    <span class="text-gray-200">{{formatNumber $stats.FileCount}} files</span>
                 </div>
                 <div class="w-full bg-gray-600 rounded-full h-2 mb-2">
                     <div class="{{serviceClass $service "bg"}} h-2 rounded-full" data-width="{{if gt $.Stats.TotalFiles 0}}{{div (mul $stats.FileCount 100.0) $.Stats.TotalFiles}}{{else}}0{{end}}"></div>
@@ -347,11 +347,11 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {{range .Stats.MultiServiceUsage}}
             <div class="bg-gray-700 rounded-lg p-4">
-                <div class="text-3xl font-bold text-blue-400 mb-1">{{.ServiceCount}}</div>
+                <div class="text-3xl font-bold text-blue-400 mb-1">{{formatNumber .ServiceCount}}</div>
                 <div class="text-sm text-gray-400 mb-2">
                     {{if eq .ServiceCount 1}}service{{else}}services{{end}}
                 </div>
-                <div class="text-lg font-medium">{{.FileCount}} files</div>
+                <div class="text-lg font-medium">{{formatNumber .FileCount}} files</div>
                 <div class="text-sm text-gray-500">{{formatSize .TotalSize}}</div>
             </div>
             {{end}}
@@ -371,7 +371,7 @@
                         <span>In Use</span>
                     </div>
                     <div class="text-right">
-                        <div class="font-semibold">{{sub .Stats.TotalFiles .Stats.OrphanedFiles}}</div>
+                        <div class="font-semibold">{{formatNumber (sub .Stats.TotalFiles .Stats.OrphanedFiles)}}</div>
                         <div class="text-sm text-gray-400">{{formatSize (sub .Stats.TotalSize .Stats.OrphanedSize)}}</div>
                     </div>
                 </div>
@@ -381,7 +381,7 @@
                         <span>Orphaned</span>
                     </div>
                     <div class="text-right">
-                        <div class="font-semibold">{{.Stats.OrphanedFiles}}</div>
+                        <div class="font-semibold">{{formatNumber .Stats.OrphanedFiles}}</div>
                         <div class="text-sm text-gray-400">{{formatSize .Stats.OrphanedSize}}</div>
                     </div>
                 </div>
@@ -436,7 +436,7 @@
                     <div class="flex-1">
                         <div class="font-medium text-yellow-400">Orphaned Files Detected</div>
                         <div class="text-sm text-gray-300 mt-1">
-                            You have {{.Stats.OrphanedFiles}} orphaned files taking up {{formatSize .Stats.OrphanedSize}}.
+                            You have {{formatNumber .Stats.OrphanedFiles}} orphaned files taking up {{formatSize .Stats.OrphanedSize}}.
                             Consider reviewing and removing these files to free up space.
                         </div>
                         <a href="/files?orphaned=true" class="inline-block mt-2 text-sm text-yellow-400 hover:text-yellow-300">
@@ -456,7 +456,7 @@
                     <div class="flex-1">
                         <div class="font-medium text-blue-400">Efficient Storage Usage</div>
                         <div class="text-sm text-gray-300 mt-1">
-                            Great! You're saving {{formatSize .Stats.HardlinkSavings}} through {{.Stats.HardlinkGroups}} hardlink groups.
+                            Great! You're saving {{formatSize .Stats.HardlinkSavings}} through {{formatNumber .Stats.HardlinkGroups}} hardlink groups.
                             Continue using hardlinks for cross-seeding to maximize efficiency.
                         </div>
                     </div>
