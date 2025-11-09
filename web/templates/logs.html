@@ -285,6 +285,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const tabButtons = document.querySelectorAll('.tab-button');
     const tabContents = document.querySelectorAll('.tab-content');
 
+    // Track which tabs have been loaded
+    const loadedTabs = new Set();
+
     // Tab switching
     tabButtons.forEach(button => {
         button.addEventListener('click', function() {
@@ -309,6 +312,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const url = new URL(window.location);
             url.searchParams.set('tab', tabName);
             window.history.pushState({}, '', url);
+
+            // Auto-load logs when switching to a tab for the first time
+            if (!loadedTabs.has(tabName)) {
+                loadedTabs.add(tabName);
+                if (tabName === 'scan' && typeof loadScanLogs === 'function') {
+                    loadScanLogs();
+                } else if (tabName === 'audit' && typeof loadAuditLogs === 'function') {
+                    loadAuditLogs();
+                }
+            }
         });
     });
 
@@ -487,8 +500,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('scan-search-filter').value = search;
 
         loadScanLogs();
+        loadedTabs.add('scan'); // Mark as loaded
     } else if (currentTab === 'audit') {
         loadAuditLogs();
+        loadedTabs.add('audit'); // Mark as loaded
     }
 
     // Handle pagination clicks via event delegation
