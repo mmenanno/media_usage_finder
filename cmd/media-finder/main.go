@@ -383,7 +383,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
-		if err := db.DeleteFileByPath(path, "CLI deletion"); err != nil {
+		if err := db.DeleteFileByPath(path, "CLI deletion", false); err != nil {
 			return fmt.Errorf("failed to delete file: %w", err)
 		}
 
@@ -419,7 +419,7 @@ func runDelete(cmd *cobra.Command, args []string) error {
 
 	deleted := 0
 	for _, file := range files {
-		if err := db.DeleteFile(file.ID, "Orphaned file cleanup"); err != nil {
+		if err := db.DeleteFile(file.ID, "Orphaned file cleanup", false); err != nil {
 			log.Printf("Failed to delete %s: %v", file.Path, err)
 			continue
 		}

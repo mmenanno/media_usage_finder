@@ -401,26 +401,27 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := FilesData{
-		Files:             filesWithUsage,
-		Total:             int64(total),
-		Page:              int64(page),
-		Limit:             limit,
-		TotalPages:        CalculateTotalPages(total, limit),
-		Title:             "Files",
-		Orphaned:          orphanedOnly,
-		Hardlinks:         hardlinksOnly,
-		Service:           legacyService,
-		Services:          services,
-		ServiceFilterMode: serviceFilterMode,
-		Search:            search,
-		OrderBy:           orderBy,
-		Direction:         direction,
-		Extensions:        extensions,
-		Devices:           deviceNames,
-		AvailableDisks:    availableDisks,
-		DiskResolver:      s.diskResolver,
-		HasDiskLocations:  len(s.config.Disks) > 0,
-		Version:           s.version,
+		Files:                    filesWithUsage,
+		Total:                    int64(total),
+		Page:                     int64(page),
+		Limit:                    limit,
+		TotalPages:               CalculateTotalPages(total, limit),
+		Title:                    "Files",
+		Orphaned:                 orphanedOnly,
+		Hardlinks:                hardlinksOnly,
+		Service:                  legacyService,
+		Services:                 services,
+		ServiceFilterMode:        serviceFilterMode,
+		Search:                   search,
+		OrderBy:                  orderBy,
+		Direction:                direction,
+		Extensions:               extensions,
+		Devices:                  deviceNames,
+		AvailableDisks:           availableDisks,
+		DiskResolver:             s.diskResolver,
+		HasDiskLocations:         len(s.config.Disks) > 0,
+		Version:                  s.version,
+		DeleteFilesFromFilesystem: s.config.DeleteFilesFromFilesystem,
 	}
 
 	s.renderTemplate(w, "files.html", data)
@@ -1581,6 +1582,7 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Note: HTML checkboxes send "on" when checked, or nothing when unchecked
 	s.config.AutoCleanupDeletedFiles = r.FormValue("auto_cleanup_deleted_files") != ""
+	s.config.DeleteFilesFromFilesystem = r.FormValue("delete_files_from_filesystem") != ""
 
 	if cacheSize := r.FormValue("db_cache_size"); cacheSize != "" {
 		if size, err := strconv.Atoi(cacheSize); err == nil && size > 0 {
@@ -3021,6 +3023,9 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	fileID := r.URL.Query().Get("id")
 	orphaned := r.URL.Query().Get("orphaned") == "true"
 
+	// Get config setting for filesystem deletion
+	deleteFromFilesystem := s.config.DeleteFilesFromFilesystem
+
 	// Single file deletion
 	if fileID != "" {
 		id, err := strconv.ParseInt(fileID, 10, 64)
@@ -3029,14 +3034,27 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if err := s.db.DeleteFile(id, "UI deletion"); err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to delete file", "delete_failed")
+		if err := s.db.DeleteFile(id, "UI deletion", deleteFromFilesystem); err != nil {
+			// Provide specific error message for filesystem failures
+			if deleteFromFilesystem && strings.Contains(err.Error(), "failed to delete file from filesystem") {
+				respondError(w, http.StatusInternalServerError, err.Error(), "filesystem_delete_failed")
+			} else {
+				respondError(w, http.StatusInternalServerError, "Failed to delete file", "delete_failed")
+			}
 			return
 		}
 
-		w.Header().Set("X-Toast-Message", "File deleted successfully")
+		// Update success message based on deletion mode
+		var successMsg string
+		if deleteFromFilesystem {
+			successMsg = "File deleted from filesystem and database"
+		} else {
+			successMsg = "File removed from database"
+		}
+
+		w.Header().Set("X-Toast-Message", successMsg)
 		w.Header().Set("X-Toast-Type", "success")
-		respondSuccess(w, "File deleted", nil)
+		respondSuccess(w, successMsg, nil)
 		return
 	}
 
@@ -3055,20 +3073,42 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 
 		deleted := 0
 		errors := 0
+		var errorMessages []string
+
 		for _, file := range files {
-			if err := s.db.DeleteFile(file.ID, "Bulk orphaned cleanup"); err != nil {
+			if err := s.db.DeleteFile(file.ID, "Bulk orphaned cleanup", deleteFromFilesystem); err != nil {
 				errors++
+				// Track filesystem errors separately
+				if deleteFromFilesystem && strings.Contains(err.Error(), "failed to delete file from filesystem") {
+					errorMessages = append(errorMessages, fmt.Sprintf("%s: %v", file.Path, err))
+				}
 				continue
 			}
 			deleted++
 		}
 
-		w.Header().Set("X-Toast-Message", fmt.Sprintf("Deleted %d files", deleted))
-		w.Header().Set("X-Toast-Type", "success")
+		// Build success message
+		var msg string
+		if deleteFromFilesystem {
+			msg = fmt.Sprintf("Deleted %d files from filesystem", deleted)
+		} else {
+			msg = fmt.Sprintf("Removed %d files from database", deleted)
+		}
+
+		if errors > 0 {
+			msg = fmt.Sprintf("%s (%d errors)", msg, errors)
+		}
+
+		w.Header().Set("X-Toast-Message", msg)
+		if errors > 0 {
+			w.Header().Set("X-Toast-Type", "warning")
+		} else {
+			w.Header().Set("X-Toast-Type", "success")
+		}
 
 		response := BulkDeleteResponse{
 			Status:  "success",
-			Message: "Bulk deletion completed",
+			Message: msg,
 			Deleted: deleted,
 			Errors:  errors,
 		}

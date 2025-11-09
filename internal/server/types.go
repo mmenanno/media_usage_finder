@@ -125,11 +125,12 @@ type FilesData struct {
 	OrderBy           string
 	Direction         string
 	Extensions        []string
-	Devices           []string             // Selected device names for filtering
-	AvailableDisks    []*disk.DiskInfo     // Available disks for filter dropdown
-	DiskResolver      *disk.DeviceResolver // For resolving device IDs to friendly names
-	HasDiskLocations  bool                 // True if disk location tracking is enabled
-	Version           string               // Application version
+	Devices                  []string             // Selected device names for filtering
+	AvailableDisks           []*disk.DiskInfo     // Available disks for filter dropdown
+	DiskResolver             *disk.DeviceResolver // For resolving device IDs to friendly names
+	HasDiskLocations         bool                 // True if disk location tracking is enabled
+	Version                  string               // Application version
+	DeleteFilesFromFilesystem bool                // Config setting for filesystem deletion
 }
 
 // ConfigData represents data for the configuration template

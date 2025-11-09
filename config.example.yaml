@@ -53,6 +53,20 @@ scan_log_retention_days: 30
 # - Ensures database stays in sync with filesystem
 auto_cleanup_deleted_files: true
 
+# Delete Files From Filesystem: Controls delete button behavior
+# ⚠️  WARNING: SETTING THIS TO TRUE IS EXTREMELY DANGEROUS! ⚠️
+# - Default: false (SAFE - only removes from database)
+# - When false: Delete operations only remove database records (files remain on disk)
+# - When true: Delete operations PERMANENTLY DELETE files from the filesystem
+# - Applies to ALL delete operations:
+#   * Single file delete button
+#   * "Delete Selected" batch operation
+#   * "Delete All Orphaned" bulk operation
+# - CANNOT BE UNDONE - files are permanently deleted from disk
+# - Recommended: Keep false and manually delete files if needed
+# - Only enable if you understand the risks and need this feature
+delete_files_from_filesystem: false
+
 # Database Connection Pool Settings
 # - Defaults are optimized for SQLite with WAL mode
 # - max_open_conns: Maximum concurrent database connections

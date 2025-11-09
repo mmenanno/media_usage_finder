@@ -18,9 +18,10 @@ type Config struct {
 	DiskScanWorkers   int           `yaml:"disk_scan_workers"` // Workers for disk location scanning
 	APITimeout        time.Duration `yaml:"api_timeout"`
 	CORSAllowedOrigin       string        `yaml:"cors_allowed_origin"`
-	StatsCacheTTL           time.Duration `yaml:"stats_cache_ttl"`
-	ScanLogRetentionDays    int           `yaml:"scan_log_retention_days"`
-	AutoCleanupDeletedFiles bool          `yaml:"auto_cleanup_deleted_files"`
+	StatsCacheTTL            time.Duration `yaml:"stats_cache_ttl"`
+	ScanLogRetentionDays     int           `yaml:"scan_log_retention_days"`
+	AutoCleanupDeletedFiles  bool          `yaml:"auto_cleanup_deleted_files"`
+	DeleteFilesFromFilesystem bool         `yaml:"delete_files_from_filesystem"` // Delete files from filesystem when deleting from DB (DANGEROUS!)
 
 	// Database connection pool settings
 	DBMaxOpenConns    int           `yaml:"db_max_open_conns"`
@@ -131,10 +132,11 @@ func Default() *Config {
 		ScanBufferSize:       100,
 		APITimeout:           30 * time.Second,
 		CORSAllowedOrigin:       "http://localhost:8787",
-		StatsCacheTTL:           30 * time.Second,
-		ScanLogRetentionDays:    30,
-		AutoCleanupDeletedFiles: true,
-		DBMaxOpenConns:          25,
+		StatsCacheTTL:            30 * time.Second,
+		ScanLogRetentionDays:     30,
+		AutoCleanupDeletedFiles:  true,
+		DeleteFilesFromFilesystem: false, // Default to safe behavior (DB only)
+		DBMaxOpenConns:           25,
 		DBMaxIdleConns:       5,
 		DBConnMaxLifetime:    5 * time.Minute,
 		DBCacheSize:          1000000, // 1GB SQLite cache

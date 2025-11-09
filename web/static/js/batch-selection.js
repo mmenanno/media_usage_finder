@@ -359,19 +359,31 @@ class BatchSelection {
     async deleteSelected() {
         if (this.selectedFiles.size === 0) return;
 
-        const confirmed = await window.confirmDialog(
-            `You are about to permanently delete ${this.selectedFiles.size} files. This action cannot be undone.`,
-            'Delete Files'
-        );
+        // Check if filesystem deletion is enabled (from global config)
+        const deleteFromFilesystem = window.appConfig?.deleteFilesFromFilesystem || false;
+
+        // Build appropriate confirmation message
+        let confirmMessage;
+        let confirmTitle;
+        if (deleteFromFilesystem) {
+            confirmMessage = `⚠️  WARNING: You are about to PERMANENTLY DELETE ${this.selectedFiles.size} files from the FILESYSTEM.\n\nThis will remove the actual files from disk and CANNOT BE UNDONE.\n\nAre you absolutely sure?`;
+            confirmTitle = 'Delete Files From Filesystem';
+        } else {
+            confirmMessage = `You are about to remove ${this.selectedFiles.size} files from the database.\n\nThe actual files will remain on disk. You can re-scan to add them back.\n\nContinue?`;
+            confirmTitle = 'Remove From Database';
+        }
+
+        const confirmed = await window.confirmDialog(confirmMessage, confirmTitle);
 
         if (!confirmed) {
             return;
         }
 
         // Show loading state and disable buttons
-        this.setLoadingState(true, 'Deleting files...');
+        const loadingMsg = deleteFromFilesystem ? 'Deleting files from filesystem...' : 'Removing files from database...';
+        this.setLoadingState(true, loadingMsg);
         this.setButtonsDisabled(true);
-        window.showToast && window.showToast('Deleting files...', 'info');
+        window.showToast && window.showToast(loadingMsg, 'info');
 
         try {
             // Use batched concurrent requests to avoid overwhelming the server
@@ -391,10 +403,17 @@ class BatchSelection {
                 deletedCount++;
             }, 10); // Process 10 at a time
 
-            window.showToast && window.showToast(`Deleted ${deletedCount} files`, 'success');
+            // Show appropriate success message
+            const successMsg = deleteFromFilesystem
+                ? `Deleted ${deletedCount} files from filesystem`
+                : `Removed ${deletedCount} files from database`;
+            window.showToast && window.showToast(successMsg, 'success');
             this.clearSelection();
         } catch (error) {
-            window.showToast && window.showToast('Failed to delete some files', 'error');
+            const errorMsg = deleteFromFilesystem
+                ? 'Failed to delete some files from filesystem'
+                : 'Failed to remove some files from database';
+            window.showToast && window.showToast(errorMsg, 'error');
         } finally {
             this.setLoadingState(false);
             this.setButtonsDisabled(false);

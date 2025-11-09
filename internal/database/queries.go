@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 )
@@ -1732,23 +1733,45 @@ func (db *DB) GetHardlinksByInodeDevice(inode, deviceID int64) ([]*File, error) 
 }
 
 // DeleteFile deletes a file and logs the action
-func (db *DB) DeleteFile(fileID int64, details string) error {
+func (db *DB) DeleteFile(fileID int64, details string, deleteFromFilesystem bool) error {
 	tx, err := db.BeginTx()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	// Log the deletion
+	// Get file path before deletion (needed for filesystem deletion and audit log)
+	var filePath string
+	err = tx.QueryRow(`SELECT path FROM files WHERE id = ?`, fileID).Scan(&filePath)
+	if err != nil {
+		return fmt.Errorf("failed to get file path: %w", err)
+	}
+
+	// Optionally delete from filesystem
+	if deleteFromFilesystem {
+		if err := os.Remove(filePath); err != nil {
+			// If filesystem deletion fails, don't delete from DB
+			return fmt.Errorf("failed to delete file from filesystem (%s): %w", filePath, err)
+		}
+	}
+
+	// Log the deletion with filesystem status
+	auditDetails := details
+	if deleteFromFilesystem {
+		auditDetails = fmt.Sprintf("%s (deleted from filesystem: %s)", details, filePath)
+	} else {
+		auditDetails = fmt.Sprintf("%s (DB only)", details)
+	}
+
 	_, err = tx.Exec(
 		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('delete', 'file', ?, ?)`,
-		fileID, details,
+		fileID, auditDetails,
 	)
 	if err != nil {
 		return err
 	}
 
-	// Delete the file (usage records will be cascade deleted)
+	// Delete the file record (usage records will be cascade deleted)
 	_, err = tx.Exec(`DELETE FROM files WHERE id = ?`, fileID)
 	if err != nil {
 		return err
@@ -1825,12 +1848,12 @@ func (db *DB) MarkFileForRescan(fileID int64) error {
 }
 
 // DeleteFileByPath deletes a file by its path
-func (db *DB) DeleteFileByPath(path string, details string) error {
+func (db *DB) DeleteFileByPath(path string, details string, deleteFromFilesystem bool) error {
 	file, err := db.GetFileByPath(path)
 	if err != nil {
 		return err
 	}
-	return db.DeleteFile(file.ID, details)
+	return db.DeleteFile(file.ID, details, deleteFromFilesystem)
 }
 
 // SetConfig sets a configuration value

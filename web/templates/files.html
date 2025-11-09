@@ -1,6 +1,16 @@
 {{template "layout.html" .}}
 
 {{define "content"}}
+<!-- Expose config settings to JavaScript via data attribute -->
+<div id="app-config" data-delete-files-from-filesystem="{{.DeleteFilesFromFilesystem}}" style="display:none;"></div>
+<script>
+    (function() {
+        var configEl = document.getElementById('app-config');
+        window.appConfig = window.appConfig || {};
+        window.appConfig.deleteFilesFromFilesystem = configEl.getAttribute('data-delete-files-from-filesystem') === 'true';
+    })();
+</script>
+
 <div class="space-y-6">
     <div class="flex justify-between items-center">
         <h2 class="text-3xl font-bold">Files</h2>
@@ -375,13 +385,17 @@
                                 </button>
                                 <button
                                     hx-delete="/api/files/delete?id={{.File.ID}}"
-                                    hx-confirm="Are you sure you want to delete this file? This action cannot be undone."
+                                    {{if .DeleteFilesFromFilesystem}}
+                                    hx-confirm="⚠️  WARNING: Permanently delete this file from the filesystem?\n\nThis will remove the actual file from disk and CANNOT be undone."
+                                    {{else}}
+                                    hx-confirm="Remove this file from the database?\n\nThe actual file will remain on disk."
+                                    {{end}}
                                     hx-target="closest tr"
                                     hx-swap="delete"
                                     aria-label="Delete file"
                                     class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition whitespace-nowrap flex items-center gap-1.5">
                                     <span class="file-delete-icon"></span>
-                                    <span>Delete</span>
+                                    <span>{{if .DeleteFilesFromFilesystem}}Delete{{else}}Remove{{end}}</span>
                                 </button>
                             </div>
                         </td>
@@ -1044,9 +1058,13 @@
                     </button>
                     <button
                         hx-delete="/api/files/delete?orphaned=true"
-                        hx-confirm="Are you ABSOLUTELY SURE you want to delete ALL {{.Total}} orphaned files? This CANNOT be undone!"
+                        {{if .DeleteFilesFromFilesystem}}
+                        hx-confirm="⚠️  WARNING: You are about to PERMANENTLY DELETE ALL {{.Total}} orphaned files from the FILESYSTEM.\n\nThis will remove the actual files from disk and CANNOT BE UNDONE.\n\nAre you absolutely sure?"
+                        {{else}}
+                        hx-confirm="Remove all {{.Total}} orphaned files from the database?\n\nThe actual files will remain on disk. You can re-scan to add them back.\n\nContinue?"
+                        {{end}}
                         class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded transition">
-                        Delete All Orphaned
+                        {{if .DeleteFilesFromFilesystem}}Delete All Orphaned{{else}}Remove All Orphaned{{end}}
                     </button>
                 </div>
             </div>

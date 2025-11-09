@@ -111,7 +111,7 @@ func (c *Consolidator) processGroup(plan *ConsolidationPlan, dryRun bool) error 
 		// Update database - remove file from files table
 		details := fmt.Sprintf("Cross-disk consolidation: kept %s on %s, deleted duplicate on %s",
 			plan.KeepFile.Path, plan.KeepFile.DiskName, deleteFile.DiskName)
-		if err := c.db.DeleteFileByPath(deleteFile.Path, details); err != nil {
+		if err := c.db.DeleteFileByPath(deleteFile.Path, details, false); err != nil {
 			log.Printf("WARNING: Failed to update database after deleting %s: %v", deleteFile.Path, err)
 		}
 
