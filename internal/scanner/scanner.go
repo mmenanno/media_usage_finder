@@ -117,7 +117,10 @@ func (s *Scanner) RescanFiles(ctx context.Context, paths []string) error {
 
 	// Track context for cancellation
 	s.scanCtx = ctx
-	defer func() { s.scanCtx = nil }()
+	defer func() {
+		s.scanCtx = nil
+		s.progress = nil
+	}()
 
 	// Store errors
 	var errors []string

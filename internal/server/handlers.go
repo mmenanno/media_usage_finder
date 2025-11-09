@@ -3874,7 +3874,9 @@ func (s *Server) renderTemplate(w http.ResponseWriter, name string, data interfa
 	// Execute layout.html which will call the "content" block from the specific page template
 	if err := tmpl.ExecuteTemplate(w, "layout.html", data); err != nil {
 		log.Printf("ERROR: Failed to execute template %s: %v", name, err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// Don't try to send error response if template execution failed
+		// Headers may have already been sent, causing "superfluous WriteHeader" error
+		// This is especially common with broken pipe errors (client disconnect)
 	}
 }
 
