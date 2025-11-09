@@ -244,7 +244,7 @@
                         <span id="apply-filters-icon"></span>
                         <span>Apply Filters</span>
                     </button>
-                    <a href="/files" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition flex items-center gap-2">
+                    <a href="/files" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded transition flex items-center gap-2 no-underline">
                         <span id="clear-filters-icon"></span>
                         <span>Clear</span>
                     </a>
@@ -459,7 +459,7 @@
             <div class="flex space-x-2">
                 {{if gt .Page 1}}
                 <a href="/files?page={{sub .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
-                   class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition">
+                   class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition no-underline">
                     Previous
                 </a>
                 {{end}}
@@ -467,7 +467,7 @@
                 {{if lt .Page .TotalPages}}
                 <a id="next-page-btn"
                    href="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
-                   class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition"
+                   class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm transition no-underline"
                    data-next-url="/files?page={{add .Page 1}}&limit={{.Limit}}{{if .Orphaned}}&orphaned=true{{end}}{{if .Hardlinks}}&hardlink=true{{end}}{{if .Services}}&services={{range $i, $svc := .Services}}{{if $i}},{{end}}{{$svc}}{{end}}{{end}}{{if .ServiceFilterMode}}&service_filter_mode={{.ServiceFilterMode}}{{end}}{{if .Extensions}}&extensions={{range $i, $ext := .Extensions}}{{if $i}},{{end}}{{$ext}}{{end}}{{end}}{{if .Search}}&search={{.Search}}{{end}}{{if .OrderBy}}&order={{.OrderBy}}{{end}}{{if .Direction}}&direction={{.Direction}}{{end}}"
                    data-current-page="{{.Page}}"
                    data-total-pages="{{.TotalPages}}">

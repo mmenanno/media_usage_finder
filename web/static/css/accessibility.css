@@ -87,12 +87,12 @@ textarea:focus-visible {
     outline: none;
 }
 
-/* Improved link states */
-a:hover {
+/* Improved link states - only for text links, not button-styled links */
+a:not(.no-underline):hover {
     text-decoration: underline;
 }
 
-a:focus {
+a:not(.no-underline):focus {
     text-decoration: underline;
 }
 
