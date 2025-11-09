@@ -1780,6 +1780,18 @@ func (db *DB) DeleteFile(fileID int64, details string, deleteFromFilesystem bool
 	return tx.Commit()
 }
 
+// LogDeletionError logs a failed deletion attempt to the audit_log
+func (db *DB) LogDeletionError(fileID int64, path string, err error) error {
+	_, execErr := db.conn.Exec(
+		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES (?, ?, ?, ?)`,
+		"delete_failed",
+		"file",
+		fileID,
+		fmt.Sprintf("Failed to delete %s: %v", path, err),
+	)
+	return execErr
+}
+
 // MarkFilesForRescan marks files matching a predefined filter for rescan
 // Only accepts predefined safe filter types to prevent SQL injection
 func (db *DB) MarkFilesForRescan(filterType string) (int64, error) {

@@ -3060,47 +3060,62 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 
 	// Bulk orphaned files deletion
 	if orphaned {
-		files, _, err := s.db.ListFiles(true, nil, "any", false, nil, nil, constants.MaxExportFiles, 0, "path", "asc")
-		if err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to list orphaned files", "list_failed")
-			return
+		// Process files in batches to avoid loading everything into memory
+		batchSize := 1000
+		offset := 0
+		totalDeleted := 0
+		totalErrors := 0
+
+		for {
+			// Fetch batch of orphaned files
+			files, _, err := s.db.ListFiles(true, nil, "any", false, nil, nil, batchSize, offset, "path", "asc")
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "Failed to list orphaned files", "list_failed")
+				return
+			}
+
+			// No more files to process
+			if len(files) == 0 {
+				break
+			}
+
+			// Delete current batch
+			for _, file := range files {
+				if err := s.db.DeleteFile(file.ID, "Bulk orphaned cleanup", deleteFromFilesystem); err != nil {
+					totalErrors++
+					// Log failed deletion to audit_log
+					if logErr := s.db.LogDeletionError(file.ID, file.Path, err); logErr != nil {
+						log.Printf("Failed to log deletion error for %s: %v", file.Path, logErr)
+					}
+					continue
+				}
+				totalDeleted++
+			}
+
+			// Move to next batch
+			offset += batchSize
 		}
 
-		if len(files) == 0 {
+		// Check if any files were found
+		if totalDeleted == 0 && totalErrors == 0 {
 			respondSuccess(w, "No orphaned files to delete", nil)
 			return
-		}
-
-		deleted := 0
-		errors := 0
-		var errorMessages []string
-
-		for _, file := range files {
-			if err := s.db.DeleteFile(file.ID, "Bulk orphaned cleanup", deleteFromFilesystem); err != nil {
-				errors++
-				// Track filesystem errors separately
-				if deleteFromFilesystem && strings.Contains(err.Error(), "failed to delete file from filesystem") {
-					errorMessages = append(errorMessages, fmt.Sprintf("%s: %v", file.Path, err))
-				}
-				continue
-			}
-			deleted++
 		}
 
 		// Build success message
 		var msg string
 		if deleteFromFilesystem {
-			msg = fmt.Sprintf("Deleted %d files from filesystem", deleted)
+			msg = fmt.Sprintf("Deleted %d files from filesystem", totalDeleted)
 		} else {
-			msg = fmt.Sprintf("Removed %d files from database", deleted)
+			msg = fmt.Sprintf("Removed %d files from database", totalDeleted)
 		}
 
-		if errors > 0 {
-			msg = fmt.Sprintf("%s (%d errors)", msg, errors)
+		if totalErrors > 0 {
+			msg = fmt.Sprintf("%s (%d errors)", msg, totalErrors)
 		}
 
 		w.Header().Set("X-Toast-Message", msg)
-		if errors > 0 {
+		if totalErrors > 0 {
 			w.Header().Set("X-Toast-Type", "warning")
 		} else {
 			w.Header().Set("X-Toast-Type", "success")
@@ -3109,8 +3124,8 @@ func (s *Server) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
 		response := BulkDeleteResponse{
 			Status:  "success",
 			Message: msg,
-			Deleted: deleted,
-			Errors:  errors,
+			Deleted: totalDeleted,
+			Errors:  totalErrors,
 		}
 		respondJSON(w, http.StatusOK, response)
 		return
