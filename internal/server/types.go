@@ -111,7 +111,7 @@ type DashboardData struct {
 // FilesData represents data for the files list template
 type FilesData struct {
 	Files             interface{}
-	Total             int
+	Total             int64
 	Page              int64
 	Limit             int
 	TotalPages        int
@@ -155,7 +155,7 @@ type StatsData struct {
 // HardlinksData represents data for the hardlinks template
 type HardlinksData struct {
 	Groups     interface{}
-	Total      int
+	Total      int64
 	Showing    int    // Number of groups shown on current page
 	Page       int64
 	TotalPages int
@@ -169,7 +169,7 @@ type HardlinksData struct {
 // ScansData represents data for the scans history template
 type ScansData struct {
 	Scans      interface{}
-	Total      int
+	Total      int64
 	Page       int64
 	TotalPages int
 	Title      string

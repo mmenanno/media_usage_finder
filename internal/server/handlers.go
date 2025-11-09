@@ -402,7 +402,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 
 	data := FilesData{
 		Files:             filesWithUsage,
-		Total:             total,
+		Total:             int64(total),
 		Page:              int64(page),
 		Limit:             limit,
 		TotalPages:        CalculateTotalPages(total, limit),
@@ -584,7 +584,7 @@ func (s *Server) HandleHardlinks(w http.ResponseWriter, r *http.Request) {
 
 	data := HardlinksData{
 		Groups:     groups,
-		Total:      total,
+		Total:      int64(total),
 		Showing:    len(groups),
 		Page:       int64(page),
 		TotalPages: CalculateTotalPages(total, limit),
@@ -642,7 +642,7 @@ func (s *Server) HandleScans(w http.ResponseWriter, r *http.Request) {
 
 	data := ScansData{
 		Scans:      scanDisplays,
-		Total:      total,
+		Total:      int64(total),
 		Page:       int64(page),
 		TotalPages: CalculateTotalPages(total, limit),
 		Title:      "Scan History",
