@@ -152,7 +152,7 @@
                                     </a>
 
                                     <!-- Error Display -->
-                                    {{if .Errors}}
+                                    {{if and .Errors (ne .Errors "")}}
                                         <button
                                             data-action="show-error-details"
                                             data-scan-id="{{.ID}}"
