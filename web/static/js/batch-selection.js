@@ -370,15 +370,18 @@ class BatchSelection {
         // Build appropriate confirmation message
         let confirmMessage;
         let confirmTitle;
+        let confirmType = 'confirm';
+
         if (deleteFromFilesystem) {
-            confirmMessage = `⚠️  WARNING: You are about to PERMANENTLY DELETE ${this.selectedFiles.size} files from the FILESYSTEM.\n\nThis will remove the actual files from disk and CANNOT BE UNDONE.\n\nAre you absolutely sure?`;
+            confirmMessage = `<strong>Warning:</strong> You are about to permanently delete <strong>${this.selectedFiles.size} files</strong> from the filesystem.\n\nThis will remove the actual files from disk and <strong>cannot be undone</strong>.\n\nAre you absolutely sure?`;
             confirmTitle = 'Delete Files From Filesystem';
+            confirmType = 'warning';
         } else {
             confirmMessage = `You are about to remove ${this.selectedFiles.size} files from the database.\n\nThe actual files will remain on disk. You can re-scan to add them back.\n\nContinue?`;
             confirmTitle = 'Remove From Database';
         }
 
-        const confirmed = await window.confirmDialog(confirmMessage, confirmTitle);
+        const confirmed = await window.confirmDialog(confirmMessage, confirmTitle, confirmType);
 
         if (!confirmed) {
             return;

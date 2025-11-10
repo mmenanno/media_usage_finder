@@ -1073,7 +1073,7 @@
                     <button
                         hx-delete="/api/files/delete?orphaned=true"
                         {{if .DeleteFilesFromFilesystem}}
-                        hx-confirm="⚠️  WARNING: You are about to PERMANENTLY DELETE ALL {{formatNumber .Total}} orphaned files from the FILESYSTEM.\n\nThis will remove the actual files from disk and CANNOT BE UNDONE.\n\nAre you absolutely sure?"
+                        hx-confirm="<strong>Warning:</strong> You are about to permanently delete all <strong>{{formatNumber .Total}} orphaned files</strong> from the filesystem.\n\nThis will remove the actual files from disk and <strong>cannot be undone</strong>.\n\nAre you absolutely sure?"
                         {{else}}
                         hx-confirm="Remove all {{formatNumber .Total}} orphaned files from the database?\n\nThe actual files will remain on disk. You can re-scan to add them back.\n\nContinue?"
                         {{end}}

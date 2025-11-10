@@ -27,7 +27,21 @@ class ModalManager {
             const question = event.detail.question;
             const target = event.target;
 
-            this.confirm(question).then((result) => {
+            // Detect dialog type and title from message content
+            let dialogType = 'confirm';
+            let dialogTitle = 'Confirm Action';
+
+            // Check for warning/danger keywords to show warning icon
+            const lowerQuestion = question.toLowerCase();
+            if (lowerQuestion.includes('warning') ||
+                lowerQuestion.includes('permanently') ||
+                lowerQuestion.includes('cannot be undone') ||
+                lowerQuestion.includes('delete') && lowerQuestion.includes('filesystem')) {
+                dialogType = 'warning';
+                dialogTitle = 'Warning';
+            }
+
+            this.confirm(question, dialogTitle, dialogType).then((result) => {
                 if (result) {
                     // Temporarily remove hx-confirm to prevent double confirmation
                     const confirmValue = target.getAttribute('hx-confirm');
@@ -47,12 +61,12 @@ class ModalManager {
         });
     }
 
-    confirm(message, title = 'Confirm Action') {
+    confirm(message, title = 'Confirm Action', type = 'confirm') {
         return new Promise((resolve) => {
             const modal = this.createModal({
                 title,
                 message,
-                type: 'confirm',
+                type,
                 buttons: [
                     { text: 'Cancel', class: 'secondary', action: () => resolve(false) },
                     { text: 'Confirm', class: 'primary', action: () => resolve(true) }
@@ -220,9 +234,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Expose for manual use
-window.confirmDialog = (message, title) => {
+window.confirmDialog = (message, title, type = 'confirm') => {
     if (window.modalManager) {
-        return window.modalManager.confirm(message, title);
+        return window.modalManager.confirm(message, title, type);
     }
     return Promise.resolve(confirm(message));
 };
