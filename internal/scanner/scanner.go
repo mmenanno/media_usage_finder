@@ -1639,14 +1639,14 @@ func (s *Scanner) associateStashGalleryImages() error {
 	}
 
 	// Build a list of gallery folder paths
+	// Gallery folders are stored with empty extension (no file extension)
 	var galleryFolders []string
 	for _, stashFile := range stashFiles {
-		// Check if this is a folder path (directory, not a file)
-		// Gallery folders typically don't have common media extensions
+		// Check if this is a folder path (no extension = folder)
+		// Files have extensions like .mp4, .mkv, .zip, etc.
 		ext := filepath.Ext(stashFile.Path)
-		if ext == "" || (!strings.HasSuffix(ext, ".mp4") && !strings.HasSuffix(ext, ".mkv") &&
-		    !strings.HasSuffix(ext, ".avi") && !strings.HasSuffix(ext, ".zip")) {
-			// Likely a folder path
+		if ext == "" {
+			// This is a folder path
 			galleryFolders = append(galleryFolders, stashFile.Path)
 		}
 	}
@@ -1656,7 +1656,12 @@ func (s *Scanner) associateStashGalleryImages() error {
 		return nil
 	}
 
-	log.Printf("stash: Found %d potential gallery folders, searching for images", len(galleryFolders))
+	log.Printf("stash: Found %d gallery folders, searching for images", len(galleryFolders))
+
+	// Debug: Log first few gallery folders
+	for i := 0; i < len(galleryFolders) && i < 3; i++ {
+		log.Printf("stash: Sample gallery folder: %s", galleryFolders[i])
+	}
 
 	// Query for all image files in the database
 	imageExts := []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
@@ -1672,6 +1677,11 @@ func (s *Scanner) associateStashGalleryImages() error {
 
 	log.Printf("stash: Found %d image files, matching to gallery folders...", len(allImages))
 
+	// Debug: Log first few image paths
+	for i := 0; i < len(allImages) && i < 3; i++ {
+		log.Printf("stash: Sample image path: %s", allImages[i].Path)
+	}
+
 	// Match image files to gallery folders
 	var matchedImages []*database.File
 	for _, imageFile := range allImages {
@@ -1686,6 +1696,7 @@ func (s *Scanner) associateStashGalleryImages() error {
 
 	if len(matchedImages) == 0 {
 		log.Printf("stash: No gallery images matched to folders")
+		log.Printf("stash: Debug - this likely means gallery folders don't match image file paths")
 		return nil
 	}
 
