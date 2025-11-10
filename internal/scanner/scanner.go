@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -1320,7 +1322,7 @@ func (s *Scanner) updatePlexUsage() error {
 		return nil
 	}
 
-	return s.updateServiceUsageWithTimeout(
+	err := s.updateServiceUsageWithTimeout(
 		"plex",
 		func(ctx context.Context) ([]serviceFile, error) {
 			client := api.NewPlexClient(s.config.Services.Plex.URL, s.config.Services.Plex.Token, s.config.APITimeout)
@@ -1336,6 +1338,119 @@ func (s *Scanner) updatePlexUsage() error {
 			return serviceFiles, nil
 		},
 	)
+
+	if err != nil {
+		return err
+	}
+
+	// Associate subtitle files with Plex media
+	return s.associatePlexSubtitles()
+}
+
+// associatePlexSubtitles finds subtitle files associated with Plex media and marks them as used by Plex
+func (s *Scanner) associatePlexSubtitles() error {
+	ctx := context.Background()
+	if s.scanCtx != nil {
+		ctx = s.scanCtx
+	}
+
+	log.Printf("plex: Associating subtitle files with media")
+
+	// Get all files currently used by Plex (these are the video files)
+	plexVideoFiles, err := s.db.GetFilesByService(ctx, "plex")
+	if err != nil {
+		return fmt.Errorf("failed to get Plex video files: %w", err)
+	}
+
+	if len(plexVideoFiles) == 0 {
+		log.Printf("plex: No video files found, skipping subtitle association")
+		return nil
+	}
+
+	log.Printf("plex: Found %d video files, searching for associated subtitles", len(plexVideoFiles))
+
+	// Common subtitle extensions and patterns
+	subtitleExts := []string{".srt", ".sub", ".sbv", ".ssa", ".ass", ".vtt"}
+	// Common language codes (2 and 3 letter)
+	langCodes := []string{
+		"en", "eng", "es", "spa", "fr", "fra", "de", "ger", "deu",
+		"it", "ita", "pt", "por", "ja", "jpn", "ko", "kor",
+		"zh", "chi", "zho", "ar", "ara", "ru", "rus", "hi", "hin",
+		"nl", "nld", "pl", "pol", "sv", "swe", "tr", "tur",
+	}
+	// Common subtitle tags
+	tags := []string{"forced", "sdh", "cc", "hi"}
+
+	// Generate potential subtitle paths for each video file
+	var potentialSubtitlePaths []string
+	for _, videoFile := range plexVideoFiles {
+		// Get the base path without extension
+		dir := filepath.Dir(videoFile.Path)
+		ext := filepath.Ext(videoFile.Path)
+		basename := strings.TrimSuffix(filepath.Base(videoFile.Path), ext)
+
+		// Pattern 1: {basename}.{subext}
+		for _, subExt := range subtitleExts {
+			potentialSubtitlePaths = append(potentialSubtitlePaths, filepath.Join(dir, basename+subExt))
+		}
+
+		// Pattern 2: {basename}.{lang}.{subext}
+		for _, lang := range langCodes {
+			for _, subExt := range subtitleExts {
+				potentialSubtitlePaths = append(potentialSubtitlePaths, filepath.Join(dir, fmt.Sprintf("%s.%s%s", basename, lang, subExt)))
+			}
+		}
+
+		// Pattern 3: {basename}.{number}.{lang}.{subext} (for multiple tracks)
+		for i := 1; i <= 5; i++ { // Support up to 5 tracks per language
+			for _, lang := range langCodes {
+				for _, subExt := range subtitleExts {
+					potentialSubtitlePaths = append(potentialSubtitlePaths, filepath.Join(dir, fmt.Sprintf("%s.%d.%s%s", basename, i, lang, subExt)))
+				}
+			}
+		}
+
+		// Pattern 4: {basename}.{lang}.{tag}.{subext}
+		for _, lang := range langCodes {
+			for _, tag := range tags {
+				for _, subExt := range subtitleExts {
+					potentialSubtitlePaths = append(potentialSubtitlePaths, filepath.Join(dir, fmt.Sprintf("%s.%s.%s%s", basename, lang, tag, subExt)))
+				}
+			}
+		}
+	}
+
+	log.Printf("plex: Generated %d potential subtitle paths, querying database...", len(potentialSubtitlePaths))
+
+	// Query database for files that match these paths
+	foundSubtitles, err := s.db.GetFilesByPaths(ctx, potentialSubtitlePaths)
+	if err != nil {
+		return fmt.Errorf("failed to query subtitle files: %w", err)
+	}
+
+	if len(foundSubtitles) == 0 {
+		log.Printf("plex: No subtitle files found in database")
+		return nil
+	}
+
+	log.Printf("plex: Found %d subtitle files, creating usage records", len(foundSubtitles))
+
+	// Create usage records for found subtitle files
+	var usages []*database.Usage
+	for _, subtitleFile := range foundSubtitles {
+		usages = append(usages, &database.Usage{
+			FileID:  subtitleFile.ID,
+			Service: "plex",
+		})
+	}
+
+	// Batch insert usage records
+	if err := s.db.BatchUpsertUsage(ctx, usages); err != nil {
+		return fmt.Errorf("failed to create subtitle usage records: %w", err)
+	}
+
+	log.Printf("plex: Successfully associated %d subtitle files with Plex media", len(usages))
+	return nil
 }
 
 // updateSonarrUsage updates usage information from Sonarr

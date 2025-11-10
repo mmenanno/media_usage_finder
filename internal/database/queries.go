@@ -383,6 +383,38 @@ func (db *DB) GetFilesByPaths(ctx context.Context, paths []string) (map[string]*
 	return fileMap, nil
 }
 
+// GetFilesByService retrieves all files that are used by a specific service
+func (db *DB) GetFilesByService(ctx context.Context, service string) ([]*File, error) {
+	query := `
+		SELECT f.id, f.path, f.size, f.inode, f.device_id, f.modified_time, f.scan_id, f.last_verified, f.is_orphaned, f.extension, f.created_at
+		FROM files f
+		INNER JOIN usage u ON f.id = u.file_id
+		WHERE u.service = ?
+		ORDER BY f.path
+	`
+
+	rows, err := db.conn.QueryContext(ctx, query, service)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query files by service: %w", err)
+	}
+	defer rows.Close()
+
+	var files []*File
+	for rows.Next() {
+		file, err := scanFileRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, file)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
 // GetAllFilesMap loads all files from the database into memory as a map
 // This is optimized for incremental scans where we need fast lookups for every file
 // WARNING: This loads the entire files table into memory - use only when appropriate
