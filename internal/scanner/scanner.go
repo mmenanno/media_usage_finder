@@ -1560,8 +1560,9 @@ func (s *Scanner) associateQBittorrentIncompleteFiles() error {
 	}
 
 	// Query for all .!qB files in the database
-	// Note: Extensions are stored WITH leading dot in database
-	incompleteFiles, err := s.db.GetFilesByExtensions(ctx, []string{".!qB"})
+	// Note: Extensions are stored as compound extensions (.mkv.!qb, .mp4.!qb, etc.)
+	// So we need to search for files where extension ends with .!qb
+	incompleteFiles, err := s.db.GetFilesByExtensionSuffix(ctx, ".!qb")
 	if err != nil {
 		return fmt.Errorf("failed to query .!qB files: %w", err)
 	}
@@ -1573,12 +1574,13 @@ func (s *Scanner) associateQBittorrentIncompleteFiles() error {
 
 	log.Printf("qBittorrent: Found %d .!qB files, matching to active torrents...", len(incompleteFiles))
 
-	// Match .!qB files to qBittorrent files by stripping the .!qB extension
+	// Match .!qB files to qBittorrent files by stripping the .!qb extension
 	var matchedIncomplete []*database.File
 	for _, incompleteFile := range incompleteFiles {
-		// Strip .!qB extension to get the expected final filename
-		// e.g., /downloads/Movie.mkv.!qB -> /downloads/Movie.mkv
-		expectedPath := strings.TrimSuffix(incompleteFile.Path, ".!qB")
+		// Strip .!qb extension to get the expected final filename
+		// e.g., /downloads/Movie.mkv.!qb -> /downloads/Movie.mkv
+		// Note: Extensions are stored lowercase, so trim lowercase .!qb
+		expectedPath := strings.TrimSuffix(incompleteFile.Path, ".!qb")
 
 		// Check if qBittorrent has this file in its active torrents
 		if qbFilePaths[expectedPath] {

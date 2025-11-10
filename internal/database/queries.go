@@ -458,6 +458,41 @@ func (db *DB) GetFilesByExtensions(ctx context.Context, extensions []string) ([]
 	return files, nil
 }
 
+// GetFilesByExtensionSuffix retrieves all files where extension ends with the given suffix
+// This is useful for compound extensions like .!qb which can be .mkv.!qb, .mp4.!qb, etc.
+func (db *DB) GetFilesByExtensionSuffix(ctx context.Context, suffix string) ([]*File, error) {
+	query := `
+		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, extension, created_at
+		FROM files
+		WHERE extension LIKE ?
+		ORDER BY path
+	`
+
+	// Use LIKE with % wildcard for suffix matching
+	pattern := "%" + suffix
+
+	rows, err := db.conn.QueryContext(ctx, query, pattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query files by extension suffix: %w", err)
+	}
+	defer rows.Close()
+
+	var files []*File
+	for rows.Next() {
+		file, err := scanFileRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, file)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
 // GetAllFilesMap loads all files from the database into memory as a map
 // This is optimized for incremental scans where we need fast lookups for every file
 // WARNING: This loads the entire files table into memory - use only when appropriate
