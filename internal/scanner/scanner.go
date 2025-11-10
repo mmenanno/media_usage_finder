@@ -1617,13 +1617,108 @@ func (s *Scanner) associateQBittorrentIncompleteFiles() error {
 	return nil
 }
 
+// associateStashGalleryImages finds image files in Stash gallery folders and marks them as used by Stash
+// Stash gallery folders are tracked by folder path, but individual images aren't returned by the API
+func (s *Scanner) associateStashGalleryImages() error {
+	ctx := context.Background()
+	if s.scanCtx != nil {
+		ctx = s.scanCtx
+	}
+
+	log.Printf("stash: Associating gallery images with folders")
+
+	// Get all files currently used by Stash
+	stashFiles, err := s.db.GetFilesByService(ctx, "stash")
+	if err != nil {
+		return fmt.Errorf("failed to get Stash files: %w", err)
+	}
+
+	if len(stashFiles) == 0 {
+		log.Printf("stash: No files found, skipping gallery image association")
+		return nil
+	}
+
+	// Build a list of gallery folder paths
+	var galleryFolders []string
+	for _, stashFile := range stashFiles {
+		// Check if this is a folder path (directory, not a file)
+		// Gallery folders typically don't have common media extensions
+		ext := filepath.Ext(stashFile.Path)
+		if ext == "" || (!strings.HasSuffix(ext, ".mp4") && !strings.HasSuffix(ext, ".mkv") &&
+		    !strings.HasSuffix(ext, ".avi") && !strings.HasSuffix(ext, ".zip")) {
+			// Likely a folder path
+			galleryFolders = append(galleryFolders, stashFile.Path)
+		}
+	}
+
+	if len(galleryFolders) == 0 {
+		log.Printf("stash: No gallery folders found, skipping image association")
+		return nil
+	}
+
+	log.Printf("stash: Found %d potential gallery folders, searching for images", len(galleryFolders))
+
+	// Query for all image files in the database
+	imageExts := []string{".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+	allImages, err := s.db.GetFilesByExtensions(ctx, imageExts)
+	if err != nil {
+		return fmt.Errorf("failed to query image files: %w", err)
+	}
+
+	if len(allImages) == 0 {
+		log.Printf("stash: No image files found in database")
+		return nil
+	}
+
+	log.Printf("stash: Found %d image files, matching to gallery folders...", len(allImages))
+
+	// Match image files to gallery folders
+	var matchedImages []*database.File
+	for _, imageFile := range allImages {
+		// Check if this image is inside any gallery folder
+		for _, galleryFolder := range galleryFolders {
+			if strings.HasPrefix(imageFile.Path, galleryFolder+"/") || strings.HasPrefix(imageFile.Path, galleryFolder+"\\") {
+				matchedImages = append(matchedImages, imageFile)
+				break
+			}
+		}
+	}
+
+	if len(matchedImages) == 0 {
+		log.Printf("stash: No gallery images matched to folders")
+		return nil
+	}
+
+	log.Printf("stash: Matched %d gallery images, creating usage records", len(matchedImages))
+
+	// Create usage records for matched images
+	var usages []*database.Usage
+	for _, imageFile := range matchedImages {
+		usages = append(usages, &database.Usage{
+			FileID:  imageFile.ID,
+			Service: "stash",
+			Metadata: map[string]interface{}{
+				"type": "gallery_image",
+			},
+		})
+	}
+
+	// Batch upsert usage records
+	if err := s.db.BatchUpsertUsage(ctx, usages); err != nil {
+		return fmt.Errorf("failed to create usage records for gallery images: %w", err)
+	}
+
+	log.Printf("stash: Successfully associated %d gallery images", len(usages))
+	return nil
+}
+
 // updateStashUsage updates usage information from Stash
 func (s *Scanner) updateStashUsage() error {
 	if s.config.Services.Stash.URL == "" {
 		return nil
 	}
 
-	return s.updateServiceUsageWithTimeout(
+	err := s.updateServiceUsageWithTimeout(
 		"stash",
 		func(ctx context.Context) ([]serviceFile, error) {
 			client := api.NewStashClient(s.config.Services.Stash.URL, s.config.Services.Stash.APIKey, s.config.APITimeout)
@@ -1638,6 +1733,13 @@ func (s *Scanner) updateStashUsage() error {
 			return serviceFiles, nil
 		},
 	)
+
+	if err != nil {
+		return err
+	}
+
+	// Associate gallery images with Stash
+	return s.associateStashGalleryImages()
 }
 
 func (s *Scanner) updateCalibreUsage() error {

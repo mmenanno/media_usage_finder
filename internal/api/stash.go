@@ -73,8 +73,30 @@ func (s *StashClient) Test() error {
 	return nil
 }
 
-// GetAllFiles retrieves all files tracked by Stash
+// GetAllFiles retrieves all files tracked by Stash (scenes and galleries)
 func (s *StashClient) GetAllFiles(ctx context.Context) ([]StashFile, error) {
+	var allFiles []StashFile
+
+	// Get scene files (videos)
+	sceneFiles, err := s.getAllSceneFiles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get scene files: %w", err)
+	}
+	allFiles = append(allFiles, sceneFiles...)
+
+	// Get gallery files (images)
+	galleryFiles, err := s.getAllGalleryFiles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get gallery files: %w", err)
+	}
+	allFiles = append(allFiles, galleryFiles...)
+
+	log.Printf("Total Stash files found: %d (%d scenes, %d galleries)", len(allFiles), len(sceneFiles), len(galleryFiles))
+	return allFiles, nil
+}
+
+// getAllSceneFiles retrieves all scene files (videos)
+func (s *StashClient) getAllSceneFiles(ctx context.Context) ([]StashFile, error) {
 	var allFiles []StashFile
 	page := 1
 	perPage := 100
@@ -96,7 +118,7 @@ func (s *StashClient) GetAllFiles(ctx context.Context) ([]StashFile, error) {
 
 		allFiles = append(allFiles, files...)
 
-		log.Printf("Retrieved %d files from page %d (total so far: %d)", len(files), page, len(allFiles))
+		log.Printf("Retrieved %d scene files from page %d (total so far: %d)", len(files), page, len(allFiles))
 
 		// Check if we've retrieved all scenes
 		if len(allFiles) >= totalCount || len(files) == 0 {
@@ -106,7 +128,42 @@ func (s *StashClient) GetAllFiles(ctx context.Context) ([]StashFile, error) {
 		page++
 	}
 
-	log.Printf("Total Stash files found: %d", len(allFiles))
+	return allFiles, nil
+}
+
+// getAllGalleryFiles retrieves all gallery files (images)
+func (s *StashClient) getAllGalleryFiles(ctx context.Context) ([]StashFile, error) {
+	var allFiles []StashFile
+	page := 1
+	perPage := 100
+
+	for {
+		// Check for context cancellation
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		log.Printf("Fetching Stash galleries page %d (per_page: %d)", page, perPage)
+
+		files, totalCount, err := s.getGalleriesPage(ctx, page, perPage)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get galleries page %d: %w", page, err)
+		}
+
+		allFiles = append(allFiles, files...)
+
+		log.Printf("Retrieved %d gallery files from page %d (total so far: %d)", len(files), page, len(allFiles))
+
+		// Check if we've retrieved all galleries
+		if len(allFiles) >= totalCount || len(files) == 0 {
+			break
+		}
+
+		page++
+	}
+
 	return allFiles, nil
 }
 
@@ -240,6 +297,111 @@ func (s *StashClient) getFilesPage(ctx context.Context, page, perPage int) ([]St
 	}
 
 	return files, resp.Data.FindScenes.Count, nil
+}
+
+func (s *StashClient) getGalleriesPage(ctx context.Context, page, perPage int) ([]StashFile, int, error) {
+	query := `
+		query FindGalleries($filter: FindFilterType) {
+			findGalleries(filter: $filter) {
+				count
+				galleries {
+					id
+					title
+					studio {
+						name
+					}
+					files {
+						path
+						size
+					}
+					folder {
+						path
+					}
+				}
+			}
+		}
+	`
+
+	variables := map[string]interface{}{
+		"filter": map[string]interface{}{
+			"per_page": perPage,
+			"page":     page,
+		},
+	}
+
+	reqBody := graphQLRequest{
+		Query:     query,
+		Variables: variables,
+	}
+
+	var resp struct {
+		Data struct {
+			FindGalleries struct {
+				Count     int `json:"count"`
+				Galleries []struct {
+					ID     string `json:"id"`
+					Title  string `json:"title"`
+					Studio *struct {
+						Name string `json:"name"`
+					} `json:"studio"`
+					Files []struct {
+						Path string `json:"path"`
+						Size int64  `json:"size"`
+					} `json:"files"`
+					Folder *struct {
+						Path string `json:"path"`
+					} `json:"folder"`
+				} `json:"galleries"`
+			} `json:"findGalleries"`
+		} `json:"data"`
+		Errors []graphQLError `json:"errors"`
+	}
+
+	if err := s.doGraphQLRequest(ctx, reqBody, &resp); err != nil {
+		return nil, 0, err
+	}
+
+	if len(resp.Errors) > 0 {
+		return nil, 0, fmt.Errorf("stash gallery query failed: %s", resp.Errors[0].Message)
+	}
+
+	var files []StashFile
+
+	// Process each gallery
+	for _, gallery := range resp.Data.FindGalleries.Galleries {
+		// Get studio name (if present)
+		studioName := ""
+		if gallery.Studio != nil {
+			studioName = gallery.Studio.Name
+		}
+
+		// Galleries can have individual files (zip archives, etc.)
+		for _, file := range gallery.Files {
+			if file.Path != "" {
+				files = append(files, StashFile{
+					Path:    file.Path,
+					Size:    file.Size,
+					SceneID: gallery.ID, // Use gallery ID
+					Title:   gallery.Title,
+					Studio:  studioName,
+				})
+			}
+		}
+
+		// Galleries can also be folders containing images
+		// In this case, we need to mark the folder path as used
+		if gallery.Folder != nil && gallery.Folder.Path != "" {
+			files = append(files, StashFile{
+				Path:    gallery.Folder.Path,
+				Size:    0, // Folder size not available
+				SceneID: gallery.ID,
+				Title:   gallery.Title,
+				Studio:  studioName,
+			})
+		}
+	}
+
+	return files, resp.Data.FindGalleries.Count, nil
 }
 
 func (s *StashClient) doGraphQLRequest(ctx context.Context, reqBody graphQLRequest, respData interface{}) error {
