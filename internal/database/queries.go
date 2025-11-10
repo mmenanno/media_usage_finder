@@ -415,6 +415,49 @@ func (db *DB) GetFilesByService(ctx context.Context, service string) ([]*File, e
 	return files, nil
 }
 
+// GetFilesByExtensions retrieves all files with specific extensions (without leading dot)
+func (db *DB) GetFilesByExtensions(ctx context.Context, extensions []string) ([]*File, error) {
+	if len(extensions) == 0 {
+		return []*File{}, nil
+	}
+
+	// Build IN clause
+	placeholders := make([]string, len(extensions))
+	args := make([]interface{}, len(extensions))
+	for i, ext := range extensions {
+		placeholders[i] = "?"
+		args[i] = ext
+	}
+
+	query := fmt.Sprintf(`
+		SELECT id, path, size, inode, device_id, modified_time, scan_id, last_verified, is_orphaned, extension, created_at
+		FROM files
+		WHERE extension IN (%s)
+		ORDER BY path
+	`, strings.Join(placeholders, ","))
+
+	rows, err := db.conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query files by extensions: %w", err)
+	}
+	defer rows.Close()
+
+	var files []*File
+	for rows.Next() {
+		file, err := scanFileRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, file)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return files, nil
+}
+
 // GetAllFilesMap loads all files from the database into memory as a map
 // This is optimized for incremental scans where we need fast lookups for every file
 // WARNING: This loads the entire files table into memory - use only when appropriate

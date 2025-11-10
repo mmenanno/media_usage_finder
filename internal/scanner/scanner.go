@@ -1369,75 +1369,73 @@ func (s *Scanner) associatePlexSubtitles() error {
 
 	log.Printf("plex: Found %d video files, searching for associated subtitles", len(plexVideoFiles))
 
-	// Common subtitle extensions and patterns
-	subtitleExts := []string{".srt", ".sub", ".sbv", ".ssa", ".ass", ".vtt"}
-	// Common language codes (2 and 3 letter)
-	langCodes := []string{
-		"en", "eng", "es", "spa", "fr", "fra", "de", "ger", "deu",
-		"it", "ita", "pt", "por", "ja", "jpn", "ko", "kor",
-		"zh", "chi", "zho", "ar", "ara", "ru", "rus", "hi", "hin",
-		"nl", "nld", "pl", "pol", "sv", "swe", "tr", "tur",
-	}
-	// Common subtitle tags
-	tags := []string{"forced", "sdh", "cc", "hi"}
-
-	// Generate potential subtitle paths for each video file
-	var potentialSubtitlePaths []string
+	// Build a map of video file basenames (dir + basename without extension) for quick lookup
+	// Key: directory/basename (e.g., "/media/movies/Movie Name")
+	videoBasenames := make(map[string]bool)
 	for _, videoFile := range plexVideoFiles {
-		// Get the base path without extension
 		dir := filepath.Dir(videoFile.Path)
 		ext := filepath.Ext(videoFile.Path)
 		basename := strings.TrimSuffix(filepath.Base(videoFile.Path), ext)
-
-		// Pattern 1: {basename}.{subext}
-		for _, subExt := range subtitleExts {
-			potentialSubtitlePaths = append(potentialSubtitlePaths, filepath.Join(dir, basename+subExt))
-		}
-
-		// Pattern 2: {basename}.{lang}.{subext}
-		for _, lang := range langCodes {
-			for _, subExt := range subtitleExts {
-				potentialSubtitlePaths = append(potentialSubtitlePaths, filepath.Join(dir, fmt.Sprintf("%s.%s%s", basename, lang, subExt)))
-			}
-		}
-
-		// Pattern 3: {basename}.{number}.{lang}.{subext} (for multiple tracks)
-		for i := 1; i <= 5; i++ { // Support up to 5 tracks per language
-			for _, lang := range langCodes {
-				for _, subExt := range subtitleExts {
-					potentialSubtitlePaths = append(potentialSubtitlePaths, filepath.Join(dir, fmt.Sprintf("%s.%d.%s%s", basename, i, lang, subExt)))
-				}
-			}
-		}
-
-		// Pattern 4: {basename}.{lang}.{tag}.{subext}
-		for _, lang := range langCodes {
-			for _, tag := range tags {
-				for _, subExt := range subtitleExts {
-					potentialSubtitlePaths = append(potentialSubtitlePaths, filepath.Join(dir, fmt.Sprintf("%s.%s.%s%s", basename, lang, tag, subExt)))
-				}
-			}
-		}
+		key := filepath.Join(dir, basename)
+		videoBasenames[key] = true
 	}
 
-	log.Printf("plex: Generated %d potential subtitle paths, querying database...", len(potentialSubtitlePaths))
+	log.Printf("plex: Built lookup map with %d unique video basenames", len(videoBasenames))
 
-	// Query database for files that match these paths
-	foundSubtitles, err := s.db.GetFilesByPaths(ctx, potentialSubtitlePaths)
+	// Query for all subtitle files in the database (by extension)
+	subtitleExts := []string{"srt", "sub", "sbv", "ssa", "ass", "vtt"}
+	allSubtitles, err := s.db.GetFilesByExtensions(ctx, subtitleExts)
 	if err != nil {
 		return fmt.Errorf("failed to query subtitle files: %w", err)
 	}
 
-	if len(foundSubtitles) == 0 {
+	if len(allSubtitles) == 0 {
 		log.Printf("plex: No subtitle files found in database")
 		return nil
 	}
 
-	log.Printf("plex: Found %d subtitle files, creating usage records", len(foundSubtitles))
+	log.Printf("plex: Found %d subtitle files, matching to video files...", len(allSubtitles))
 
-	// Create usage records for found subtitle files
+	// Match subtitle files to video files
+	var matchedSubtitles []*database.File
+	for _, subtitleFile := range allSubtitles {
+		dir := filepath.Dir(subtitleFile.Path)
+		filename := filepath.Base(subtitleFile.Path)
+		ext := filepath.Ext(filename)
+		nameWithoutExt := strings.TrimSuffix(filename, ext)
+
+		// Try to extract the base video filename from the subtitle filename
+		// Handle patterns like:
+		// - Movie.srt -> Movie
+		// - Movie.en.srt -> Movie
+		// - Movie.1.en.srt -> Movie
+		// - Movie.en.forced.srt -> Movie
+
+		// Split by dots to find the base name
+		parts := strings.Split(nameWithoutExt, ".")
+
+		// Try progressively shorter basenames (from full to first part)
+		for i := len(parts); i > 0; i-- {
+			candidateBasename := strings.Join(parts[:i], ".")
+			videoKey := filepath.Join(dir, candidateBasename)
+
+			if videoBasenames[videoKey] {
+				matchedSubtitles = append(matchedSubtitles, subtitleFile)
+				break
+			}
+		}
+	}
+
+	if len(matchedSubtitles) == 0 {
+		log.Printf("plex: No subtitle files matched to Plex videos")
+		return nil
+	}
+
+	log.Printf("plex: Matched %d subtitle files to Plex videos, creating usage records", len(matchedSubtitles))
+
+	// Create usage records for matched subtitle files
 	var usages []*database.Usage
-	for _, subtitleFile := range foundSubtitles {
+	for _, subtitleFile := range matchedSubtitles {
 		usages = append(usages, &database.Usage{
 			FileID:  subtitleFile.ID,
 			Service: "plex",
