@@ -68,7 +68,7 @@
                             data-services-button
                             aria-expanded="false"
                             class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
-                            <span data-services-text>{{if .Services}}{{len .Services}} service(s){{else}}All Services{{end}}</span>
+                            <span data-services-text>{{if .Services}}{{len .Services}} {{pluralize (len .Services) "service" "services"}}{{else}}All Services{{end}}</span>
                             <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
@@ -169,7 +169,7 @@
                             data-devices-button
                             aria-expanded="false"
                             class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
-                            <span data-devices-text>{{if .Devices}}{{len .Devices}} device(s){{else}}All Devices{{end}}</span>
+                            <span data-devices-text>{{if .Devices}}{{len .Devices}} {{pluralize (len .Devices) "device" "devices"}}{{else}}All Devices{{end}}</span>
                             <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
@@ -212,7 +212,7 @@
                             data-extensions-button
                             aria-expanded="false"
                             class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
-                            <span data-extensions-text>{{if .Extensions}}{{len .Extensions}} extension(s){{else}}All Extensions{{end}}</span>
+                            <span data-extensions-text>{{if .Extensions}}{{len .Extensions}} {{pluralize (len .Extensions) "extension" "extensions"}}{{else}}All Extensions{{end}}</span>
                             <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>

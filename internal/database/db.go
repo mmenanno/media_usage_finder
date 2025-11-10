@@ -685,6 +685,58 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 16: Update scans table CHECK constraint to include 'service_update_calibre'
+	// Test if migration is needed by trying to insert a test record with scan_type='service_update_calibre'
+	needsCalibreServiceUpdateMigration := false
+
+	// Start a transaction for the test
+	tx16, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction for service_update_calibre scan_type migration check: %w", err)
+	}
+	defer tx16.Rollback()
+
+	// Try to insert a test record with scan_type='service_update_calibre'
+	_, err = tx16.Exec(`
+		INSERT INTO scans (started_at, status, scan_type)
+		VALUES (?, 'completed', 'service_update_calibre')
+	`, time.Now().Unix())
+
+	if err != nil {
+		// Check if the error is a CHECK constraint failure
+		if strings.Contains(err.Error(), "CHECK constraint failed") {
+			needsCalibreServiceUpdateMigration = true
+		}
+	} else {
+		// If insert succeeded, delete the test record
+		_, _ = tx16.Exec(`DELETE FROM scans WHERE scan_type = 'service_update_calibre'`)
+	}
+
+	// Rollback the test transaction
+	tx16.Rollback()
+
+	// Run migration if needed
+	if needsCalibreServiceUpdateMigration {
+		// Disable foreign key constraints for migration
+		_, err = db.conn.Exec("PRAGMA foreign_keys = OFF")
+		if err != nil {
+			return fmt.Errorf("failed to disable foreign keys for service_update_calibre scan_type migration: %w", err)
+		}
+
+		_, err = db.conn.Exec(migrateAddCalibreServiceUpdateToScanType)
+		if err != nil {
+			// Re-enable foreign keys before returning error
+			db.conn.Exec("PRAGMA foreign_keys = ON")
+			return fmt.Errorf("failed to update scans table CHECK constraint for service_update_calibre: %w", err)
+		}
+
+		// Re-enable foreign key constraints
+		_, err = db.conn.Exec("PRAGMA foreign_keys = ON")
+		if err != nil {
+			return fmt.Errorf("failed to re-enable foreign keys after service_update_calibre scan_type migration: %w", err)
+		}
+	}
+
 	return nil
 }
 

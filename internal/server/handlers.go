@@ -4114,6 +4114,13 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 			}
 			return 1 // Minimum level for very small files
 		},
+		"pluralize": func(count int, singular, plural string) string {
+			// Returns the correct singular or plural form based on count
+			if count == 1 {
+				return singular
+			}
+			return plural
+		},
 	}
 }
 
