@@ -3968,9 +3968,21 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 		"formatTimestamp": func(t time.Time) string {
 			return t.Format("2006-01-02 15:04:05")
 		},
-		"base64Encode": func(data string) string {
+		"base64Encode": func(data interface{}) string {
 			// Encode data to base64 for safe embedding in HTML attributes
-			return base64.StdEncoding.EncodeToString([]byte(data))
+			// Handle both string and *string types
+			var str string
+			switch v := data.(type) {
+			case string:
+				str = v
+			case *string:
+				if v != nil {
+					str = *v
+				}
+			default:
+				str = fmt.Sprintf("%v", v)
+			}
+			return base64.StdEncoding.EncodeToString([]byte(str))
 		},
 		"formatServiceName": func(service string) string {
 			// Map internal service names to proper display names
@@ -4120,6 +4132,10 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 				return singular
 			}
 			return plural
+		},
+		"isNotEmptyString": func(s *string) bool {
+			// Check if a string pointer is not nil and not empty
+			return s != nil && *s != ""
 		},
 	}
 }
