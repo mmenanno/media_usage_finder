@@ -928,7 +928,7 @@ func (s *Server) checkExternalServices() map[string]interface{} {
 		result map[string]string
 	}
 
-	serviceNames := []string{"plex", "sonarr", "radarr", "qbittorrent", "stash"}
+	serviceNames := []string{"plex", "sonarr", "radarr", "qbittorrent", "stash", "calibre"}
 	results := make(chan serviceCheck, len(serviceNames))
 	timeout := 2 * time.Second
 	var wg sync.WaitGroup
@@ -1745,6 +1745,14 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		validationErrors = append(validationErrors, fmt.Sprintf("Stash API key: %v", err))
 	}
 
+	// Validate Calibre config (paths don't need URL validation)
+	calibreLibraryPath := r.FormValue("calibre_library_path")
+	calibreDBPath := r.FormValue("calibre_db_path")
+	// Calibre paths are optional, but if one is set, both should be set
+	if (calibreLibraryPath != "" && calibreDBPath == "") || (calibreLibraryPath == "" && calibreDBPath != "") {
+		validationErrors = append(validationErrors, "Calibre: Both library path and database path must be set together")
+	}
+
 	// If there are validation errors, show them in the error panel
 	if len(validationErrors) > 0 {
 		s.renderValidationErrors(w, "Configuration Validation Failed", validationErrors)
@@ -1770,6 +1778,9 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 
 	s.config.Services.Stash.URL = stashURL
 	s.config.Services.Stash.APIKey = stashAPIKey
+
+	s.config.Services.Calibre.LibraryPath = calibreLibraryPath
+	s.config.Services.Calibre.DBPath = calibreDBPath
 
 	// Parse scan paths (one per line)
 	if scanPathsStr := r.FormValue("scan_paths"); scanPathsStr != "" {
@@ -2487,6 +2498,17 @@ func (s *Server) HandleTestService(w http.ResponseWriter, r *http.Request) {
 		} else {
 			testConfig.Services.Stash.URL = url
 			testConfig.Services.Stash.APIKey = apiKey
+		}
+	case "calibre":
+		libraryPath := strings.TrimSpace(r.FormValue("calibre_library_path"))
+		dbPath := strings.TrimSpace(r.FormValue("calibre_db_path"))
+		if libraryPath == "" {
+			missingField = "Calibre Library Path"
+		} else if dbPath == "" {
+			missingField = "Calibre Database Path"
+		} else {
+			testConfig.Services.Calibre.LibraryPath = libraryPath
+			testConfig.Services.Calibre.DBPath = dbPath
 		}
 	}
 
@@ -3960,6 +3982,8 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 				return "Radarr"
 			case "stash":
 				return "Stash"
+			case "calibre":
+				return "Calibre"
 			default:
 				return service
 			}
@@ -3969,7 +3993,7 @@ func (s *Server) createTemplateFuncs() template.FuncMap {
 			// Variants: "bg", "bg-faded", "bg-gradient", "border", "text", "text-on-bg", "hover"
 			validServices := map[string]bool{
 				"plex": true, "sonarr": true, "radarr": true,
-				"qbittorrent": true, "stash": true,
+				"qbittorrent": true, "stash": true, "calibre": true,
 			}
 			if !validServices[service] {
 				return "" // Invalid service, return empty string

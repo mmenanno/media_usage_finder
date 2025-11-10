@@ -60,6 +60,7 @@ type Services struct {
 	Radarr      RadarrConfig      `yaml:"radarr"`
 	QBittorrent QBittorrentConfig `yaml:"qbittorrent"`
 	Stash       StashConfig       `yaml:"stash"`
+	Calibre     CalibreConfig     `yaml:"calibre"`
 }
 
 // PlexConfig contains Plex server configuration
@@ -93,6 +94,12 @@ type QBittorrentConfig struct {
 type StashConfig struct {
 	URL    string `yaml:"url"`
 	APIKey string `yaml:"api_key"`
+}
+
+// CalibreConfig contains Calibre configuration
+type CalibreConfig struct {
+	LibraryPath string `yaml:"library_path"`
+	DBPath      string `yaml:"db_path"`
 }
 
 // DiskConfig contains configuration for a single disk

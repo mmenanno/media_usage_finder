@@ -163,7 +163,7 @@ func (c *Calculator) calculateServiceBreakdown(stats *Stats) error {
 		SELECT u.service, COUNT(DISTINCT f.id), COALESCE(SUM(f.size), 0)
 		FROM files f
 		INNER JOIN usage u ON f.id = u.file_id
-		WHERE u.service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash')
+		WHERE u.service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash', 'calibre')
 		GROUP BY u.service
 	`
 
@@ -174,7 +174,7 @@ func (c *Calculator) calculateServiceBreakdown(stats *Stats) error {
 	defer rows.Close()
 
 	// Initialize all services with zero stats
-	services := []string{"plex", "sonarr", "radarr", "qbittorrent", "stash"}
+	services := []string{"plex", "sonarr", "radarr", "qbittorrent", "stash", "calibre"}
 	for _, service := range services {
 		stats.ServiceBreakdown[service] = ServiceStats{FileCount: 0, TotalSize: 0}
 	}

@@ -492,6 +492,9 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 	if s.config.Services.Stash.URL != "" {
 		totalServices++
 	}
+	if s.config.Services.Calibre.LibraryPath != "" && s.config.Services.Calibre.DBPath != "" {
+		totalServices++
+	}
 	currentService := 0
 
 	// Update Plex if configured
@@ -546,6 +549,17 @@ func (s *Scanner) runScan(ctx context.Context, scanID int64, incremental bool) e
 		s.progress.Log("Querying Stash for tracked files...")
 		if err := s.updateStashUsage(); err != nil {
 			s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+		}
+	}
+
+	// Update Calibre if configured
+	if s.config.Services.Calibre.LibraryPath != "" && s.config.Services.Calibre.DBPath != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking Calibre")
+		s.progress.Log("Querying Calibre for tracked files...")
+		if err := s.updateCalibreUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update Calibre usage: %v", err))
 		}
 	}
 
@@ -650,6 +664,9 @@ func (s *Scanner) runScanWithResume(ctx context.Context, scanID int64, increment
 	if s.config.Services.Stash.URL != "" {
 		totalServices++
 	}
+	if s.config.Services.Calibre.LibraryPath != "" && s.config.Services.Calibre.DBPath != "" {
+		totalServices++
+	}
 	currentService := 0
 
 	// Update Plex if configured
@@ -704,6 +721,17 @@ func (s *Scanner) runScanWithResume(ctx context.Context, scanID int64, increment
 		s.progress.Log("Querying Stash for tracked files...")
 		if err := s.updateStashUsage(); err != nil {
 			s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+		}
+	}
+
+	// Update Calibre if configured
+	if s.config.Services.Calibre.LibraryPath != "" && s.config.Services.Calibre.DBPath != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.updatePhase(scanID, "Checking Calibre")
+		s.progress.Log("Querying Calibre for tracked files...")
+		if err := s.updateCalibreUsage(); err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to update Calibre usage: %v", err))
 		}
 	}
 
@@ -785,6 +813,20 @@ func (f stashServiceFile) GetMetadata() map[string]interface{} {
 		"scene_id": f.SceneID,
 		"title":    f.Title,
 		"studio":   f.Studio,
+	}
+}
+
+type calibreServiceFile struct{ api.CalibreFile }
+
+func (f calibreServiceFile) GetPath() string { return f.Path }
+func (f calibreServiceFile) GetMetadata() map[string]interface{} {
+	return map[string]interface{}{
+		"book_id":      f.BookID,
+		"title":        f.Title,
+		"author":       f.Author,
+		"series":       f.Series,
+		"series_index": f.SeriesIndex,
+		"format":       f.Format,
 	}
 }
 
@@ -1094,6 +1136,9 @@ func (s *Scanner) updateAllServicesForPaths(ctx context.Context, scanID int64, p
 	if s.config.Services.Stash.URL != "" {
 		totalServices++
 	}
+	if s.config.Services.Calibre.LibraryPath != "" && s.config.Services.Calibre.DBPath != "" {
+		totalServices++
+	}
 
 	if totalServices == 0 {
 		s.progress.Log("No services configured, skipping service updates")
@@ -1204,6 +1249,27 @@ func (s *Scanner) updateAllServicesForPaths(ctx context.Context, scanID int64, p
 			}
 			if err := s.updateServiceUsageForPaths(ctx, "stash", wrappedFiles, pathFilter); err != nil {
 				s.progress.Log(fmt.Sprintf("Warning: Failed to update Stash usage: %v", err))
+			}
+		}
+	}
+
+	// Update Calibre if configured
+	if s.config.Services.Calibre.LibraryPath != "" && s.config.Services.Calibre.DBPath != "" {
+		currentService++
+		s.progress.SetServiceProgress(currentService, totalServices)
+		s.progress.Log("Querying Calibre for tracked files...")
+
+		client := api.NewCalibreClient(s.config.Services.Calibre.LibraryPath, s.config.Services.Calibre.DBPath, s.config.APITimeout)
+		calibreFiles, err := client.GetAllFiles(ctx)
+		if err != nil {
+			s.progress.Log(fmt.Sprintf("Warning: Failed to query Calibre: %v", err))
+		} else {
+			wrappedFiles := make([]serviceFile, len(calibreFiles))
+			for i, f := range calibreFiles {
+				wrappedFiles[i] = calibreServiceFile{f}
+			}
+			if err := s.updateServiceUsageForPaths(ctx, "calibre", wrappedFiles, pathFilter); err != nil {
+				s.progress.Log(fmt.Sprintf("Warning: Failed to update Calibre usage: %v", err))
 			}
 		}
 	}
@@ -1365,6 +1431,28 @@ func (s *Scanner) updateStashUsage() error {
 	)
 }
 
+func (s *Scanner) updateCalibreUsage() error {
+	if s.config.Services.Calibre.LibraryPath == "" || s.config.Services.Calibre.DBPath == "" {
+		return nil
+	}
+
+	return s.updateServiceUsageWithTimeout(
+		"calibre",
+		func(ctx context.Context) ([]serviceFile, error) {
+			client := api.NewCalibreClient(s.config.Services.Calibre.LibraryPath, s.config.Services.Calibre.DBPath, s.config.APITimeout)
+			files, err := client.GetAllFiles(ctx)
+			if err != nil {
+				return nil, err
+			}
+			serviceFiles := make([]serviceFile, len(files))
+			for i, f := range files {
+				serviceFiles[i] = calibreServiceFile{f}
+			}
+			return serviceFiles, nil
+		},
+	)
+}
+
 // updateServiceUsageWithTimeout is a generic helper to update service usage with timeout handling
 // This eliminates duplication across all service update methods
 func (s *Scanner) updateServiceUsageWithTimeout(serviceName string, getFiles func(context.Context) ([]serviceFile, error)) error {
@@ -1509,6 +1597,12 @@ func (s *Scanner) UpdateAllServices() error {
 		hadErrors = true
 	}
 
+	s.progress.Log("Checking Calibre...")
+	if err := s.updateCalibreUsage(); err != nil {
+		s.progress.Log(fmt.Sprintf("Warning: Failed to update Calibre usage: %v", err))
+		hadErrors = true
+	}
+
 	// Update orphaned status after service checks
 	s.progress.Log("Recalculating orphaned status...")
 	if err := s.db.UpdateOrphanedStatus(context.Background()); err != nil {
@@ -1564,6 +1658,8 @@ func (s *Scanner) UpdateSingleService(serviceName string) error {
 		updateErr = s.updateQBittorrentUsage()
 	case "stash":
 		updateErr = s.updateStashUsage()
+	case "calibre":
+		updateErr = s.updateCalibreUsage()
 	default:
 		errMsg := fmt.Sprintf("unknown service: %s", serviceName)
 		s.db.UpdateScanStatus(scan.ID, "failed", errMsg)

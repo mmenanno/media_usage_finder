@@ -145,6 +145,14 @@
                                         class="service-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded">
                                     <span class="text-gray-100">Stash</span>
                                 </label>
+                                <label class="flex items-center space-x-2 px-4 py-2 hover:bg-gray-600">
+                                    <input
+                                        type="checkbox"
+                                        value="calibre"
+                                        {{range $selectedServices}}{{if eq . "calibre"}}checked{{end}}{{end}}
+                                        class="service-checkbox w-4 h-4 bg-gray-700 border-gray-600 rounded">
+                                    <span class="text-gray-100">Calibre</span>
+                                </label>
                             </div>
                         </div>
                     </div>

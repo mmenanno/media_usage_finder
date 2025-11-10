@@ -30,6 +30,8 @@ func (f *ClientFactory) CreateClient(serviceName string, timeout time.Duration) 
 		return f.CreateQBittorrentClient(timeout), nil
 	case "stash":
 		return f.CreateStashClient(timeout), nil
+	case "calibre":
+		return f.CreateCalibreClient(timeout), nil
 	default:
 		return nil, fmt.Errorf("unknown service: %s", serviceName)
 	}
@@ -61,6 +63,11 @@ func (f *ClientFactory) CreateStashClient(timeout time.Duration) *StashClient {
 	return NewStashClient(f.config.Services.Stash.URL, f.config.Services.Stash.APIKey, timeout)
 }
 
+// CreateCalibreClient creates a Calibre API client
+func (f *ClientFactory) CreateCalibreClient(timeout time.Duration) *CalibreClient {
+	return NewCalibreClient(f.config.Services.Calibre.LibraryPath, f.config.Services.Calibre.DBPath, timeout)
+}
+
 // IsServiceConfigured checks if a service is configured with valid credentials
 func (f *ClientFactory) IsServiceConfigured(serviceName string) bool {
 	switch serviceName {
@@ -78,6 +85,8 @@ func (f *ClientFactory) IsServiceConfigured(serviceName string) bool {
 		return hasDirectAccess || hasProxyAccess
 	case "stash":
 		return f.config.Services.Stash.URL != "" && f.config.Services.Stash.APIKey != ""
+	case "calibre":
+		return f.config.Services.Calibre.LibraryPath != "" && f.config.Services.Calibre.DBPath != ""
 	default:
 		return false
 	}

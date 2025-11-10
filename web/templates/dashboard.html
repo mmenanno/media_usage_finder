@@ -351,8 +351,8 @@
             <h3 class="text-xl font-semibold text-white">Service Breakdown</h3>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {{range $service, $stats := .Stats.ServiceBreakdown}}
-            {{if eq $service "plex"}}
+            {{if index .Stats.ServiceBreakdown "plex"}}
+            {{$stats := index .Stats.ServiceBreakdown "plex"}}
             <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
                 <div class="p-3 bg-orange-500/20 rounded-full shrink-0">
                     <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -360,7 +360,7 @@
                     </svg>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName $service}}</div>
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName "plex"}}</div>
                     <div class="flex items-center gap-3 text-sm">
                         <span class="text-orange-400 font-medium">{{formatNumber $stats.FileCount}}</span>
                         <span class="text-gray-500">files</span>
@@ -369,7 +369,9 @@
                     </div>
                 </div>
             </div>
-            {{else if eq $service "sonarr"}}
+            {{end}}
+            {{if index .Stats.ServiceBreakdown "sonarr"}}
+            {{$stats := index .Stats.ServiceBreakdown "sonarr"}}
             <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
                 <div class="p-3 bg-cyan-500/20 rounded-full shrink-0">
                     <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -377,7 +379,7 @@
                     </svg>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName $service}}</div>
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName "sonarr"}}</div>
                     <div class="flex items-center gap-3 text-sm">
                         <span class="text-cyan-400 font-medium">{{formatNumber $stats.FileCount}}</span>
                         <span class="text-gray-500">files</span>
@@ -386,7 +388,9 @@
                     </div>
                 </div>
             </div>
-            {{else if eq $service "radarr"}}
+            {{end}}
+            {{if index .Stats.ServiceBreakdown "radarr"}}
+            {{$stats := index .Stats.ServiceBreakdown "radarr"}}
             <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
                 <div class="p-3 bg-amber-500/20 rounded-full shrink-0">
                     <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -394,7 +398,7 @@
                     </svg>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName $service}}</div>
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName "radarr"}}</div>
                     <div class="flex items-center gap-3 text-sm">
                         <span class="text-amber-400 font-medium">{{formatNumber $stats.FileCount}}</span>
                         <span class="text-gray-500">files</span>
@@ -403,7 +407,9 @@
                     </div>
                 </div>
             </div>
-            {{else if eq $service "qbittorrent"}}
+            {{end}}
+            {{if index .Stats.ServiceBreakdown "qbittorrent"}}
+            {{$stats := index .Stats.ServiceBreakdown "qbittorrent"}}
             <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
                 <div class="p-3 bg-blue-500/20 rounded-full shrink-0">
                     <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -411,7 +417,7 @@
                     </svg>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName $service}}</div>
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName "qbittorrent"}}</div>
                     <div class="flex items-center gap-3 text-sm">
                         <span class="text-blue-400 font-medium">{{formatNumber $stats.FileCount}}</span>
                         <span class="text-gray-500">files</span>
@@ -420,7 +426,9 @@
                     </div>
                 </div>
             </div>
-            {{else if eq $service "stash"}}
+            {{end}}
+            {{if index .Stats.ServiceBreakdown "stash"}}
+            {{$stats := index .Stats.ServiceBreakdown "stash"}}
             <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
                 <div class="p-3 bg-red-500/20 rounded-full shrink-0">
                     <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -428,7 +436,7 @@
                     </svg>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName $service}}</div>
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName "stash"}}</div>
                     <div class="flex items-center gap-3 text-sm">
                         <span class="text-red-400 font-medium">{{formatNumber $stats.FileCount}}</span>
                         <span class="text-gray-500">files</span>
@@ -438,6 +446,24 @@
                 </div>
             </div>
             {{end}}
+            {{if index .Stats.ServiceBreakdown "calibre"}}
+            {{$stats := index .Stats.ServiceBreakdown "calibre"}}
+            <div class="bg-gray-700 rounded-lg p-4 flex items-center gap-4 hover:bg-gray-650 transition">
+                <div class="p-3 bg-orange-500/20 rounded-full shrink-0">
+                    <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-lg font-semibold text-white mb-1">{{formatServiceName "calibre"}}</div>
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="text-orange-400 font-medium">{{formatNumber $stats.FileCount}}</span>
+                        <span class="text-gray-500">files</span>
+                        <span class="text-gray-600">•</span>
+                        <span class="text-gray-400">{{formatSize $stats.TotalSize}}</span>
+                    </div>
+                </div>
+            </div>
             {{end}}
         </div>
     </div>
@@ -528,7 +554,8 @@
         </div>
 
         <!-- Individual Services -->
-        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <!-- Row 1: Plex, Sonarr, Radarr, qBittorrent -->
             <button
                 hx-post="/api/scan/update-service?service=plex"
                 hx-swap="none"
@@ -587,6 +614,23 @@
                 <div class="flex-1 min-w-0">
                     <div class="text-sm font-semibold text-white">Update qBittorrent</div>
                     <div class="text-xs text-gray-400">Check qBittorrent only</div>
+                </div>
+            </button>
+
+            <!-- Row 2: Calibre and Stash (centered) -->
+            <button
+                hx-post="/api/scan/update-service?service=calibre"
+                hx-swap="none"
+                {{if .HasActiveScan}}disabled{{end}}
+                class="lg:col-start-2 p-3 bg-gray-700 rounded-lg border border-gray-600 hover:bg-gray-600 hover:border-orange-500/50 hover:shadow-md hover:shadow-orange-500/10 transition-all duration-200 text-left flex items-center gap-3 {{if .HasActiveScan}}opacity-50 cursor-not-allowed{{end}}">
+                <div class="p-2 bg-orange-500/20 rounded-full shrink-0">
+                    <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-white">Update Calibre</div>
+                    <div class="text-xs text-gray-400">Check Calibre only</div>
                 </div>
             </button>
             <button
