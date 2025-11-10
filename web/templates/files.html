@@ -399,7 +399,7 @@
                                 <button
                                     hx-delete="/api/files/delete?id={{.File.ID}}"
                                     {{if .DeleteFilesFromFilesystem}}
-                                    hx-confirm="⚠️  WARNING: Permanently delete this file from the filesystem?\n\nThis will remove the actual file from disk and CANNOT be undone."
+                                    hx-confirm="<strong>Warning:</strong> Permanently delete this file from the filesystem?\n\nThis will remove the actual file from disk and <strong>cannot be undone</strong>."
                                     {{else}}
                                     hx-confirm="Remove this file from the database?\n\nThe actual file will remain on disk."
                                     {{end}}

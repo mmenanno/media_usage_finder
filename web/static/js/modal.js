@@ -107,7 +107,10 @@ class ModalManager {
         modal.className = 'fixed inset-0 flex items-center justify-center animate-fadeIn';
 
         // Convert newlines to <br> tags for proper rendering
-        const formattedMessage = message.replace(/\n/g, '<br>');
+        // Handle both escaped \n from HTML attributes and actual newline characters
+        const formattedMessage = message
+            .replace(/\\n/g, '<br>')  // Escaped \n from HTML attributes
+            .replace(/\n/g, '<br>');   // Actual newline characters
 
         modal.innerHTML = `
             <div class="bg-gray-800 border border-gray-600 rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all animate-scaleIn">
