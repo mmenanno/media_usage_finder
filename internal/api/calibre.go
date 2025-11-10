@@ -121,6 +121,8 @@ func (c *CalibreClient) GetAllFiles(ctx context.Context) ([]CalibreFile, error) 
 	defer rows.Close()
 
 	var files []CalibreFile
+	bookPaths := make(map[string]bool) // Track unique book paths for metadata files
+
 	for rows.Next() {
 		// Check for context cancellation
 		select {
@@ -158,13 +160,67 @@ func (c *CalibreClient) GetAllFiles(ctx context.Context) ([]CalibreFile, error) 
 			SeriesIndex: seriesIndex,
 			Format:      format,
 		})
+
+		// Track book path for metadata files
+		bookPaths[bookPath] = true
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	log.Printf("Total Calibre files found: %d", len(files))
+	// Add per-book metadata files (cover.jpg, metadata.opf)
+	for bookPath := range bookPaths {
+		bookDir := filepath.Join(c.libraryPath, bookPath)
+
+		// Add cover.jpg
+		files = append(files, CalibreFile{
+			Path:        filepath.Join(bookDir, "cover.jpg"),
+			Size:        0, // Size not available without stat-ing
+			BookID:      0,
+			Title:       "Cover Image",
+			Author:      "",
+			Series:      "",
+			SeriesIndex: 0,
+			Format:      "jpg",
+		})
+
+		// Add metadata.opf
+		files = append(files, CalibreFile{
+			Path:        filepath.Join(bookDir, "metadata.opf"),
+			Size:        0,
+			BookID:      0,
+			Title:       "Metadata",
+			Author:      "",
+			Series:      "",
+			SeriesIndex: 0,
+			Format:      "opf",
+		})
+	}
+
+	// Add library-level metadata files
+	libraryMetadataFiles := []string{
+		"metadata.db",
+		filepath.Join("books", "metadata.db"),
+		"metadata_db_prefs_backup.json",
+		filepath.Join(".calnotes", "notes.db"),
+		"metadata_pre_restore.db",
+	}
+
+	for _, metaFile := range libraryMetadataFiles {
+		files = append(files, CalibreFile{
+			Path:        filepath.Join(c.libraryPath, metaFile),
+			Size:        0,
+			BookID:      0,
+			Title:       "Library Metadata",
+			Author:      "",
+			Series:      "",
+			SeriesIndex: 0,
+			Format:      filepath.Ext(metaFile),
+		})
+	}
+
+	log.Printf("Total Calibre files found: %d (including metadata files)", len(files))
 	return files, nil
 }
 
