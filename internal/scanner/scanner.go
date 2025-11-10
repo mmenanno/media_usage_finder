@@ -1627,36 +1627,37 @@ func (s *Scanner) associateStashGalleryImages() error {
 
 	log.Printf("stash: Associating gallery images with folders")
 
-	// Get all files currently used by Stash
-	stashFiles, err := s.db.GetFilesByService(ctx, "stash")
+	// Query Stash API directly to get gallery folders
+	// Note: Gallery folder paths are NOT in the database (only actual files are scanned)
+	client := api.NewStashClient(s.config.Services.Stash.URL, s.config.Services.Stash.APIKey, s.config.APITimeout)
+	stashFiles, err := client.GetAllFiles(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get Stash files: %w", err)
+		return fmt.Errorf("failed to get Stash files from API: %w", err)
 	}
 
 	if len(stashFiles) == 0 {
-		log.Printf("stash: No files found, skipping gallery image association")
+		log.Printf("stash: No files found in Stash, skipping gallery image association")
 		return nil
 	}
 
-	// Build a list of gallery folder paths
-	// Gallery folders are stored with empty extension (no file extension)
+	// Build a list of gallery folder paths and apply path mappings
 	var galleryFolders []string
 	for _, stashFile := range stashFiles {
 		// Check if this is a folder path (no extension = folder)
-		// Files have extensions like .mp4, .mkv, .zip, etc.
 		ext := filepath.Ext(stashFile.Path)
 		if ext == "" {
-			// This is a folder path
-			galleryFolders = append(galleryFolders, stashFile.Path)
+			// This is a folder path - apply path mapping
+			translatedPath := s.config.TranslatePathToHost(stashFile.Path, "stash")
+			galleryFolders = append(galleryFolders, translatedPath)
 		}
 	}
 
 	if len(galleryFolders) == 0 {
-		log.Printf("stash: No gallery folders found, skipping image association")
+		log.Printf("stash: No gallery folders found in Stash, skipping image association")
 		return nil
 	}
 
-	log.Printf("stash: Found %d gallery folders, searching for images", len(galleryFolders))
+	log.Printf("stash: Found %d gallery folders from Stash API, searching for images", len(galleryFolders))
 
 	// Debug: Log first few gallery folders
 	for i := 0; i < len(galleryFolders) && i < 3; i++ {
