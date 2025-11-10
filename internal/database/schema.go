@@ -688,6 +688,8 @@ CREATE TABLE service_missing_files_new (
 	service_path TEXT NOT NULL,
 	translated_path TEXT NOT NULL,
 	size INTEGER,
+	service_group TEXT,
+	service_group_id TEXT,
 	metadata TEXT,
 	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
 	FOREIGN KEY (scan_id) REFERENCES scans(id) ON DELETE CASCADE
