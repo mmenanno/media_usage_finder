@@ -2425,6 +2425,8 @@ func getServiceDisplayName(serviceName string) string {
 		return "qBittorrent"
 	case "stash":
 		return "Stash"
+	case "calibre":
+		return "Calibre"
 	default:
 		return serviceName
 	}
