@@ -67,14 +67,19 @@ func (c *CalibreClient) Test() error {
 		return fmt.Errorf("calibre database verification failed: %w. The database at %s does not appear to be a valid Calibre library", err, c.dbPath)
 	}
 
-	// Get count of books
-	var bookCount int
+	// Get count of books and formats
+	var bookCount, formatCount int
 	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM books").Scan(&bookCount)
 	if err != nil {
 		return fmt.Errorf("failed to query Calibre database: %w", err)
 	}
 
-	log.Printf("Connected to Calibre database with %d books", bookCount)
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM data").Scan(&formatCount)
+	if err != nil {
+		return fmt.Errorf("failed to query Calibre formats: %w", err)
+	}
+
+	log.Printf("Connected to Calibre database with %d books and %d format files", bookCount, formatCount)
 	return nil
 }
 
