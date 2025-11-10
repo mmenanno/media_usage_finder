@@ -650,6 +650,61 @@ CREATE INDEX idx_scans_status ON scans(status);
 CREATE INDEX idx_scans_started_at ON scans(started_at);
 `
 
+// Migration to add 'calibre' to usage and service_missing_files table CHECK constraints
+const migrateAddCalibreToServiceTables = `
+-- Update usage table
+DROP TABLE IF EXISTS usage_new;
+CREATE TABLE usage_new (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	file_id INTEGER NOT NULL,
+	service TEXT NOT NULL CHECK(service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash', 'calibre')),
+	reference_path TEXT NOT NULL,
+	metadata TEXT,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE,
+	UNIQUE(file_id, service)
+);
+
+INSERT INTO usage_new SELECT * FROM usage;
+
+DROP INDEX IF EXISTS idx_usage_file_id;
+DROP INDEX IF EXISTS idx_usage_service;
+DROP INDEX IF EXISTS idx_usage_reference_path;
+DROP TABLE usage;
+
+ALTER TABLE usage_new RENAME TO usage;
+
+CREATE INDEX idx_usage_file_id ON usage(file_id);
+CREATE INDEX idx_usage_service ON usage(service);
+CREATE INDEX idx_usage_reference_path ON usage(reference_path);
+
+-- Update service_missing_files table
+DROP TABLE IF EXISTS service_missing_files_new;
+CREATE TABLE service_missing_files_new (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	scan_id INTEGER NOT NULL,
+	service TEXT NOT NULL CHECK(service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash', 'calibre')),
+	service_path TEXT NOT NULL,
+	translated_path TEXT NOT NULL,
+	size INTEGER,
+	metadata TEXT,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	FOREIGN KEY (scan_id) REFERENCES scans(id) ON DELETE CASCADE
+);
+
+INSERT INTO service_missing_files_new SELECT * FROM service_missing_files;
+
+DROP INDEX IF EXISTS idx_service_missing_files_scan_id;
+DROP INDEX IF EXISTS idx_service_missing_files_service;
+DROP TABLE service_missing_files;
+
+ALTER TABLE service_missing_files_new RENAME TO service_missing_files;
+
+CREATE INDEX idx_service_missing_files_scan_id ON service_missing_files(scan_id);
+CREATE INDEX idx_service_missing_files_service ON service_missing_files(service);
+`
+
 // Migration to add scan_id column to audit_log table
 const migrateAddScanIdToAuditLog = `
 -- Drop audit_log_new if it exists from a previous failed migration

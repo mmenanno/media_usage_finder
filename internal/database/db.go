@@ -737,6 +737,59 @@ func (db *DB) runMigrations() error {
 		}
 	}
 
+	// Migration 17: Add 'calibre' to usage and service_missing_files table CHECK constraints
+	// Test if migration is needed by trying to insert a test record with service='calibre'
+	needsCalibreServiceTablesMigration := false
+
+	// Start a transaction for the test
+	tx17, err := db.conn.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start transaction for calibre service tables migration check: %w", err)
+	}
+	defer tx17.Rollback()
+
+	// Try to insert a test record with service='calibre' into usage table
+	_, err = tx17.Exec(`
+		INSERT INTO usage (file_id, service, reference_path)
+		VALUES (999999999, 'calibre', '/migration-test')
+	`)
+
+	if err != nil {
+		// Check if the error is a CHECK constraint failure
+		if strings.Contains(err.Error(), "CHECK constraint failed") {
+			needsCalibreServiceTablesMigration = true
+		}
+		// Foreign key errors are expected and mean no migration is needed
+	} else {
+		// If insert succeeded, delete the test record
+		_, _ = tx17.Exec(`DELETE FROM usage WHERE file_id = 999999999 AND service = 'calibre'`)
+	}
+
+	// Rollback the test transaction
+	tx17.Rollback()
+
+	// Run migration if needed
+	if needsCalibreServiceTablesMigration {
+		// Disable foreign key constraints for migration
+		_, err = db.conn.Exec("PRAGMA foreign_keys = OFF")
+		if err != nil {
+			return fmt.Errorf("failed to disable foreign keys for calibre service tables migration: %w", err)
+		}
+
+		_, err = db.conn.Exec(migrateAddCalibreToServiceTables)
+		if err != nil {
+			// Re-enable foreign keys before returning error
+			db.conn.Exec("PRAGMA foreign_keys = ON")
+			return fmt.Errorf("failed to update usage and service_missing_files tables for calibre: %w", err)
+		}
+
+		// Re-enable foreign key constraints
+		_, err = db.conn.Exec("PRAGMA foreign_keys = ON")
+		if err != nil {
+			return fmt.Errorf("failed to re-enable foreign keys after calibre service tables migration: %w", err)
+		}
+	}
+
 	return nil
 }
 
