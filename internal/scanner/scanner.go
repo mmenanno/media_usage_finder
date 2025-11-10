@@ -1383,7 +1383,8 @@ func (s *Scanner) associatePlexSubtitles() error {
 	log.Printf("plex: Built lookup map with %d unique video basenames", len(videoBasenames))
 
 	// Query for all subtitle files in the database (by extension)
-	subtitleExts := []string{"srt", "sub", "sbv", "ssa", "ass", "vtt"}
+	// Note: Extensions are stored WITH leading dot in database
+	subtitleExts := []string{".srt", ".sub", ".sbv", ".ssa", ".ass", ".vtt"}
 	allSubtitles, err := s.db.GetFilesByExtensions(ctx, subtitleExts)
 	if err != nil {
 		return fmt.Errorf("failed to query subtitle files: %w", err)

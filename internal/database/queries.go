@@ -415,7 +415,7 @@ func (db *DB) GetFilesByService(ctx context.Context, service string) ([]*File, e
 	return files, nil
 }
 
-// GetFilesByExtensions retrieves all files with specific extensions (without leading dot)
+// GetFilesByExtensions retrieves all files with specific extensions (WITH leading dot, e.g., ".srt")
 func (db *DB) GetFilesByExtensions(ctx context.Context, extensions []string) ([]*File, error) {
 	if len(extensions) == 0 {
 		return []*File{}, nil
