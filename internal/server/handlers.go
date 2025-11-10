@@ -1150,6 +1150,7 @@ func (s *Server) HandleUpdateSingleService(w http.ResponseWriter, r *http.Reques
 		"radarr":      true,
 		"qbittorrent": true,
 		"stash":       true,
+		"calibre":     true,
 	}
 	if !validServices[serviceName] {
 		respondError(w, http.StatusBadRequest, "Invalid service name", "invalid_service")
