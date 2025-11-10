@@ -48,8 +48,12 @@
                                 <span class="px-2 py-1 bg-red-600 rounded text-xs">Update qBittorrent</span>
                             {{else if eq .ScanType "service_update_stash"}}
                                 <span class="px-2 py-1 bg-pink-600 rounded text-xs">Update Stash</span>
+                            {{else if eq .ScanType "service_update_calibre"}}
+                                <span class="px-2 py-1 bg-orange-600 rounded text-xs">Update Calibre</span>
                             {{else if eq .ScanType "cleanup"}}
                                 <span class="px-2 py-1 bg-red-600 rounded text-xs">Cleanup Scan</span>
+                            {{else if eq .ScanType "file_rescan"}}
+                                <span class="px-2 py-1 bg-slate-600 rounded text-xs">File Rescan</span>
                             {{else}}
                                 <span class="px-2 py-1 bg-gray-600 rounded text-xs capitalize">{{.ScanType}}</span>
                             {{end}}
