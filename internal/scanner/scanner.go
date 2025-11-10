@@ -1505,7 +1505,7 @@ func (s *Scanner) updateQBittorrentUsage() error {
 		return nil
 	}
 
-	return s.updateServiceUsageWithTimeout(
+	err := s.updateServiceUsageWithTimeout(
 		"qbittorrent",
 		func(ctx context.Context) ([]serviceFile, error) {
 			client := api.NewQBittorrentClient(qbConfig.URL, qbConfig.Username, qbConfig.Password, qbConfig.QuiProxyURL, s.config.APITimeout)
@@ -1520,6 +1520,99 @@ func (s *Scanner) updateQBittorrentUsage() error {
 			return serviceFiles, nil
 		},
 	)
+
+	if err != nil {
+		return err
+	}
+
+	// Associate incomplete download files (.!qB) with qBittorrent
+	return s.associateQBittorrentIncompleteFiles()
+}
+
+// associateQBittorrentIncompleteFiles finds incomplete download files (.!qB) and marks them as used by qBittorrent
+// qBittorrent adds .!qB extension to files during download, then removes it when complete
+// The API reports the final filename (without .!qB), so we need to match incomplete files to active torrents
+func (s *Scanner) associateQBittorrentIncompleteFiles() error {
+	ctx := context.Background()
+	if s.scanCtx != nil {
+		ctx = s.scanCtx
+	}
+
+	log.Printf("qBittorrent: Associating incomplete download files (.!qB)")
+
+	// Get all files currently tracked by qBittorrent (these are the final filenames)
+	qbFiles, err := s.db.GetFilesByService(ctx, "qbittorrent")
+	if err != nil {
+		return fmt.Errorf("failed to get qBittorrent files: %w", err)
+	}
+
+	if len(qbFiles) == 0 {
+		log.Printf("qBittorrent: No files found in active torrents, skipping .!qB association")
+		return nil
+	}
+
+	log.Printf("qBittorrent: Found %d files in active torrents, searching for .!qB files", len(qbFiles))
+
+	// Build a map of qBittorrent file paths for quick lookup
+	qbFilePaths := make(map[string]bool)
+	for _, qbFile := range qbFiles {
+		qbFilePaths[qbFile.Path] = true
+	}
+
+	// Query for all .!qB files in the database
+	// Note: Extensions are stored WITH leading dot in database
+	incompleteFiles, err := s.db.GetFilesByExtensions(ctx, []string{".!qB"})
+	if err != nil {
+		return fmt.Errorf("failed to query .!qB files: %w", err)
+	}
+
+	if len(incompleteFiles) == 0 {
+		log.Printf("qBittorrent: No .!qB files found in database")
+		return nil
+	}
+
+	log.Printf("qBittorrent: Found %d .!qB files, matching to active torrents...", len(incompleteFiles))
+
+	// Match .!qB files to qBittorrent files by stripping the .!qB extension
+	var matchedIncomplete []*database.File
+	for _, incompleteFile := range incompleteFiles {
+		// Strip .!qB extension to get the expected final filename
+		// e.g., /downloads/Movie.mkv.!qB -> /downloads/Movie.mkv
+		expectedPath := strings.TrimSuffix(incompleteFile.Path, ".!qB")
+
+		// Check if qBittorrent has this file in its active torrents
+		if qbFilePaths[expectedPath] {
+			matchedIncomplete = append(matchedIncomplete, incompleteFile)
+		}
+	}
+
+	if len(matchedIncomplete) == 0 {
+		log.Printf("qBittorrent: No .!qB files matched to active torrents (all may be orphaned)")
+		return nil
+	}
+
+	log.Printf("qBittorrent: Matched %d .!qB files to active torrents, creating usage records", len(matchedIncomplete))
+
+	// Create usage records for matched incomplete files
+	var usages []*database.Usage
+	for _, file := range matchedIncomplete {
+		usages = append(usages, &database.Usage{
+			FileID:  file.ID,
+			Service: "qbittorrent",
+			Metadata: map[string]interface{}{
+				"status": "downloading",
+				"type":   "incomplete",
+			},
+		})
+	}
+
+	// Batch upsert usage records
+	if err := s.db.BatchUpsertUsage(ctx, usages); err != nil {
+		return fmt.Errorf("failed to create usage records for .!qB files: %w", err)
+	}
+
+	log.Printf("qBittorrent: Successfully associated %d incomplete download files", len(usages))
+	return nil
 }
 
 // updateStashUsage updates usage information from Stash
