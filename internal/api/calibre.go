@@ -102,13 +102,15 @@ func (c *CalibreClient) GetAllFiles(ctx context.Context) ([]CalibreFile, error) 
 			b.path,
 			b.title,
 			COALESCE(b.author_sort, ''),
-			COALESCE((SELECT name FROM series WHERE id = b.series), ''),
+			COALESCE(s.name, ''),
 			COALESCE(b.series_index, 0),
 			d.format,
 			d.name,
 			COALESCE(d.uncompressed_size, 0)
 		FROM books b
 		JOIN data d ON b.id = d.book
+		LEFT JOIN books_series_link bsl ON b.id = bsl.book
+		LEFT JOIN series s ON bsl.series = s.id
 		ORDER BY b.id
 	`
 
