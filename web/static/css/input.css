@@ -21,6 +21,7 @@
   --color-service-radarr: #FFD60A;
   --color-service-qbittorrent: #0A84FF;
   --color-service-stash: #FF6B35;
+  --color-service-calibre: #FF8C00;
 }
 
 /* Global cursor-pointer for interactive elements */
@@ -117,6 +118,14 @@
 .text-service-stash { color: var(--color-service-stash); }
 .text-on-service-stash { color: #1F2937; } /* Dark text for badge contrast */
 .hover\:bg-service-stash-dark:hover { background-color: #CC562A; }
+
+.bg-service-calibre { background-color: var(--color-service-calibre); }
+.bg-service-calibre-faded { background-color: rgba(255, 140, 0, 0.1); }
+.bg-service-calibre-gradient { background: radial-gradient(circle at top left, rgba(255, 140, 0, 0.45) 0%, rgba(255, 140, 0, 0.25) 35%, rgba(255, 140, 0, 0.08) 100%); }
+.border-service-calibre { border-color: var(--color-service-calibre); }
+.text-service-calibre { color: var(--color-service-calibre); }
+.text-on-service-calibre { color: #1F2937; } /* Dark text for badge contrast */
+.hover\:bg-service-calibre-dark:hover { background-color: #CC7000; }
 
 /* HTMX loading indicators */
 .htmx-request {
