@@ -132,7 +132,8 @@ type DashboardData struct {
 // FilesData represents data for the files list template
 type FilesData struct {
 	Files             interface{}
-	Total             int64
+	Total             int64 // Filtered count
+	TotalUnfiltered   int64 // Total count without filters
 	Page              int64
 	Limit             int
 	TotalPages        int

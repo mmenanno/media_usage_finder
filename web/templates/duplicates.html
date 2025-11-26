@@ -79,7 +79,7 @@
                                 onclick="previewConsolidation('cross-disk')"
                                 class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors flex items-center justify-center gap-2">
                                 <span class="preview-button-loading">Loading...</span>
-                                <span class="preview-button-text hidden flex items-center gap-2">
+                                <span class="preview-button-text flex items-center gap-2">
                                     <span class="preview-icon"></span>
                                     <span>Preview All ({{formatNumber (toInt64 .CrossDiskCount)}} groups)</span>
                                 </span>
@@ -127,6 +127,30 @@
                                         </svg>
                                         <span>Quick Hash Only</span>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Hash Level Filter (shown only when Progressive is selected) -->
+                        <div id="cross-disk-hash-level-container" class="hidden">
+                            <label class="block text-sm font-medium text-gray-400 mb-2">Hash Level</label>
+                            <div class="relative" data-custom-dropdown>
+                                <input type="hidden" id="cross-disk-hash-level-filter" value="" data-dropdown-input>
+                                <button
+                                    type="button"
+                                    data-dropdown-button
+                                    aria-expanded="false"
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
+                                    <span data-dropdown-text>Any Level</span>
+                                    <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                                    <div data-dropdown-option data-value="" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">Any Level</div>
+                                    <div data-dropdown-option data-value="2" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Level 2 (10MB)</div>
+                                    <div data-dropdown-option data-value="3" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Level 3 (100MB)</div>
+                                    <div data-dropdown-option data-value="4" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Level 4 (1GB)</div>
+                                    <div data-dropdown-option data-value="5" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Level 5 (10GB)</div>
                                 </div>
                             </div>
                         </div>
@@ -182,7 +206,7 @@
                 <!-- Duplicate Groups -->
                 <div id="cross-disk-groups" class="space-y-4">
                     {{range $plan := .CrossDiskGroups}}
-                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{$plan.SpaceSavings}}" data-hash-type="{{if gt $plan.Group.HashLevel 0}}{{if eq $plan.Group.HashLevel 6}}full{{else if eq $plan.Group.HashLevel 1}}quick{{else}}progressive{{end}}{{else}}{{$plan.Group.HashType}}{{end}}" data-copies="{{$plan.Group.TotalCopies}}" data-file-size="{{$plan.Group.TotalSize}}">
+                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{$plan.SpaceSavings}}" data-hash-type="{{if gt $plan.Group.HashLevel 0}}{{if eq $plan.Group.HashLevel 6}}full{{else if eq $plan.Group.HashLevel 1}}quick{{else}}progressive{{end}}{{else}}{{$plan.Group.HashType}}{{end}}" data-hash-level="{{$plan.Group.HashLevel}}" data-copies="{{$plan.Group.TotalCopies}}" data-file-size="{{$plan.Group.TotalSize}}">
                             <!-- Group Header -->
                             <div class="bg-gray-800 px-6 py-4 border-b border-gray-700">
                                 <div class="flex justify-between items-start">
@@ -357,7 +381,7 @@
                                 onclick="previewHardlinks()"
                                 class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors flex items-center justify-center gap-2">
                                 <span class="preview-button-loading">Loading...</span>
-                                <span class="preview-button-text hidden flex items-center gap-2">
+                                <span class="preview-button-text flex items-center gap-2">
                                     <span class="preview-icon"></span>
                                     <span>Preview All ({{formatNumber (toInt64 .SameDiskCount)}} groups)</span>
                                 </span>
@@ -418,6 +442,30 @@
                                         </svg>
                                         <span>Quick Hash Only</span>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Hash Level Filter (shown only when Progressive is selected) -->
+                        <div id="same-disk-hash-level-container" class="hidden">
+                            <label class="block text-sm font-medium text-gray-400 mb-2">Hash Level</label>
+                            <div class="relative" data-custom-dropdown>
+                                <input type="hidden" id="same-disk-hash-level-filter" name="hash_level" value="" data-dropdown-input>
+                                <button
+                                    type="button"
+                                    data-dropdown-button
+                                    aria-expanded="false"
+                                    class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500 text-gray-100 text-left">
+                                    <span data-dropdown-text>Any Level</span>
+                                    <svg class="w-4 h-4 absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </button>
+                                <div data-dropdown-menu class="hidden absolute z-50 w-full mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg max-h-60 overflow-auto">
+                                    <div data-dropdown-option data-value="" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100 bg-blue-600" aria-selected="true">Any Level</div>
+                                    <div data-dropdown-option data-value="2" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Level 2 (10MB)</div>
+                                    <div data-dropdown-option data-value="3" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Level 3 (100MB)</div>
+                                    <div data-dropdown-option data-value="4" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Level 4 (1GB)</div>
+                                    <div data-dropdown-option data-value="5" class="px-4 py-2 text-sm hover:bg-gray-600 text-gray-100" aria-selected="false">Level 5 (10GB)</div>
                                 </div>
                             </div>
                         </div>
@@ -522,13 +570,13 @@
                     <!-- Duplicate Groups -->
                     <div id="same-disk-groups" class="space-y-4 p-6">
                     {{range $plan := .SameDiskGroups}}
-                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{$plan.SpaceSavings}}" data-hash-type="{{if gt $plan.Group.HashLevel 0}}{{if eq $plan.Group.HashLevel 6}}full{{else if eq $plan.Group.HashLevel 1}}quick{{else}}progressive{{end}}{{else}}{{$plan.Group.HashType}}{{end}}" data-copies="{{$plan.Group.TotalCopies}}" data-file-size="{{$plan.Group.TotalSize}}">
+                        <div class="duplicate-group bg-gray-750 rounded-lg border border-gray-700 overflow-hidden" data-size="{{$plan.SpaceSavings}}" data-hash-type="{{if gt $plan.Group.HashLevel 0}}{{if eq $plan.Group.HashLevel 6}}full{{else if eq $plan.Group.HashLevel 1}}quick{{else}}progressive{{end}}{{else}}{{$plan.Group.HashType}}{{end}}" data-hash-level="{{$plan.Group.HashLevel}}" data-copies="{{$plan.Group.TotalCopies}}" data-file-size="{{$plan.Group.TotalSize}}">
                             <!-- Group Header -->
                             <div class="bg-gray-800 px-6 py-4 border-b border-gray-700">
-                                <div class="flex justify-between items-start">
-                                    <div class="flex-1">
-                                        <div class="flex items-center space-x-3">
-                                            <h3 class="text-lg font-semibold text-gray-100">
+                                <div class="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                                            <h3 class="text-base sm:text-lg font-semibold text-gray-100 wrap-break-word">
                                                 {{$plan.Group.TotalSize | formatBytes}} × {{$plan.TotalFiles}} files in {{$plan.ActualCopies}} cluster(s)
                                             </h3>
                                             {{if gt $plan.Group.HashLevel 0}}
@@ -580,14 +628,14 @@
                                             <span>{{len $plan.AlreadyLinked}} cluster(s) already internally linked</span>
                                         </div>
                                         {{end}}
-                                        <div class="text-sm text-gray-400 mt-1 font-mono truncate">
+                                        <div class="text-sm text-gray-400 mt-1 font-mono break-all">
                                             Hash: {{$plan.Group.FileHash}}
                                         </div>
-                                        <div class="text-sm text-gray-400 mt-1">
+                                        <div class="text-sm text-gray-400 mt-1 wrap-break-word">
                                             Disk: {{if $plan.KeepDisk}}{{$plan.KeepDisk.Name}}{{else}}Unknown{{end}}
                                         </div>
                                     </div>
-                                    <div class="text-right space-y-3">
+                                    <div class="shrink-0 lg:text-right space-y-3">
                                         <div>
                                             <div class="text-sm text-gray-400">Actual Savings</div>
                                             <div class="text-xl font-bold text-green-400">{{$plan.SpaceSavings | formatBytes}}</div>
@@ -639,16 +687,16 @@
                                 <!-- Primary Cluster -->
                                 {{if $plan.KeepCluster}}
                                 <div class="hardlink-cluster bg-blue-900 bg-opacity-10 border border-blue-700 rounded-lg p-3">
-                                    <div class="text-xs font-semibold text-blue-400 mb-2 flex items-center space-x-2">
-                                        <span>PRIMARY CLUSTER (inode {{$plan.KeepCluster.Inode}})</span>
+                                    <div class="text-xs font-semibold text-blue-400 mb-2 flex flex-col sm:flex-row sm:items-center sm:space-x-2 gap-2">
+                                        <span class="wrap-break-word">PRIMARY CLUSTER (inode {{$plan.KeepCluster.Inode}})</span>
                                         {{if $plan.KeepCluster.IsLinked}}
-                                        <span class="px-2 py-0.5 rounded bg-blue-600 bg-opacity-30 text-blue-300">
+                                        <span class="px-2 py-0.5 rounded bg-blue-600 bg-opacity-30 text-blue-300 shrink-0">
                                             {{$plan.KeepCluster.LinkCount}} files already linked
                                         </span>
                                         {{end}}
                                     </div>
                                     {{range $plan.KeepCluster.Files}}
-                                    <div class="file-entry flex items-center justify-between p-2 rounded bg-blue-900 bg-opacity-20 mb-2">
+                                    <div class="file-entry flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 rounded bg-blue-900 bg-opacity-20 mb-2 gap-2">
                                         <div class="flex items-center space-x-3 flex-1 min-w-0">
                                             <div class="shrink-0 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
                                                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
@@ -1028,10 +1076,29 @@ document.addEventListener('DOMContentLoaded', function() {
     const crossDiskHashFilter = document.getElementById('cross-disk-hash-filter');
     const crossDiskSizeFilter = document.getElementById('cross-disk-size-filter');
     const crossDiskSort = document.getElementById('cross-disk-sort');
+    const crossDiskHashLevelContainer = document.getElementById('cross-disk-hash-level-container');
+    const crossDiskHashLevelFilter = document.getElementById('cross-disk-hash-level-filter');
 
+    // Show/hide hash level filter based on hash type selection for cross-disk
     if (crossDiskHashFilter) {
+        // Initialize hash level visibility
+        if (crossDiskHashLevelContainer) {
+            const currentHashType = crossDiskHashFilter.value || 'all';
+            updateHashLevelVisibility(currentHashType, crossDiskHashLevelContainer, crossDiskHashLevelFilter);
+        }
+
         crossDiskHashFilter.addEventListener('change', function() {
+            if (crossDiskHashLevelContainer) {
+                updateHashLevelVisibility(this.value, crossDiskHashLevelContainer, crossDiskHashLevelFilter);
+            }
             applyFiltersAndSort('cross-disk');
+        });
+    }
+
+    if (crossDiskHashLevelFilter) {
+        crossDiskHashLevelFilter.addEventListener('change', function() {
+            applyFiltersAndSort('cross-disk');
+            updatePreviewButton('cross-disk');
         });
     }
 
@@ -1053,9 +1120,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const sameDiskSort = document.getElementById('same-disk-sort');
     const sameDiskLimitFilter = document.getElementById('same-disk-limit');
     const sameDiskApplyBtn = document.getElementById('apply-same-disk-filters');
+    const sameDiskHashLevelContainer = document.getElementById('same-disk-hash-level-container');
+    const sameDiskHashLevelFilter = document.getElementById('same-disk-hash-level-filter');
+
+    // Show/hide hash level filter based on hash type selection
+    function updateHashLevelVisibility(hashType, container, levelFilter) {
+        if (hashType === 'progressive') {
+            container.classList.remove('hidden');
+        } else {
+            container.classList.add('hidden');
+            // Reset hash level when hiding
+            if (levelFilter) {
+                const dropdown = levelFilter.closest('[data-custom-dropdown]');
+                if (dropdown) {
+                    setDropdownValue(dropdown, '', 'Any Level');
+                }
+            }
+        }
+    }
+
+    // Initialize hash level visibility based on current hash type
+    if (sameDiskHashFilter && sameDiskHashLevelContainer) {
+        const currentHashType = sameDiskHashFilter.value || 'all';
+        updateHashLevelVisibility(currentHashType, sameDiskHashLevelContainer, sameDiskHashLevelFilter);
+    }
 
     if (sameDiskHashFilter && sameDiskApplyBtn) {
         sameDiskHashFilter.addEventListener('change', function() {
+            // Update hash level visibility
+            if (sameDiskHashLevelContainer) {
+                updateHashLevelVisibility(this.value, sameDiskHashLevelContainer, sameDiskHashLevelFilter);
+            }
             // Trigger form submission for server-side filtering
             sameDiskApplyBtn.click();
         });
@@ -1081,6 +1176,13 @@ document.addEventListener('DOMContentLoaded', function() {
             sameDiskApplyBtn.click();
         });
     }
+
+    // Update preview button when hash level changes
+    if (sameDiskHashLevelFilter) {
+        sameDiskHashLevelFilter.addEventListener('change', function() {
+            updatePreviewButton('same-disk');
+        });
+    }
 });
 
 // Apply all filters and sorting for a given type (client-side)
@@ -1089,12 +1191,14 @@ function applyFiltersAndSort(type) {
     const hashFilter = document.getElementById(`${type}-hash-filter`);
     const sizeFilter = document.getElementById(`${type}-size-filter`);
     const sortSelect = document.getElementById(`${type}-sort`);
+    const hashLevelFilter = document.getElementById(`${type}-hash-level-filter`);
 
     if (!hashFilter || !sizeFilter || !sortSelect) return;
 
     const hashType = hashFilter.value;
     const minSize = parseInt(sizeFilter.value);
     const sortBy = sortSelect.value;
+    const hashLevel = hashLevelFilter ? hashLevelFilter.value : '';
 
     const container = document.getElementById(`${type}-groups`);
     if (!container) return;
@@ -1109,6 +1213,14 @@ function applyFiltersAndSort(type) {
         if (hashType !== 'all') {
             const groupHashType = group.getAttribute('data-hash-type');
             if (groupHashType !== hashType) {
+                visible = false;
+            }
+        }
+
+        // Filter by hash level (only if hash type is progressive and level is specified)
+        if (hashType === 'progressive' && hashLevel && hashLevel !== '') {
+            const groupHashLevel = group.getAttribute('data-hash-level');
+            if (groupHashLevel !== hashLevel) {
                 visible = false;
             }
         }
@@ -1812,11 +1924,21 @@ if (clearFiltersBtn) {
         const sizeDropdown = document.querySelector('#same-disk-size-filter').closest('[data-custom-dropdown]');
         const sortDropdown = document.querySelector('#same-disk-sort').closest('[data-custom-dropdown]');
         const limitDropdown = document.querySelector('#same-disk-limit').closest('[data-custom-dropdown]');
+        const hashLevelDropdown = document.querySelector('#same-disk-hash-level-filter')?.closest('[data-custom-dropdown]');
 
         setDropdownValue(hashDropdown, 'all', 'All Hashes');
         setDropdownValue(sizeDropdown, '', 'Any Size');
         setDropdownValue(sortDropdown, 'savings', 'Largest Savings');
         setDropdownValue(limitDropdown, '25', '25');
+        if (hashLevelDropdown) {
+            setDropdownValue(hashLevelDropdown, '', 'Any Level');
+        }
+
+        // Hide hash level container
+        const hashLevelContainer = document.getElementById('same-disk-hash-level-container');
+        if (hashLevelContainer) {
+            hashLevelContainer.classList.add('hidden');
+        }
 
         // Reload with cleared filters
         loadSameDiskGroups();
@@ -1851,11 +1973,13 @@ function getCurrentFilters(tab) {
     const search = document.getElementById(`${tab}-search`)?.value || '';
     const hashType = document.getElementById(`${tab}-hash-filter`)?.value || 'all';
     const minSize = parseInt(document.getElementById(`${tab}-size-filter`)?.value || '0');
+    const hashLevel = document.getElementById(`${tab}-hash-level-filter`)?.value || '';
 
     return {
         search: search.trim(),
         hash_type: hashType,
-        min_size: minSize
+        min_size: minSize,
+        hash_level: hashLevel
     };
 }
 
@@ -1864,7 +1988,8 @@ function hasActiveFilters(tab) {
     const filters = getCurrentFilters(tab);
     return filters.search !== '' ||
            (filters.hash_type !== 'all' && filters.hash_type !== '') ||
-           filters.min_size > 0;
+           filters.min_size > 0 ||
+           (filters.hash_level !== '' && filters.hash_level !== '0');
 }
 
 // Update preview button text with current group count
@@ -1899,6 +2024,10 @@ async function updatePreviewButton(tab) {
             else if (filters.min_size >= 107374182400) params.append('min_size', '100gb');
             else if (filters.min_size >= 10737418240) params.append('min_size', '10gb');
             else if (filters.min_size >= 1073741824) params.append('min_size', '1gb');
+        }
+
+        if (filters.hash_level && filters.hash_level !== '' && filters.hash_level !== '0') {
+            params.append('hash_level', filters.hash_level);
         }
 
         // Fetch count from API
@@ -2003,15 +2132,21 @@ window.previewHardlinks = async function() {
     showToast('Analyzing hardlinks...', 'info', {duration: 5000});
 
     // Run dry-run hardlink with filters
+    const requestBody = {
+        dry_run: true,
+        search_text: filters.search,
+        hash_type: filters.hash_type,
+        min_size: filters.min_size
+    };
+
+    if (filters.hash_level && filters.hash_level !== '' && filters.hash_level !== '0') {
+        requestBody.hash_level = parseInt(filters.hash_level, 10);
+    }
+
     fetch('/api/duplicates/hardlink', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            dry_run: true,
-            search_text: filters.search,
-            hash_type: filters.hash_type,
-            min_size: filters.min_size
-        })
+        body: JSON.stringify(requestBody)
     })
     .then(response => {
         if (!response.ok) {
@@ -2061,7 +2196,12 @@ window.showDryRunSummary = function(data, groupHashes = null) {
             }
             if (data.active_filters.hash_type && data.active_filters.hash_type !== 'all') {
                 const hashLabels = {full: 'Full Hash', progressive: 'Progressive Hash', quick: 'Quick Hash'};
-                filters.push(hashLabels[data.active_filters.hash_type] || data.active_filters.hash_type);
+                let hashLabel = hashLabels[data.active_filters.hash_type] || data.active_filters.hash_type;
+                if (data.active_filters.hash_level && data.active_filters.hash_level > 0) {
+                    const levelLabels = {2: 'Level 2 (10MB)', 3: 'Level 3 (100MB)', 4: 'Level 4 (1GB)', 5: 'Level 5 (10GB)'};
+                    hashLabel += ' - ' + (levelLabels[data.active_filters.hash_level] || `Level ${data.active_filters.hash_level}`);
+                }
+                filters.push(hashLabel);
             }
             if (data.active_filters.min_size) {
                 const sizeLabel = data.active_filters.min_size >= 1099511627776 ? '1TB+' :

@@ -103,16 +103,16 @@
                 <!-- Primary Cluster -->
                 {{if $plan.KeepCluster}}
                 <div class="hardlink-cluster bg-blue-900 bg-opacity-10 border border-blue-700 rounded-lg p-3">
-                    <div class="text-xs font-semibold text-blue-400 mb-2 flex items-center space-x-2">
-                        <span>PRIMARY CLUSTER (inode {{$plan.KeepCluster.Inode}})</span>
+                    <div class="text-xs font-semibold text-blue-400 mb-2 flex flex-col sm:flex-row sm:items-center sm:space-x-2 gap-2">
+                        <span class="break-words">PRIMARY CLUSTER (inode {{$plan.KeepCluster.Inode}})</span>
                         {{if $plan.KeepCluster.IsLinked}}
-                        <span class="px-2 py-0.5 rounded bg-blue-600 bg-opacity-30 text-blue-300">
+                        <span class="px-2 py-0.5 rounded bg-blue-600 bg-opacity-30 text-blue-300 shrink-0">
                             {{formatNumber (toInt64 $plan.KeepCluster.LinkCount)}} files already linked
                         </span>
                         {{end}}
                     </div>
                     {{range $plan.KeepCluster.Files}}
-                    <div class="file-entry flex items-center justify-between p-2 rounded bg-blue-900 bg-opacity-20 mb-2">
+                    <div class="file-entry flex flex-col sm:flex-row sm:items-center sm:justify-between p-2 rounded bg-blue-900 bg-opacity-20 mb-2 gap-2">
                         <div class="flex items-center space-x-3 flex-1 min-w-0">
                             <div class="shrink-0 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
                                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
@@ -133,7 +133,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="shrink-0 ml-4 text-right">
+                        <div class="shrink-0 sm:ml-4 text-left sm:text-right">
                             <div class="text-sm font-medium text-blue-400">PRIMARY</div>
                             {{if eq .ID $plan.KeepFile.ID}}
                             <div class="text-xs text-gray-400">{{$plan.ReasonToKeep}}</div>

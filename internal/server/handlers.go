@@ -311,6 +311,9 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		serviceFilterMode = "any" // default
 	}
 
+	// Debug logging for service filter
+	log.Printf("DEBUG [HandleFiles] Service filter - Mode: %q, Services: %v, Services param: %q", serviceFilterMode, services, r.URL.Query().Get("services"))
+
 	// Parse extensions filter (can be comma-separated or multiple params)
 	var extensions []string
 	if extParam := r.URL.Query().Get("extensions"); extParam != "" {
@@ -356,6 +359,13 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		log.Printf("ERROR: Failed to list files: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to list files. The database may be locked or experiencing issues", "database_error")
 		return
+	}
+
+	// Get total unfiltered count for comparison
+	totalUnfiltered, err := s.db.GetCurrentFileCount()
+	if err != nil {
+		log.Printf("WARNING: Failed to get total unfiltered count: %v", err)
+		totalUnfiltered = int64(total) // Fallback to filtered count if we can't get total
 	}
 
 	// Batch load usage for all files (fixes N+1 query problem)
@@ -404,6 +414,7 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 	data := FilesData{
 		Files:                    filesWithUsage,
 		Total:                    int64(total),
+		TotalUnfiltered:         totalUnfiltered,
 		Page:                     int64(page),
 		Limit:                    limit,
 		TotalPages:               CalculateTotalPages(total, limit),

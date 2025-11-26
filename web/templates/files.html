@@ -14,14 +14,18 @@
 <div class="space-y-6">
     <div class="flex justify-between items-center">
         <h2 class="text-3xl font-bold">Files</h2>
-        <div class="text-gray-400">
-            Total: {{formatNumber .Total}} files
+        <div class="text-gray-400" id="files-total-display" hx-swap-oob="true">
+            {{if ne .Total .TotalUnfiltered}}
+                {{formatNumber .Total}} of {{formatNumber .TotalUnfiltered}} files
+            {{else}}
+                Total: {{formatNumber .Total}} files
+            {{end}}
         </div>
     </div>
 
     <!-- Search and Filters -->
     <div class="bg-gray-800 rounded-lg p-6">
-        <form hx-get="/files" hx-target="#files-table" hx-select="#files-table" hx-push-url="true" class="space-y-4" autocomplete="off">
+        <form hx-get="/files" hx-target="#files-table" hx-select="#files-table, #files-total-display" hx-push-url="true" class="space-y-4" autocomplete="off">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Search -->
                 <div class="md:col-span-3">
@@ -40,6 +44,7 @@
                             hx-get="/files"
                             hx-trigger="keyup changed delay:500ms, search"
                             hx-target="#files-table"
+                            hx-select="#files-table, #files-total-display"
                             hx-include="[name='services'], [name='service_filter_mode'], [name='orphaned'], [name='extensions'], [name='devices'], [name='limit'], [name='order'], [name='direction']"
                             class="w-full px-4 py-2 pr-10 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                         <div id="search-spinner" class="absolute right-3 top-1/2 transform -translate-y-1/2 hidden">
@@ -298,7 +303,128 @@
 
     <!-- Files Table -->
     <div id="files-table" class="bg-gray-800 rounded-lg overflow-hidden" role="region" aria-label="Files list">
-        <div class="overflow-x-auto scrollbar-thin">
+        <!-- Mobile Card View -->
+        <div class="block lg:hidden space-y-3 p-4">
+            {{range .Files}}
+            <div class="bg-gray-750 rounded-lg border border-gray-700 p-4 space-y-3">
+                <!-- Path -->
+                <div>
+                    <div class="text-xs text-gray-400 mb-1">Path</div>
+                    <div class="text-sm text-gray-300 font-mono wrap-break-word" title="{{.File.Path}}">
+                        {{.File.Path}}
+                    </div>
+                </div>
+
+                <!-- Size and Status Row -->
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-xs text-gray-400 mb-1">Size</div>
+                        <div class="text-sm text-gray-400">{{formatSize .File.Size}}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-400 mb-1">Status</div>
+                        {{if .File.IsOrphaned}}
+                        <span class="px-2 py-1 bg-yellow-600 rounded text-xs">Orphaned</span>
+                        {{else}}
+                        <span class="px-2 py-1 bg-green-600 rounded text-xs">In Use</span>
+                        {{end}}
+                    </div>
+                </div>
+
+                <!-- Services -->
+                <div>
+                    <div class="text-xs text-gray-400 mb-1">Services</div>
+                    {{if .Usage}}
+                    <div class="flex flex-wrap gap-1">
+                        {{range .Usage}}
+                        <span class="px-2 py-1 {{serviceClass .Service "bg"}} {{serviceClass .Service "text-on-bg"}} rounded text-xs">{{formatServiceName .Service}}</span>
+                        {{end}}
+                    </div>
+                    {{else}}
+                    <span class="text-gray-500 text-sm">None</span>
+                    {{end}}
+                </div>
+
+                <!-- Actions -->
+                <div>
+                    <div class="text-xs text-gray-400 mb-2">Actions</div>
+                    <div class="flex flex-col space-y-2">
+                        <button
+                            data-file-id="{{.File.ID}}"
+                            data-action="show-details"
+                            aria-label="View file details"
+                            class="w-full px-3 py-2 bg-green-600 hover:bg-green-700 rounded text-sm transition flex items-center justify-center gap-1.5">
+                            <span class="file-details-icon"></span>
+                            <span>Details</span>
+                        </button>
+                        <button
+                            hx-post="/api/files/rescan?id={{.File.ID}}"
+                            hx-swap="none"
+                            aria-label="Rescan file now"
+                            class="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm transition flex items-center justify-center gap-1.5">
+                            <span class="file-rescan-icon"></span>
+                            <span>Rescan</span>
+                        </button>
+                        <button
+                            hx-delete="/api/files/delete?id={{.File.ID}}"
+                            {{if .DeleteFilesFromFilesystem}}
+                            hx-confirm="<strong>Warning:</strong> Permanently delete this file from the filesystem?\n\nThis will remove the actual file from disk and <strong>cannot be undone</strong>."
+                            {{else}}
+                            hx-confirm="Remove this file from the database?\n\nThe actual file will remain on disk."
+                            {{end}}
+                            hx-target="closest .bg-gray-750"
+                            hx-swap="delete"
+                            aria-label="Delete file"
+                            class="w-full px-3 py-2 bg-red-600 hover:bg-red-700 rounded text-sm transition flex items-center justify-center gap-1.5">
+                            <span class="file-delete-icon"></span>
+                            <span>{{if .DeleteFilesFromFilesystem}}Delete{{else}}Remove{{end}}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {{else}}
+            <div class="p-8 text-center">
+                <div class="flex flex-col items-center justify-center text-center space-y-4">
+                    <svg class="w-16 h-16 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    {{if .Search}}
+                    <div class="space-y-2">
+                        <p class="text-lg font-medium text-gray-400">No files match your search</p>
+                        <p class="text-sm text-gray-500">Try adjusting your search terms or filters</p>
+                    </div>
+                    {{else if .Orphaned}}
+                    <div class="space-y-2">
+                        <p class="text-lg font-medium text-gray-400">No orphaned files found</p>
+                        <p class="text-sm text-gray-500">All your files are being tracked by at least one service!</p>
+                    </div>
+                    {{else if .Services}}
+                    <div class="space-y-2">
+                        <p class="text-lg font-medium text-gray-400">No files found for selected services</p>
+                        <p class="text-sm text-gray-500">{{if eq (len .Services) 1}}This service hasn't indexed any files yet{{else}}No files match the selected service filter{{end}}</p>
+                    </div>
+                    {{else}}
+                    <div class="space-y-3">
+                        <p class="text-lg font-medium text-gray-400">No files found</p>
+                        <p class="text-sm text-gray-500">Start a scan to discover and track your media files</p>
+                        <button
+                            hx-post="/api/scan/start"
+                            hx-confirm="Start a new scan? This may take a while for large libraries."
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition inline-flex items-center space-x-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                            <span>Start Scan</span>
+                        </button>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Desktop Table View -->
+        <div class="hidden lg:block overflow-x-auto scrollbar-thin">
             <table class="w-full" role="table" aria-label="Media files">
                 <thead class="bg-gray-700">
                     <tr role="row">
@@ -403,7 +529,7 @@
                                     {{else}}
                                     hx-confirm="Remove this file from the database?\n\nThe actual file will remain on disk."
                                     {{end}}
-                                    hx-target="closest tr"
+                                    hx-target="closest tr, closest .bg-gray-750"
                                     hx-swap="delete"
                                     aria-label="Delete file"
                                     class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm transition whitespace-nowrap flex items-center gap-1.5">
