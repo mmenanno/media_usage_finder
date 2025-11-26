@@ -1366,17 +1366,13 @@ func (db *DB) SearchFiles(searchQuery string, orphanedOnly bool, services []stri
 			// File must be tracked by ONLY these services (exact match, no others)
 			if len(services) == 0 {
 				// If no services selected in exact mode, show only orphaned files (files with no services)
-				log.Printf("DEBUG [ListFiles] Exact mode with empty services - showing orphaned files only")
 				conditions = append(conditions, "NOT EXISTS (SELECT 1 FROM usage u WHERE u.file_id = f.id)")
 			} else {
 				// File must have exactly the selected services and no others
 				// Build placeholders for IN clause
 				placeholders := make([]string, len(services))
-				serviceArgs := make([]interface{}, len(services))
-				for i, svc := range services {
+				for i := range services {
 					placeholders[i] = "?"
-					lowerSvc := strings.ToLower(svc) // Ensure lowercase for consistency
-					serviceArgs[i] = lowerSvc
 				}
 				// Query structure:
 				// 1. First ? = total count check
@@ -1392,7 +1388,6 @@ func (db *DB) SearchFiles(searchQuery string, orphanedOnly bool, services []stri
 						"(SELECT COUNT(DISTINCT LOWER(u.service)) FROM usage u WHERE u.file_id = f.id AND LOWER(u.service) IN (%s)) = ?",
 					strings.Join(placeholders, ", "),
 				)
-				log.Printf("DEBUG [ListFiles] Exact mode query - Services: %v, Service args: %v, Query part: %s, Args order: [count=%d, services=%v, count=%d]", services, serviceArgs, queryPart, len(services), serviceArgs, len(services))
 				conditions = append(conditions, queryPart)
 			}
 		}
@@ -1558,7 +1553,6 @@ func (db *DB) GetFileExtensions(orphanedOnly bool, service string) ([]string, er
 
 // ListFiles retrieves files with filtering and pagination
 func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode string, hardlinksOnly bool, extensions []string, deviceIDs []int64, limit, offset int, orderBy, direction string) ([]*File, int, error) {
-	log.Printf("DEBUG [ListFiles] Called with - orphanedOnly: %v, services: %v, serviceFilterMode: %q, hardlinksOnly: %v, extensions: %v, deviceIDs: %v", orphanedOnly, services, serviceFilterMode, hardlinksOnly, extensions, deviceIDs)
 	var conditions []string
 	args := []interface{}{}
 
@@ -1621,17 +1615,13 @@ func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode 
 			// File must be tracked by ONLY these services (exact match, no others)
 			if len(services) == 0 {
 				// If no services selected in exact mode, show only orphaned files (files with no services)
-				log.Printf("DEBUG [ListFiles] Exact mode with empty services - showing orphaned files only")
 				conditions = append(conditions, "NOT EXISTS (SELECT 1 FROM usage u WHERE u.file_id = f.id)")
 			} else {
 				// File must have exactly the selected services and no others
 				// Build placeholders for IN clause
 				placeholders := make([]string, len(services))
-				serviceArgs := make([]interface{}, len(services))
-				for i, svc := range services {
+				for i := range services {
 					placeholders[i] = "?"
-					lowerSvc := strings.ToLower(svc) // Ensure lowercase for consistency
-					serviceArgs[i] = lowerSvc
 				}
 				// Query structure:
 				// 1. First ? = total count check
@@ -1647,7 +1637,6 @@ func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode 
 						"(SELECT COUNT(DISTINCT LOWER(u.service)) FROM usage u WHERE u.file_id = f.id AND LOWER(u.service) IN (%s)) = ?",
 					strings.Join(placeholders, ", "),
 				)
-				log.Printf("DEBUG [ListFiles] Exact mode query - Services: %v, Service args: %v, Query part: %s, Args order: [count=%d, services=%v, count=%d]", services, serviceArgs, queryPart, len(services), serviceArgs, len(services))
 				conditions = append(conditions, queryPart)
 			}
 		}
@@ -1681,15 +1670,11 @@ func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode 
 
 	// Count total
 	countQuery := fmt.Sprintf("SELECT COUNT(*) FROM files f %s", whereClause)
-	log.Printf("DEBUG [ListFiles] Count query: %s", countQuery)
-	log.Printf("DEBUG [ListFiles] Count query args: %v", args)
 	var total int
 	err := db.conn.QueryRow(countQuery, args...).Scan(&total)
 	if err != nil {
-		log.Printf("ERROR [ListFiles] Count query failed: %v", err)
 		return nil, 0, err
 	}
-	log.Printf("DEBUG [ListFiles] Count result: %d", total)
 
 	// Validate and sanitize orderBy and direction
 	// SQL Injection Safety: ValidateOrderBy uses an allowlist to ensure only
@@ -1708,11 +1693,8 @@ func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode 
 	`, whereClause, safeOrderBy, safeDirection)
 
 	queryArgs := append(args, limit, offset)
-	log.Printf("DEBUG [ListFiles] Main query: %s", query)
-	log.Printf("DEBUG [ListFiles] Main query args: %v", queryArgs)
 	rows, err := db.conn.Query(query, queryArgs...)
 	if err != nil {
-		log.Printf("ERROR [ListFiles] Main query failed: %v", err)
 		return nil, 0, err
 	}
 	defer rows.Close()
@@ -1725,7 +1707,6 @@ func (db *DB) ListFiles(orphanedOnly bool, services []string, serviceFilterMode 
 		}
 		files = append(files, file)
 	}
-	log.Printf("DEBUG [ListFiles] Returned %d files (total: %d)", len(files), total)
 
 	return files, total, rows.Err()
 }

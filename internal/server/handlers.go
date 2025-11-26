@@ -311,9 +311,6 @@ func (s *Server) HandleFiles(w http.ResponseWriter, r *http.Request) {
 		serviceFilterMode = "any" // default
 	}
 
-	// Debug logging for service filter
-	log.Printf("DEBUG [HandleFiles] Service filter - Mode: %q, Services: %v, Services param: %q", serviceFilterMode, services, r.URL.Query().Get("services"))
-
 	// Parse extensions filter (can be comma-separated or multiple params)
 	var extensions []string
 	if extParam := r.URL.Query().Get("extensions"); extParam != "" {
