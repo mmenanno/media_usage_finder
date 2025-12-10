@@ -209,9 +209,9 @@ duplicate_detection:
   # - With 128GB RAM, even 16MB × 10 workers = only 160MB
   hash_buffer_size: "4MB"
 
-  # Progressive hash level toggles (only used when hash_mode = "progressive")
+  # Progressive hash level toggles (used by the "Progressive Verify" button on dashboard)
   # Enable or disable specific levels. Disabled levels will be skipped during verification.
-  # At least one level must be enabled when using progressive mode.
+  # At least one level must be enabled.
   # Tip: Disable level 5 (10GB) to skip verification of very large files.
   enable_level_1: true   # 1MB - Quick hash (first + last 1MB)
   enable_level_2: true   # 10MB - First progressive step

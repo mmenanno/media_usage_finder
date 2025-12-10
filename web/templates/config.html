@@ -708,11 +708,11 @@
                     </div>
 
                     <!-- Progressive Hash Levels -->
-                    <div id="progressive-levels-section" class="col-span-2 {{if ne .Config.DuplicateDetection.HashMode "progressive"}}hidden{{end}}">
+                    <div id="progressive-levels-section" class="col-span-2">
                         <label class="block text-sm font-medium text-gray-400 mb-2">Progressive Hash Levels</label>
                         <p class="text-xs text-gray-500 mb-3">
-                            Enable or disable specific progressive hash levels. Disabled levels will be skipped during verification.
-                            At least one level must be enabled.
+                            Configure which levels are used by the <strong>Progressive Verify</strong> button on the dashboard.
+                            Disabled levels will be skipped during verification.
                         </p>
                         <div class="space-y-2 bg-gray-700 p-4 rounded">
                             <div class="flex items-center gap-2">
@@ -900,43 +900,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Save Configuration icon
     const saveConfigIcon = document.querySelector('.save-config-icon');
     if (saveConfigIcon) saveConfigIcon.innerHTML = Icons.get('save', 5);
-
-    // ===========================
-    // Progressive Hash Levels Visibility
-    // ===========================
-    const hashModeInput = document.querySelector('input[name="hash_mode"]');
-    const progressiveLevelsSection = document.getElementById('progressive-levels-section');
-
-    function updateProgressiveLevelsVisibility() {
-        const hashMode = hashModeInput ? hashModeInput.value : '';
-        if (progressiveLevelsSection) {
-            if (hashMode === 'progressive') {
-                progressiveLevelsSection.classList.remove('hidden');
-            } else {
-                progressiveLevelsSection.classList.add('hidden');
-            }
-        }
-    }
-
-    // Watch for dropdown changes (custom dropdown uses hidden input)
-    if (hashModeInput) {
-        // Use MutationObserver to watch for value changes on hidden input
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
-                    updateProgressiveLevelsVisibility();
-                }
-            });
-        });
-        observer.observe(hashModeInput, { attributes: true, attributeFilter: ['value'] });
-
-        // Also listen for change and input events
-        hashModeInput.addEventListener('change', updateProgressiveLevelsVisibility);
-        hashModeInput.addEventListener('input', updateProgressiveLevelsVisibility);
-
-        // Initial state check
-        updateProgressiveLevelsVisibility();
-    }
 
     // ===========================
     // Disk Configuration

@@ -1910,12 +1910,10 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 	s.config.DuplicateDetection.EnableLevel5 = r.FormValue("enable_level_5") != ""
 	s.config.DuplicateDetection.EnableLevel6 = r.FormValue("enable_level_6") != ""
 
-	// Validate: At least one level must be enabled when using progressive mode
-	if s.config.DuplicateDetection.HashMode == "progressive" {
-		enabledLevels := s.config.DuplicateDetection.GetEnabledProgressiveLevels()
-		if len(enabledLevels) == 0 {
-			validationErrors = append(validationErrors, "Progressive hashing requires at least one level to be enabled")
-		}
+	// Validate: At least one level must be enabled (used by Progressive Verify)
+	enabledLevels := s.config.DuplicateDetection.GetEnabledProgressiveLevels()
+	if len(enabledLevels) == 0 {
+		validationErrors = append(validationErrors, "At least one progressive hash level must be enabled")
 	}
 
 	// Parse consolidation settings
