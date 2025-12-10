@@ -120,6 +120,38 @@ type DuplicateDetectionConfig struct {
 	MaxHashRateMB         int    `yaml:"max_hash_rate_mbps"`       // Rate limit for hashing (MB/s, 0 = unlimited)
 	EnableProgressiveHash bool   `yaml:"enable_progressive_hash"`  // Enable progressive hash verification (incremental levels)
 	HashOrder             string `yaml:"hash_order"`               // Order strategy: "smallest_first", "largest_first", "random", "by_disk", "by_duplicate_probability", "by_modification_time_newest", "by_modification_time_oldest", "db_order"
+
+	// Progressive hash level toggles (only used when HashMode = "progressive")
+	EnableLevel1 bool `yaml:"enable_level_1"` // 1MB progressive hash
+	EnableLevel2 bool `yaml:"enable_level_2"` // 10MB progressive hash
+	EnableLevel3 bool `yaml:"enable_level_3"` // 100MB progressive hash
+	EnableLevel4 bool `yaml:"enable_level_4"` // 1GB progressive hash
+	EnableLevel5 bool `yaml:"enable_level_5"` // 10GB progressive hash
+	EnableLevel6 bool `yaml:"enable_level_6"` // Full file hash
+}
+
+// GetEnabledProgressiveLevels returns a slice of enabled progressive levels (1-6)
+func (c *DuplicateDetectionConfig) GetEnabledProgressiveLevels() []int {
+	levels := []int{}
+	if c.EnableLevel1 {
+		levels = append(levels, 1)
+	}
+	if c.EnableLevel2 {
+		levels = append(levels, 2)
+	}
+	if c.EnableLevel3 {
+		levels = append(levels, 3)
+	}
+	if c.EnableLevel4 {
+		levels = append(levels, 4)
+	}
+	if c.EnableLevel5 {
+		levels = append(levels, 5)
+	}
+	if c.EnableLevel6 {
+		levels = append(levels, 6)
+	}
+	return levels
 }
 
 // DuplicateConsolidationConfig contains configuration for duplicate file consolidation
@@ -180,6 +212,12 @@ func Default() *Config {
 			MaxHashRateMB:         200,
 			EnableProgressiveHash: false,            // Progressive mode opt-in
 			HashOrder:             "smallest_first", // Hash smaller files first for fast initial progress
+			EnableLevel1:          true,             // 1MB progressive hash
+			EnableLevel2:          true,             // 10MB progressive hash
+			EnableLevel3:          true,             // 100MB progressive hash
+			EnableLevel4:          true,             // 1GB progressive hash
+			EnableLevel5:          true,             // 10GB progressive hash
+			EnableLevel6:          true,             // Full file hash
 		},
 		DuplicateConsolidation: DuplicateConsolidationConfig{
 			Enabled:              true,

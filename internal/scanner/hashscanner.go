@@ -233,7 +233,8 @@ func (hs *HashScanner) UpgradeAllQuickHashes(ctx context.Context, minSize int64,
 }
 
 // VerifyDuplicatesProgressive progressively verifies duplicates by upgrading hash levels
-// Starts at level 1 and progressively upgrades to higher levels only for files that remain duplicates
+// Starts at the first enabled level and progressively upgrades to higher enabled levels
+// only for files that remain duplicates
 func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context, minSize int64, maxSize int64) error {
 	// Create scan record first
 	scan, err := hs.db.CreateScan("hash_scan")
@@ -251,10 +252,27 @@ func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context, minSize 
 	hs.cancel = cancel
 	hs.scanCtx = ctx
 
-	// Process levels 2 through 6
-	for level := 2; level <= 6; level++ {
-		prevLevel := level - 1
+	// Get enabled levels from config
+	enabledLevels := hs.config.GetEnabledProgressiveLevels()
 
+	if len(enabledLevels) == 0 {
+		hs.progress.Log("No progressive levels enabled, skipping verification")
+		hs.progress.SetPhase("Completed")
+		if err := hs.db.CompleteScan(scan.ID, "completed", ""); err != nil {
+			log.Printf("Warning: failed to complete scan: %v", err)
+		}
+		hs.progress.Stop()
+		return nil
+	}
+
+	hs.progress.Log(fmt.Sprintf("Enabled progressive levels: %v", enabledLevels))
+
+	// Track the previous level for finding duplicates
+	// Start from level 0 (no hash) for the first enabled level
+	prevLevel := 0
+
+	// Process enabled levels in order
+	for _, level := range enabledLevels {
 		// Update scan phase
 		levelName := GetLevelName(level)
 		phaseName := fmt.Sprintf("Upgrading to %s", levelName)
@@ -279,7 +297,7 @@ func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context, minSize 
 		}
 
 		hs.progress.SetTotalFiles(int64(len(files)))
-		hs.progress.Log(fmt.Sprintf("Found %d files with duplicates at level %d, upgrading to level %d", len(files), prevLevel, level))
+		hs.progress.Log(fmt.Sprintf("Found %d files with duplicates at level %d, upgrading to level %d (%s)", len(files), prevLevel, level, levelName))
 
 		// Calculate total size for this level
 		var totalSize int64
@@ -297,6 +315,9 @@ func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context, minSize 
 			return fmt.Errorf("verification cancelled")
 		default:
 		}
+
+		// Update prevLevel for next iteration
+		prevLevel = level
 
 		// Reset counters for next level
 		hs.mu.Lock()

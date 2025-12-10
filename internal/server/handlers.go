@@ -1901,6 +1901,23 @@ func (s *Server) HandleSaveConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Parse progressive level settings
+	// Note: HTML checkboxes send "on" when checked, or nothing when unchecked
+	s.config.DuplicateDetection.EnableLevel1 = r.FormValue("enable_level_1") != ""
+	s.config.DuplicateDetection.EnableLevel2 = r.FormValue("enable_level_2") != ""
+	s.config.DuplicateDetection.EnableLevel3 = r.FormValue("enable_level_3") != ""
+	s.config.DuplicateDetection.EnableLevel4 = r.FormValue("enable_level_4") != ""
+	s.config.DuplicateDetection.EnableLevel5 = r.FormValue("enable_level_5") != ""
+	s.config.DuplicateDetection.EnableLevel6 = r.FormValue("enable_level_6") != ""
+
+	// Validate: At least one level must be enabled when using progressive mode
+	if s.config.DuplicateDetection.HashMode == "progressive" {
+		enabledLevels := s.config.DuplicateDetection.GetEnabledProgressiveLevels()
+		if len(enabledLevels) == 0 {
+			validationErrors = append(validationErrors, "Progressive hashing requires at least one level to be enabled")
+		}
+	}
+
 	// Parse consolidation settings
 	// Note: HTML checkboxes send "on" when checked, or nothing when unchecked
 	s.config.DuplicateConsolidation.Enabled = r.FormValue("consolidation_enabled") != ""

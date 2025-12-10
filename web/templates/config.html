@@ -706,6 +706,80 @@
                                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded focus:outline-none focus:border-blue-500">
                         <p class="text-xs text-gray-500 mt-1">SQLite cache size in KB (1000000 ≈ 1GB). Larger = faster queries. Default: 1000000</p>
                     </div>
+
+                    <!-- Progressive Hash Levels -->
+                    <div id="progressive-levels-section" class="col-span-2 {{if ne .Config.DuplicateDetection.HashMode "progressive"}}hidden{{end}}">
+                        <label class="block text-sm font-medium text-gray-400 mb-2">Progressive Hash Levels</label>
+                        <p class="text-xs text-gray-500 mb-3">
+                            Enable or disable specific progressive hash levels. Disabled levels will be skipped during verification.
+                            At least one level must be enabled.
+                        </p>
+                        <div class="space-y-2 bg-gray-700 p-4 rounded">
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="enable_level_1" name="enable_level_1"
+                                       {{if .Config.DuplicateDetection.EnableLevel1}}checked{{end}}
+                                       class="w-5 h-5 bg-gray-600 border-gray-500 rounded">
+                                <label for="enable_level_1" class="text-sm">
+                                    <span class="font-medium">Level 1: 1MB</span>
+                                    <span class="text-gray-400"> - Quick hash (first + last 1MB)</span>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="enable_level_2" name="enable_level_2"
+                                       {{if .Config.DuplicateDetection.EnableLevel2}}checked{{end}}
+                                       class="w-5 h-5 bg-gray-600 border-gray-500 rounded">
+                                <label for="enable_level_2" class="text-sm">
+                                    <span class="font-medium">Level 2: 10MB</span>
+                                    <span class="text-gray-400"> - First progressive step</span>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="enable_level_3" name="enable_level_3"
+                                       {{if .Config.DuplicateDetection.EnableLevel3}}checked{{end}}
+                                       class="w-5 h-5 bg-gray-600 border-gray-500 rounded">
+                                <label for="enable_level_3" class="text-sm">
+                                    <span class="font-medium">Level 3: 100MB</span>
+                                    <span class="text-gray-400"> - Good for medium-sized files</span>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="enable_level_4" name="enable_level_4"
+                                       {{if .Config.DuplicateDetection.EnableLevel4}}checked{{end}}
+                                       class="w-5 h-5 bg-gray-600 border-gray-500 rounded">
+                                <label for="enable_level_4" class="text-sm">
+                                    <span class="font-medium">Level 4: 1GB</span>
+                                    <span class="text-gray-400"> - Covers most HD content</span>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="enable_level_5" name="enable_level_5"
+                                       {{if .Config.DuplicateDetection.EnableLevel5}}checked{{end}}
+                                       class="w-5 h-5 bg-gray-600 border-gray-500 rounded">
+                                <label for="enable_level_5" class="text-sm">
+                                    <span class="font-medium">Level 5: 10GB</span>
+                                    <span class="text-gray-400"> - Large files (4K content, remuxes)</span>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="enable_level_6" name="enable_level_6"
+                                       {{if .Config.DuplicateDetection.EnableLevel6}}checked{{end}}
+                                       class="w-5 h-5 bg-gray-600 border-gray-500 rounded">
+                                <label for="enable_level_6" class="text-sm">
+                                    <span class="font-medium">Level 6: Full Hash</span>
+                                    <span class="text-gray-400"> - Complete file verification (100% accurate)</span>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">
+                            <strong>Tip:</strong> Disable Level 5 (10GB) to skip verification of very large files,
+                            going directly from 1GB to full hash. This saves time if you have few files between 1-10GB.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -826,6 +900,43 @@ document.addEventListener('DOMContentLoaded', function() {
     // Save Configuration icon
     const saveConfigIcon = document.querySelector('.save-config-icon');
     if (saveConfigIcon) saveConfigIcon.innerHTML = Icons.get('save', 5);
+
+    // ===========================
+    // Progressive Hash Levels Visibility
+    // ===========================
+    const hashModeInput = document.querySelector('input[name="hash_mode"]');
+    const progressiveLevelsSection = document.getElementById('progressive-levels-section');
+
+    function updateProgressiveLevelsVisibility() {
+        const hashMode = hashModeInput ? hashModeInput.value : '';
+        if (progressiveLevelsSection) {
+            if (hashMode === 'progressive') {
+                progressiveLevelsSection.classList.remove('hidden');
+            } else {
+                progressiveLevelsSection.classList.add('hidden');
+            }
+        }
+    }
+
+    // Watch for dropdown changes (custom dropdown uses hidden input)
+    if (hashModeInput) {
+        // Use MutationObserver to watch for value changes on hidden input
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+                    updateProgressiveLevelsVisibility();
+                }
+            });
+        });
+        observer.observe(hashModeInput, { attributes: true, attributeFilter: ['value'] });
+
+        // Also listen for change and input events
+        hashModeInput.addEventListener('change', updateProgressiveLevelsVisibility);
+        hashModeInput.addEventListener('input', updateProgressiveLevelsVisibility);
+
+        // Initial state check
+        updateProgressiveLevelsVisibility();
+    }
 
     // ===========================
     // Disk Configuration
