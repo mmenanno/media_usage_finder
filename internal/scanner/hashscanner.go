@@ -267,37 +267,47 @@ func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context, minSize 
 
 	hs.progress.Log(fmt.Sprintf("Enabled progressive levels: %v", enabledLevels))
 
-	// Track the previous level for finding duplicates
-	// Start from level 0 (no hash) for the first enabled level
-	prevLevel := 0
+	// Need at least 2 levels to do progressive verification (from → to)
+	if len(enabledLevels) < 2 {
+		hs.progress.Log("Only one level enabled, nothing to upgrade")
+		hs.progress.SetPhase("Completed")
+		if err := hs.db.CompleteScan(scan.ID, "completed", ""); err != nil {
+			log.Printf("Warning: failed to complete scan: %v", err)
+		}
+		hs.progress.Stop()
+		return nil
+	}
 
-	// Process enabled levels in order
-	for _, level := range enabledLevels {
+	// Process pairs of enabled levels: upgrade files from level[i] to level[i+1]
+	for i := 0; i < len(enabledLevels)-1; i++ {
+		fromLevel := enabledLevels[i]
+		toLevel := enabledLevels[i+1]
+
 		// Update scan phase
-		levelName := GetLevelName(level)
-		phaseName := fmt.Sprintf("Upgrading to %s", levelName)
+		toLevelName := GetLevelName(toLevel)
+		phaseName := fmt.Sprintf("Upgrading to %s", toLevelName)
 		if err := hs.db.UpdateScanPhase(scan.ID, phaseName); err != nil {
 			log.Printf("Warning: failed to update scan phase: %v", err)
 		}
 		hs.progress.SetPhase(phaseName)
 
-		// Get files with duplicates at previous level
-		files, err := hs.db.GetFilesWithHashDuplicatesAtLevel(prevLevel, minSize, maxSize)
+		// Get files with duplicates at fromLevel
+		files, err := hs.db.GetFilesWithHashDuplicatesAtLevel(fromLevel, minSize, maxSize)
 		if err != nil {
-			hs.progress.AddError(fmt.Sprintf("Failed to get level %d duplicates: %v", prevLevel, err))
+			hs.progress.AddError(fmt.Sprintf("Failed to get level %d duplicates: %v", fromLevel, err))
 			hs.progress.Stop()
 			hs.db.CompleteScan(scan.ID, "failed", fmt.Sprintf("Failed to get duplicates: %v", err))
-			return fmt.Errorf("failed to get duplicates at level %d: %w", prevLevel, err)
+			return fmt.Errorf("failed to get duplicates at level %d: %w", fromLevel, err)
 		}
 
 		// If no duplicates at this level, stop (optimization)
 		if len(files) == 0 {
-			hs.progress.Log(fmt.Sprintf("No duplicates found at level %d, stopping progressive verification", prevLevel))
+			hs.progress.Log(fmt.Sprintf("No duplicates found at level %d, stopping progressive verification", fromLevel))
 			break
 		}
 
 		hs.progress.SetTotalFiles(int64(len(files)))
-		hs.progress.Log(fmt.Sprintf("Found %d files with duplicates at level %d, upgrading to level %d (%s)", len(files), prevLevel, level, levelName))
+		hs.progress.Log(fmt.Sprintf("Found %d files with duplicates at level %d, upgrading to level %d (%s)", len(files), fromLevel, toLevel, toLevelName))
 
 		// Calculate total size for this level
 		var totalSize int64
@@ -307,7 +317,7 @@ func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context, minSize 
 		hs.progress.TotalSize = totalSize
 
 		// Process files for this level (blocks until complete)
-		hs.progressiveVerifyFiles(ctx, files, scan.ID, level)
+		hs.progressiveVerifyFiles(ctx, files, scan.ID, toLevel)
 
 		// Check if cancelled
 		select {
@@ -315,9 +325,6 @@ func (hs *HashScanner) VerifyDuplicatesProgressive(ctx context.Context, minSize 
 			return fmt.Errorf("verification cancelled")
 		default:
 		}
-
-		// Update prevLevel for next iteration
-		prevLevel = level
 
 		// Reset counters for next level
 		hs.mu.Lock()
