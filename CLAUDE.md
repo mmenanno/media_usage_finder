@@ -13,10 +13,11 @@
 
 ### Tech Stack
 
-- **Backend**: Go 1.21+
+- **Backend**: Go 1.25+
 - **Database**: SQLite with WAL mode, FTS5, comprehensive indexing
 - **Frontend**: HTMX for dynamic updates, Tailwind CSS for styling, Chart.js for visualizations
-- **Real-time**: Server-Sent Events (SSE) for live scan progress
+- **Real-time**: HTTP polling today; SSE infrastructure exists for log streaming. Migration to push-based progress is planned (see `plans/005-sse-progress.md` if present).
+- **Hashing**: BLAKE3 (`github.com/zeebo/blake3`) with progressive verification levels
 - **Deployment**: Docker/Docker Compose ready
 
 ### Supported Services
@@ -26,6 +27,7 @@
 - **Radarr** - Movie management (REST API with API key)
 - **qBittorrent** - Torrent client (Web API or qui proxy)
 - **Stash** - Adult content organizer (GraphQL API with API key)
+- **Calibre** - Ebook library manager (Calibre Content Server API)
 
 ## Common Development Commands
 
@@ -42,7 +44,8 @@ make tailwind             # Build Tailwind CSS (required after HTML/class change
 npx tailwindcss -i ./web/static/css/input.css -o ./web/static/css/styles.css --minify
 
 # Testing
-make test                 # Run all Go tests
+make test                 # Run all Go tests (note: no test files yet — refactor work has been
+                          # mechanical, but new features should ship with tests)
 
 # Docker
 make docker-build         # Build Docker image (uses VERSION file)
@@ -52,62 +55,133 @@ make docker-stop          # Stop and remove container
 # Cleanup
 make clean                # Remove bin/ and built CSS
 
+# CLI subcommands (also available via the binary directly)
+./bin/media-finder serve            # Start the web server (port 8787)
+./bin/media-finder scan             # Run a full scan from the CLI
+./bin/media-finder scan --incremental
+./bin/media-finder disk-scan        # Scan disk locations only (requires disks configured)
+./bin/media-finder stats            # Print summary statistics
+./bin/media-finder export --orphaned --format json -o orphaned.json
+./bin/media-finder delete           # CLI-driven file deletion
+./bin/media-finder config validate
+./bin/media-finder config show
+
 # Version Management
 # ALWAYS bump the VERSION file when making changes
-# Format: MAJOR.MINOR.PATCH (e.g., 0.22.2)
+# Format: MAJOR.MINOR.PATCH (e.g., 0.61.3)
 # - MAJOR: Breaking changes
 # - MINOR: New features (like adding a service)
-# - PATCH: Bug fixes
+# - PATCH: Bug fixes and refactors
 ```
 
 ## Project Structure
 
 ```text
 media_usage_finder/
-├── cmd/media-finder/           # CLI entrypoint (main.go, commands)
+├── cmd/media-finder/           # CLI entrypoint (main.go, all subcommands)
 ├── internal/
-│   ├── api/                    # Service API clients
-│   │   ├── factory.go          # Client factory pattern (CreateClient)
-│   │   ├── arr.go              # Shared Sonarr/Radarr client
-│   │   ├── plex.go             # Plex REST API client
-│   │   ├── sonarr.go           # Sonarr v3 API client
-│   │   ├── radarr.go           # Radarr v3 API client
-│   │   ├── qbittorrent.go      # qBittorrent Web API client
-│   │   └── stash.go            # Stash GraphQL client
+│   ├── api/                    # Service API clients (one file per service)
+│   │   ├── factory.go          # Client factory (CreateClient, IsServiceConfigured)
+│   │   ├── arr.go              # Shared Sonarr/Radarr base client
+│   │   ├── plex.go
+│   │   ├── sonarr.go
+│   │   ├── radarr.go
+│   │   ├── qbittorrent.go
+│   │   ├── stash.go            # GraphQL
+│   │   └── calibre.go          # Calibre Content Server REST
 │   ├── config/                 # Configuration management
 │   │   ├── config.go           # Config struct, YAML loading
-│   │   └── pathmapper.go       # Path translation (container <-> host)
+│   │   ├── pathmapper.go       # Path translation (container <-> host)
+│   │   └── pathcache.go        # Thread-safe LRU-ish cache for path translations
+│   ├── constants/              # Shared constants (buffer sizes, retention defaults)
 │   ├── database/               # SQLite database layer
-│   │   ├── db.go               # Connection, queries, transactions
-│   │   ├── schema.go           # Schema definition and migrations
-│   │   └── migrations.go       # Schema versioning
-│   ├── scanner/                # File scanner with worker pools
-│   │   ├── scanner.go          # Main scanner orchestration
-│   │   ├── progress.go         # Progress tracking for SSE
-│   │   └── walker.go           # Concurrent file walking
+│   │   ├── db.go               # Connection, transactions, lifecycle
+│   │   ├── schema.go           # Schema + migrations
+│   │   ├── queries.go          # Types, generic helpers (scanFileRow,
+│   │   │                       # buildInClause, ValidateOrderBy, …),
+│   │   │                       # config CRUD, vacuum/FTS, GetDatabaseStats
+│   │   ├── queries_files.go    # File CRUD (Upsert/Get/List/Delete/Clear)
+│   │   ├── queries_search.go   # SearchFiles (FTS5), ListFiles, GetFileExtensions
+│   │   ├── queries_hardlinks.go
+│   │   ├── queries_hashes.go   # Hash CRUD, level stats, quick/per-level dupe queries
+│   │   ├── queries_scans.go    # Scan lifecycle, scan logs, missing-files
+│   │   ├── queries_usage.go    # Usage upsert, orphan recalc
+│   │   ├── queries_disks.go    # file_disk_locations CRUD
+│   │   ├── queries_audit.go    # Audit log, consolidation/hardlink logging
+│   │   └── duplicates.go       # Duplicate-group queries (used by analyzer)
+│   ├── disk/                   # Disk detection and per-disk stats (Unraid support)
+│   │   ├── detector.go         # Detect mounted disks (cache + SSD profiling)
+│   │   ├── resolver.go         # DeviceResolver: device_id → friendly name
+│   │   ├── space.go            # Per-disk used/free/total
+│   │   └── unraid.go           # /mnt/disk* and /mnt/cache awareness
+│   ├── duplicates/             # Cross-disk duplicate analysis + consolidation
+│   │   ├── analyzer.go         # Group by hash, compute potential savings
+│   │   └── consolidator.go     # Hardlink and delete-and-replace strategies
+│   ├── scanner/                # Filesystem + service scanner (worker pools)
+│   │   ├── scanner.go          # Orchestration (Scan/ResumeScan/runScan/...)
+│   │   ├── scanner_services.go # serviceFile interface + 6 adapters,
+│   │   │                       # generic update plumbing, UpdateAllServices
+│   │   ├── scanner_clients.go  # Per-service updateXxxUsage + associate funcs
+│   │   ├── scanner_actions.go  # RescanFiles, RecalculateOrphanedStatus,
+│   │   │                       # ScanDiskLocations, RunCleanupScan
+│   │   ├── progress.go         # Progress tracker + log pub/sub
+│   │   ├── worker.go           # Per-file worker pool
+│   │   ├── batch.go            # DB batch insert orchestration
+│   │   ├── filesystem.go       # Walk + counting helpers
+│   │   ├── disk_scanner.go     # Per-disk location scanner
+│   │   ├── hasher.go           # BLAKE3 hashing wrapper
+│   │   ├── hashscanner.go      # Hash scan orchestration + progressive verify
+│   │   ├── fadvise_linux.go    # POSIX_FADV_SEQUENTIAL hints (Linux build tag)
+│   │   └── fadvise_other.go    # No-op fallback for non-Linux
 │   ├── server/                 # HTTP server and handlers
-│   │   ├── server.go           # Server struct, routing
-│   │   ├── handlers.go         # Page handlers, API endpoints
-│   │   ├── sse.go              # Server-Sent Events for real-time updates
-│   │   └── errors.go           # Error response helpers
-│   ├── stats/                  # Statistics calculations
-│   │   ├── stats.go            # Stats queries and aggregation
-│   │   └── cache.go            # TTL-based caching
-│   └── constants/              # Shared constants
+│   │   ├── server.go           # Server struct, route table, middleware chain
+│   │   ├── handlers.go         # Server, NewServer, LoadTemplates, HandleHealth,
+│   │   │                       # render helpers, template funcs
+│   │   ├── handlers_pages.go   # Page renderers (index, files page, hardlinks, …)
+│   │   ├── handlers_files.go   # /api/files/* + missing-files + export
+│   │   ├── handlers_scan.go    # /api/scan/{start,resume,cancel,…}
+│   │   ├── handlers_progress.go # Scan progress (HTML polling endpoints)
+│   │   ├── handlers_audit.go   # /api/logs, /api/audit-logs
+│   │   ├── handlers_config.go  # Config save/test, path-mapping testers
+│   │   ├── handlers_disk.go    # /api/disks/*, /api/scan/disk-*
+│   │   ├── handlers_hash.go    # /api/hash/* (start, verify, upgrade, level-stats)
+│   │   ├── handlers_duplicates.go # /api/duplicates/*, /duplicates page
+│   │   ├── handlers_admin.go   # /api/admin/* (clear-files, vacuum, rebuild-fts, …)
+│   │   ├── middleware.go       # Recovery, RequestID, Logger, RequestSizeLimit, CORS
+│   │   ├── ratelimit.go        # Token bucket rate limiter
+│   │   ├── validation.go       # ValidatePage/ValidateLimit/CalculateTotalPages
+│   │   ├── errors.go           # respondError + JSON error envelope
+│   │   └── types.go            # Page-data structs (FilesData, …)
+│   └── stats/                  # Statistics calculations
+│       ├── stats.go            # Stats queries and aggregation
+│       └── cache.go            # TTL cache (binary; SWR planned in plans/007)
 ├── web/
-│   ├── templates/              # Go HTML templates
+│   ├── templates/              # Go HTML templates (parsed at server startup)
 │   │   ├── layout.html         # Base layout with nav
-│   │   ├── dashboard.html      # Homepage (stats, scan controls)
+│   │   ├── dashboard.html      # Homepage (now references partials/dashboard_*)
 │   │   ├── files.html          # File browser (search, filter, delete)
+│   │   ├── duplicates.html     # Duplicate groups view + consolidation actions
 │   │   ├── hardlinks.html      # Hardlink groups view
 │   │   ├── scans.html          # Scan history
-│   │   ├── stats.html          # Statistics with charts
+│   │   ├── logs.html           # Scan-log + audit-log browser
+│   │   ├── stats.html          # Statistics with Chart.js
 │   │   ├── config.html         # Configuration editor
-│   │   └── advanced.html       # Advanced tools (export, bulk delete)
+│   │   ├── advanced.html       # Advanced tools (export, bulk delete, admin)
+│   │   ├── duplicates_table.html  # HTMX partial — duplicates table body
+│   │   ├── logs_table.html        # HTMX partial — logs table body
+│   │   ├── audit_logs_table.html  # HTMX partial — audit log body
+│   │   └── partials/           # Per-page partials parsed alongside their owner
+│   │       ├── validation-errors.html
+│   │       ├── dashboard_progress.html        # scan + hash progress cards
+│   │       ├── dashboard_disks.html           # disk status block
+│   │       ├── dashboard_services.html        # per-service breakdown
+│   │       └── dashboard_manual_updates.html  # manual update buttons
 │   └── static/
-│       └── css/
-│           ├── input.css       # Tailwind input file
-│           └── styles.css      # Generated CSS (gitignored)
+│       ├── css/
+│       │   ├── input.css       # Tailwind input
+│       │   ├── accessibility.css
+│       │   └── styles.css      # Generated by `make tailwind` (gitignored)
+│       └── js/                 # Custom dialog, dropdowns, icons, etc.
 ├── config.example.yaml         # Example configuration
 ├── VERSION                     # Current version (MAJOR.MINOR.PATCH)
 ├── Dockerfile                  # Multi-stage build
@@ -115,6 +189,13 @@ media_usage_finder/
 ├── Makefile                    # Build commands
 └── README.md                   # User documentation
 ```
+
+**Note on file organization:** Many handler/query/scanner files were split out
+of monolithic originals (handlers.go was 5,658 lines; queries.go was 3,426;
+scanner.go was 2,261). Methods stayed on `*Server` / `*DB` / `*Scanner`, so
+the public APIs are unchanged. When adding new functionality, place it in the
+file whose responsibility matches; if no clear home exists, prefer creating
+a new well-named file over appending to a large existing one.
 
 ## Key Architecture Patterns
 
@@ -201,7 +282,7 @@ File scanning uses a worker pool for concurrent processing to handle large datas
 **Important**: When adding a service, update the CHECK constraint on `usage.service`:
 
 ```sql
-service TEXT NOT NULL CHECK(service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash'))
+service TEXT NOT NULL CHECK(service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash', 'calibre'))
 ```
 
 ### 5. HTMX Partial Rendering
@@ -322,18 +403,26 @@ showToast(
 
 **See examples**: [web/templates/files.html](web/templates/files.html), [web/templates/duplicates.html](web/templates/duplicates.html)
 
-### 7. Server-Sent Events (SSE)
+### 7. Progress endpoints (currently HTML polling, SSE planned)
 
-Real-time scan progress uses SSE to stream updates to the browser.
+Today the dashboard polls progress endpoints every 2s:
 
-**Location**: [internal/server/sse.go](internal/server/sse.go)
+- `GET /api/scan/progress-html` — scan progress fragment
+- `GET /api/hash/progress-html` — hash scan progress fragment
+- `GET /api/scan/disk-progress-html` — disk-location scan progress fragment
 
-**Flow**:
+The pub/sub broadcaster in [internal/scanner/progress.go](internal/scanner/progress.go)
+(`Subscribe`/`Unsubscribe`/`broadcastLogs`) is real SSE infrastructure used today
+only for log streaming (`/api/scan/logs`). Migrating progress to push-based SSE is
+planned (see local `plans/005-sse-progress.md` if present).
 
-1. Browser connects to `/api/scan/progress`
-2. Server streams JSON events with progress updates
-3. JavaScript updates UI in real-time
-4. Connection closes when scan completes
+**Flow today (polling)**:
+
+1. Page loads with `hx-get="/api/...-progress-html" hx-trigger="load, every 2s"`
+2. Server renders the current snapshot as an HTML fragment
+3. HTMX swaps the inner HTML on each tick
+4. JS removes the `hx-trigger` attribute when the scan completes (via the
+   `scanCompleted` event header)
 
 ### 8. Statistics Caching
 
@@ -348,11 +437,11 @@ Statistics are expensive to calculate, so they're cached with configurable TTL.
 **IMPORTANT**: When adding a new service, update the hardcoded service list in [internal/stats/stats.go](internal/stats/stats.go):
 
 ```go
-// Line ~102: SQL query WHERE clause
-WHERE u.service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash')
+// SQL query WHERE clause
+WHERE u.service IN ('plex', 'sonarr', 'radarr', 'qbittorrent', 'stash', 'calibre')
 
-// Line ~113: Initialize services array
-services := []string{"plex", "sonarr", "radarr", "qbittorrent", "stash"}
+// Initialize services array
+services := []string{"plex", "sonarr", "radarr", "qbittorrent", "stash", "calibre"}
 ```
 
 ## Adding a New Service - Complete Checklist
@@ -590,11 +679,14 @@ Custom functions available in templates (defined in [internal/server/handlers.go
 
 - `GET /` - Dashboard
 - `GET /files` - File browser
+- `GET /duplicates` - Duplicate groups + consolidation actions
 - `GET /hardlinks` - Hardlink groups
 - `GET /scans` - Scan history
-- `GET /stats` - Statistics
+- `GET /logs` - Scan log + audit log browser
+- `GET /stats` - Statistics with charts
 - `GET /config` - Configuration editor
-- `GET /advanced` - Advanced tools
+- `GET /advanced` - Advanced tools (export, bulk delete, admin)
+- `GET /health` - Health check endpoint (JSON)
 
 ### API Routes (JSON/HTMX)
 
@@ -602,37 +694,93 @@ Custom functions available in templates (defined in [internal/server/handlers.go
 
 - `POST /api/scan/start` - Start full scan
 - `POST /api/scan/start?incremental=true` - Start incremental scan
+- `POST /api/scan/resume` - Resume interrupted scan
 - `POST /api/scan/cancel` - Gracefully cancel scan
 - `POST /api/scan/force-stop` - Force stop scan
-- `POST /api/scan/resume` - Resume interrupted scan
-- `GET /api/scan/progress` - SSE endpoint for real-time progress
+- `POST /api/scan/cleanup` - Walk filesystem and remove DB entries for missing files
+- `GET /api/scan/progress` - JSON snapshot of current progress
+- `GET /api/scan/progress-html` - HTML fragment for HTMX polling
+- `GET /api/scan/logs` - Live log SSE stream for the running scan
 
 **Service Updates**:
 
 - `POST /api/scan/update-services` - Update all configured services
 - `POST /api/scan/update-service?service={name}` - Update single service
-- `POST /api/scan/recalculate-orphaned` - Recalculate orphaned status
+- `POST /api/scan/recalculate-orphaned` - Recalculate orphaned status without re-scanning
+
+**Disk Scanning** (Unraid / multi-disk):
+
+- `GET /api/disks/detect` - Detect mounted disks
+- `POST /api/scan/disk-locations` - Start a per-disk location scan
+- `GET /api/scan/disk-progress` - Disk scan progress JSON
+- `GET /api/scan/disk-progress-html` - Disk scan progress HTML fragment
+
+**Hash Scanning + Duplicate Verification**:
+
+- `POST /api/hash/start` - Start hash calculation pass
+- `POST /api/hash/cancel` - Cancel current hash scan
+- `POST /api/hash/clear` - Clear all stored hashes
+- `GET /api/hash/progress` - Hash scan progress JSON
+- `GET /api/hash/progress-html` - HTML fragment
+- `POST /api/hash/verify` - Verify duplicate groups via full hash
+- `POST /api/hash/verify-progressive` - Progressive verification (1MB → 10MB → … → full)
+- `GET /api/hash/level-stats` - Coverage stats per progressive level
+- `POST /api/hash/upgrade-all` - Upgrade all hashes to the next level
+- `POST /api/hash/upgrade-group-full` - Upgrade one group to full hash
+- `POST /api/hash/upgrade-group-progressive` - Upgrade one group progressively
+
+**Duplicates**:
+
+- `GET /api/duplicates/count` - Group count for a query (HTMX)
+- `POST /api/duplicates/preview` - Preview consolidation plan
+- `POST /api/duplicates/consolidate` - Run consolidation (delete + reference)
+- `POST /api/duplicates/hardlink` - Hardlink duplicates instead of deleting
+- `POST /api/duplicates/refresh-inodes` - Refresh inode/device for a group
 
 **File Operations**:
 
-- `GET /api/files` - List files (supports filtering, pagination, search)
-- `DELETE /api/files?path={path}` - Delete single file
-- `DELETE /api/files/orphaned` - Bulk delete orphaned files
-- `POST /api/files/mark-rescan` - Mark files for rescan
+- `GET /api/files/extensions` - Distinct extensions (filter dropdown)
+- `POST /api/files/delete` - Delete a single file (DB row + optional fs)
+- `POST /api/files/batch-delete` - Bulk delete by IDs
+- `POST /api/files/rescan` - Mark files for rescan
+- `GET /api/files/{id}/details` - File detail card (HTMX)
+- `GET /api/files/{id}/disk-locations` - Disk-location list for a file
+
+**Missing Files** (files services report but aren't on disk):
+
+- `GET /api/missing-files` - Latest missing-file scan results
+- `GET /api/missing-files/export` - Export missing-files list
+
+**Logs + Audit**:
+
+- `GET /api/logs` - Paginated/filterable scan logs (HTMX table)
+- `GET /api/audit-logs` - Paginated/filterable audit log
 
 **Configuration**:
 
 - `POST /api/config/save` - Save configuration
 - `POST /api/config/test?service={name}` - Test service connection
-- `GET /api/config/reload` - Reload configuration from disk
-
-**Statistics**:
-
-- `GET /api/stats` - Get statistics (cached)
+- `POST /api/config/test-scan-paths` - Validate scan paths exist
+- `POST /api/config/test-path-mappings` - Validate per-service path mappings
+- `GET /api/plex/libraries` - Discover Plex libraries (config helper)
 
 **Export**:
 
-- `GET /api/export?format={json|csv}` - Export files
+- `GET /api/export?format={json|csv}&orphaned=true` - Export filtered file list
+
+**Admin** (destructive — confirm before invoking):
+
+- `POST /api/admin/clear-files` - Delete all rows from files table
+- `POST /api/admin/clear-scans` - Delete all scan records
+- `POST /api/admin/clear-usage` - Delete all usage rows
+- `POST /api/admin/vacuum` - Run SQLite VACUUM
+- `POST /api/admin/rebuild-fts` - Rebuild the FTS5 index
+- `POST /api/admin/clean-stale-scans` - Mark stuck "running" scans as interrupted
+- `POST /api/admin/recalculate-orphaned` - Force orphan recalc
+- `GET /api/admin/database-stats` - Detailed DB stats (size, freelist, etc.)
+- `GET /api/admin/audit-log` - Raw audit log dump
+- `POST /api/admin/clear-config` - Wipe config table
+- `POST /api/admin/clear-audit-log?older_than_days=N` - Trim audit log
 
 ## Security Considerations
 
@@ -759,7 +907,19 @@ Currently no authentication is implemented. If exposing to internet:
 - Config example: `config.example.yaml`
 - Main entry: `cmd/media-finder/main.go`
 - Database schema: `internal/database/schema.go`
-- Scanner: `internal/scanner/scanner.go`
+- Database queries: `internal/database/queries*.go` (split by entity — see Project Structure)
+- Scanner orchestration: `internal/scanner/scanner.go`
+- Service-update plumbing: `internal/scanner/scanner_services.go`
+- Per-service implementations: `internal/scanner/scanner_clients.go`
+- Hash scanner: `internal/scanner/hashscanner.go`
+- Disk detection / Unraid: `internal/disk/`
+- Duplicate analysis + consolidation: `internal/duplicates/`
 - Server routes: `internal/server/server.go`
-- Templates: `web/templates/`
+- HTTP handlers: `internal/server/handlers*.go` (split by domain — see Project Structure)
+- Templates: `web/templates/` (with `partials/` for per-page partials)
 - CSS input: `web/static/css/input.css`
+
+---
+
+*Last verified against: v0.61.4. If you make architectural changes, please
+update the relevant sections of this document and the version footer.*
