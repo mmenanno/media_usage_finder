@@ -114,6 +114,18 @@ func (s *Server) LoadTemplates(pattern string) error {
 		"advanced.html",
 	}
 
+	// Page-specific partials to parse alongside the page template so the page
+	// can invoke them via {{template "name.html" .}}. Keep names unique across
+	// pages — Go templates share a namespace within each parsed set.
+	pagePartials := map[string][]string{
+		"dashboard.html": {
+			"partials/dashboard_progress.html",
+			"partials/dashboard_disks.html",
+			"partials/dashboard_services.html",
+			"partials/dashboard_manual_updates.html",
+		},
+	}
+
 	layoutPath := baseDir + "/layout.html"
 
 	// Parse each page template with layout.html to avoid block name collisions
@@ -121,10 +133,12 @@ func (s *Server) LoadTemplates(pattern string) error {
 	for _, page := range pages {
 		fullPath := baseDir + "/" + page
 
-		tmpl, err := template.New("").Funcs(s.templateFuncs).ParseFiles(
-			layoutPath,
-			fullPath,
-		)
+		parseFiles := []string{layoutPath, fullPath}
+		for _, p := range pagePartials[page] {
+			parseFiles = append(parseFiles, baseDir+"/"+p)
+		}
+
+		tmpl, err := template.New("").Funcs(s.templateFuncs).ParseFiles(parseFiles...)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", page, err)
 		}
