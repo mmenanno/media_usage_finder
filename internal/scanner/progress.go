@@ -27,6 +27,13 @@ type Progress struct {
 	// Progress estimation
 	IsEstimated bool // True if TotalFiles is estimated from previous scan
 
+	// Smoothed throughput (files/sec) using an exponentially weighted
+	// moving average. Sampled at most every emaSampleInterval to avoid
+	// per-file noise. Used by GetSnapshot to compute a stable ETA.
+	emaRate            float64
+	lastSampleTime     time.Time
+	lastSampleFiles    int64
+
 	// Service update progress
 	CurrentService int // Which service is being updated (1-based)
 	TotalServices  int // Total number of configured services
@@ -40,6 +47,19 @@ type Progress struct {
 	logListeners []chan string
 	stopOnce     sync.Once
 }
+
+// EMA tuning knobs for smoothed-rate ETA. emaAlpha closer to 1 reacts
+// faster to changes; closer to 0 is steadier. emaSampleInterval is the
+// minimum gap between rate samples — prevents noisy per-file updates.
+const (
+	emaAlpha          = 0.2
+	emaSampleInterval = 500 * time.Millisecond
+
+	// Don't show an ETA at all until we've been running long enough
+	// or processed enough files for an extrapolation to be meaningful.
+	etaWarmupDuration   = 30 * time.Second
+	etaWarmupPercentMin = 1.0
+)
 
 // NewProgress creates a new progress tracker
 func NewProgress(scanID int64, db *database.DB) *Progress {
@@ -195,13 +215,40 @@ func (p *Progress) CleanupStaleListeners() {
 	p.logListeners = activeListeners
 }
 
-// IncrementFiles increments the file counters
+// IncrementFiles increments the file counters and, when enough time has
+// elapsed since the last sample, updates the EMA throughput estimate.
+// Sampling at sub-second cadence (rather than per file) keeps the EMA
+// stable when the scanner is processing thousands of files per second.
 func (p *Progress) IncrementFiles(size int64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	p.ProcessedFiles++
 	p.ProcessedSize += size
+
+	now := time.Now()
+	if p.lastSampleTime.IsZero() {
+		p.lastSampleTime = p.StartTime
+		p.lastSampleFiles = 0
+	}
+	dt := now.Sub(p.lastSampleTime)
+	if dt < emaSampleInterval {
+		return
+	}
+
+	dFiles := p.ProcessedFiles - p.lastSampleFiles
+	if dFiles <= 0 || dt <= 0 {
+		return
+	}
+	instantRate := float64(dFiles) / dt.Seconds()
+	if p.emaRate == 0 {
+		// Seed the EMA with the first sample instead of biasing toward 0.
+		p.emaRate = instantRate
+	} else {
+		p.emaRate = emaAlpha*instantRate + (1-emaAlpha)*p.emaRate
+	}
+	p.lastSampleTime = now
+	p.lastSampleFiles = p.ProcessedFiles
 }
 
 // SetTotalFiles sets the total number of files
@@ -280,7 +327,13 @@ func (p *Progress) GetScanID() int64 {
 	return p.scanID
 }
 
-// GetSnapshot returns a snapshot of the current progress
+// GetSnapshot returns a snapshot of the current progress.
+//
+// ETA is computed from the EMA-smoothed throughput rather than the raw
+// `processed/elapsed` average — the latter swings wildly during the
+// first minute of a scan as the worker pool warms up. ETA is suppressed
+// entirely until the scan has been running for etaWarmupDuration or has
+// crossed etaWarmupPercentMin, whichever comes first.
 func (p *Progress) GetSnapshot() ProgressSnapshot {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -291,9 +344,20 @@ func (p *Progress) GetSnapshot() ProgressSnapshot {
 
 	if p.TotalFiles > 0 {
 		percentComplete = float64(p.ProcessedFiles) / float64(p.TotalFiles) * 100
-		if p.ProcessedFiles > 0 {
-			rate := float64(p.ProcessedFiles) / elapsed.Seconds()
-			remaining := p.TotalFiles - p.ProcessedFiles
+	}
+
+	// Pick the rate: prefer the EMA once we have one, otherwise fall back
+	// to the simple cumulative rate so the snapshot still has *some* ETA
+	// data once we leave the warmup window.
+	rate := p.emaRate
+	if rate == 0 && p.ProcessedFiles > 0 && elapsed > 0 {
+		rate = float64(p.ProcessedFiles) / elapsed.Seconds()
+	}
+
+	if p.TotalFiles > 0 && rate > 0 &&
+		(elapsed >= etaWarmupDuration || percentComplete >= etaWarmupPercentMin) {
+		remaining := p.TotalFiles - p.ProcessedFiles
+		if remaining > 0 {
 			eta = time.Duration(float64(remaining)/rate) * time.Second
 		}
 	}
