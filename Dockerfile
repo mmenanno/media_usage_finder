@@ -54,10 +54,10 @@ RUN --mount=type=cache,target=/go/pkg/mod,sharing=locked \
 # Runtime stage
 FROM alpine:latest
 
-# Only ca-certificates (HTTPS to upstream services) and wget (HEALTHCHECK).
-# The sqlite CLI is no longer installed: FTS5 is compiled into the binary
-# via -tags "sqlite_fts5", so the CLI tool isn't needed at runtime.
-RUN apk --no-cache add ca-certificates wget
+# Only ca-certificates (HTTPS to upstream services). The healthcheck uses
+# `media-finder healthcheck`, so wget/curl aren't needed. The sqlite CLI
+# isn't installed either — FTS5 is compiled into the binary.
+RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 
@@ -69,8 +69,10 @@ RUN mkdir -p /appdata/data /appdata/config
 
 EXPOSE 8787
 
+# Healthcheck via the binary itself (exits non-zero on failure). No
+# external tooling required in the runtime image.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8787/health || exit 1
+  CMD ["/app/media-finder", "healthcheck"]
 
 ENTRYPOINT ["/app/media-finder"]
 CMD ["serve"]

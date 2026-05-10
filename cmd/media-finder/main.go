@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/mmenanno/media-usage-finder/internal/config"
 	"github.com/mmenanno/media-usage-finder/internal/constants"
@@ -47,6 +49,14 @@ func main() {
 orphaned files and optimizes storage through hardlink detection.`,
 		Version: Version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			// healthcheck is a thin HTTP probe used by Docker HEALTHCHECK.
+			// It must not depend on the config file or hold the DB open
+			// (otherwise a healthcheck during a long write could deadlock
+			// or fail spuriously).
+			if cmd.Name() == "healthcheck" {
+				return nil
+			}
+
 			// Load configuration
 			var err error
 			cfg, err = config.Load(configPath)
@@ -78,6 +88,10 @@ orphaned files and optimizes storage through hardlink detection.`,
 			return nil
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			// healthcheck never opened the DB.
+			if cmd.Name() == "healthcheck" {
+				return nil
+			}
 			if db != nil {
 				return db.Close()
 			}
@@ -159,11 +173,45 @@ orphaned files and optimizes storage through hardlink detection.`,
 
 	configCmd.AddCommand(configValidateCmd, configShowCmd)
 
-	rootCmd.AddCommand(serveCmd, scanCmd, diskScanCmd, statsCmd, exportCmd, deleteCmd, configCmd)
+	// Healthcheck command — used by Docker HEALTHCHECK so the runtime
+	// image doesn't need wget/curl. Does not load config or open the DB.
+	healthCmd := &cobra.Command{
+		Use:   "healthcheck",
+		Short: "Probe the running server's /health endpoint (exit non-zero on failure)",
+		RunE:  runHealthcheck,
+		// Don't dump usage on a probe failure — Docker's healthcheck logs
+		// only need the error line, not the full Cobra help output.
+		SilenceUsage: true,
+	}
+	healthCmd.Flags().StringP("url", "u", "http://127.0.0.1:8787/health", "Health endpoint URL")
+	healthCmd.Flags().DurationP("timeout", "t", 3*time.Second, "Request timeout")
+
+	rootCmd.AddCommand(serveCmd, scanCmd, diskScanCmd, statsCmd, exportCmd, deleteCmd, configCmd, healthCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
+}
+
+// runHealthcheck issues a single GET to the local /health endpoint. Exit
+// 0 on 2xx responses, non-zero on connection errors, timeouts, or non-2xx
+// status codes. Bound to the `media-finder healthcheck` subcommand and
+// invoked from the Dockerfile HEALTHCHECK directive.
+func runHealthcheck(cmd *cobra.Command, args []string) error {
+	url, _ := cmd.Flags().GetString("url")
+	timeout, _ := cmd.Flags().GetDuration("timeout")
+
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Get(url)
+	if err != nil {
+		return fmt.Errorf("healthcheck request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("healthcheck returned HTTP %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
