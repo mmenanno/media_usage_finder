@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mmenanno/media-usage-finder/internal/database"
+	"github.com/mmenanno/media-usage-finder/web"
 )
 
 // Run starts the HTTP server with graceful shutdown on port 8787
@@ -18,8 +20,13 @@ func (s *Server) Run() error {
 	// Setup routes
 	mux := http.NewServeMux()
 
-	// Static files (serve from filesystem for now)
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+	// Static files served from the embedded FS so the runtime image doesn't
+	// need a `web/` directory at all.
+	staticFS, err := fs.Sub(web.StaticFS, "static")
+	if err != nil {
+		return fmt.Errorf("static sub-fs: %w", err)
+	}
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
 	// Health check
 	mux.HandleFunc("/health", s.HandleHealth)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/mmenanno/media-usage-finder/internal/disk"
 	"github.com/mmenanno/media-usage-finder/internal/scanner"
 	"github.com/mmenanno/media-usage-finder/internal/stats"
+	"github.com/mmenanno/media-usage-finder/web"
 )
 
 // Server holds the application state
@@ -94,18 +96,21 @@ func NewServer(db *database.DB, cfg *config.Config, version string) *Server {
 	return srv
 }
 
-// LoadTemplates loads HTML templates
-// Each page template is parsed separately to avoid block name collisions
-func (s *Server) LoadTemplates(pattern string) error {
+// LoadTemplates parses every page template (with its layout and per-page
+// partials) plus the standalone HTMX partials. Templates live in the
+// embedded `web` package — there is no longer any filesystem dependency
+// at runtime. The string parameter is unused and kept only so callers
+// don't have to change.
+func (s *Server) LoadTemplates(_ string) error {
 	s.templates = make(map[string]*template.Template)
 
-	// Extract base directory from pattern (e.g., "web/templates/*.html" -> "web/templates")
-	baseDir := "web/templates"
-	if idx := strings.LastIndex(pattern, "/"); idx > 0 {
-		baseDir = pattern[:idx]
+	// Sub-FS rooted at templates/ so paths read naturally
+	// (e.g., "dashboard.html" instead of "templates/dashboard.html").
+	tplFS, err := fs.Sub(web.TemplatesFS, "templates")
+	if err != nil {
+		return fmt.Errorf("sub-fs for templates: %w", err)
 	}
 
-	// List of page templates that need to be loaded
 	pages := []string{
 		"dashboard.html",
 		"files.html",
@@ -118,9 +123,9 @@ func (s *Server) LoadTemplates(pattern string) error {
 		"advanced.html",
 	}
 
-	// Page-specific partials to parse alongside the page template so the page
-	// can invoke them via {{template "name.html" .}}. Keep names unique across
-	// pages — Go templates share a namespace within each parsed set.
+	// Page-specific partials parsed into the same template set so the page
+	// can invoke them via {{template "name.html" .}}. Names must be unique
+	// across the set — Go templates share a namespace within each parse.
 	pagePartials := map[string][]string{
 		"dashboard.html": {
 			"partials/dashboard_progress.html",
@@ -130,27 +135,18 @@ func (s *Server) LoadTemplates(pattern string) error {
 		},
 	}
 
-	layoutPath := baseDir + "/layout.html"
-
-	// Parse each page template with layout.html to avoid block name collisions
-	// This ensures each page gets its own "content" block without conflicts
 	for _, page := range pages {
-		fullPath := baseDir + "/" + page
+		patterns := []string{"layout.html", page}
+		patterns = append(patterns, pagePartials[page]...)
 
-		parseFiles := []string{layoutPath, fullPath}
-		for _, p := range pagePartials[page] {
-			parseFiles = append(parseFiles, baseDir+"/"+p)
-		}
-
-		tmpl, err := template.New("").Funcs(s.templateFuncs).ParseFiles(parseFiles...)
+		tmpl, err := template.New("").Funcs(s.templateFuncs).ParseFS(tplFS, patterns...)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", page, err)
 		}
-
 		s.templates[page] = tmpl
 	}
 
-	// Load partial templates (used for HTMX responses)
+	// Standalone partials used for HTMX-only responses.
 	partials := []string{
 		"partials/validation-errors.html",
 		"logs_table.html",
@@ -159,11 +155,7 @@ func (s *Server) LoadTemplates(pattern string) error {
 	}
 
 	for _, partial := range partials {
-		// Create template set without a named root to avoid conflicts
-		// ParseFiles will add the file content as a named template
-		tmpl, err := template.New("").Funcs(s.templateFuncs).ParseFiles(
-			baseDir + "/" + partial,
-		)
+		tmpl, err := template.New("").Funcs(s.templateFuncs).ParseFS(tplFS, partial)
 		if err != nil {
 			return fmt.Errorf("failed to parse %s: %w", partial, err)
 		}
