@@ -148,6 +148,21 @@
         </div>
     </div>
 
+    <!-- Maintenance Status (read-only summary) -->
+    <div class="bg-gray-800 rounded-lg p-6" id="maintenance-status-card">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-semibold text-blue-400">Maintenance Status</h3>
+            <button
+                onclick="loadMaintenanceStatus()"
+                class="text-sm text-gray-400 hover:text-gray-200">
+                Refresh
+            </button>
+        </div>
+        <div id="maintenance-status-body" class="text-sm text-gray-300">
+            <div class="text-gray-500">Loading…</div>
+        </div>
+    </div>
+
     <!-- Database Maintenance (Safe) -->
     <div class="bg-gray-800 rounded-lg p-6">
         <h3 class="text-xl font-semibold mb-6 text-blue-400">Database Maintenance</h3>
@@ -157,8 +172,7 @@
                 <h4 class="font-medium mb-2">Optimize Database</h4>
                 <p class="text-sm text-gray-400 mb-4">Run VACUUM and ANALYZE to reclaim space and update statistics</p>
                 <button
-                    hx-post="/api/admin/vacuum"
-                    hx-swap="none"
+                    onclick="confirmAndVacuum()"
                     class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors w-full flex items-center justify-center gap-2">
                     <span class="optimize-db-icon"></span>
                     <span>Optimize Database</span>
@@ -381,6 +395,83 @@ function formatBytes(bytes) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+// --- Maintenance Status widget ---
+
+function relativeTime(unix) {
+    if (!unix) return 'never';
+    const now = Math.floor(Date.now() / 1000);
+    const delta = now - unix;
+    if (delta < 60) return delta + 's ago';
+    if (delta < 3600) return Math.floor(delta / 60) + 'm ago';
+    if (delta < 86400) return Math.floor(delta / 3600) + 'h ago';
+    return Math.floor(delta / 86400) + 'd ago';
+}
+
+function autoVacuumLabel(mode) {
+    return mode === 2 ? 'INCREMENTAL'
+        : mode === 1 ? 'FULL'
+        : 'NONE (run a manual VACUUM once to enable INCREMENTAL)';
+}
+
+function loadMaintenanceStatus() {
+    const body = document.getElementById('maintenance-status-body');
+    if (!body) return;
+    fetch('/api/admin/maintenance-status').then(r => r.json()).then(data => {
+        const reclaimableBytes = (data.reclaimable_kb || 0) * 1024;
+        const dbBytes = (data.database_kb || 0) * 1024;
+        const intervalHours = Math.round((data.interval_seconds || 0) / 3600);
+        body.innerHTML = `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Last runs</div>
+                    <div>PRAGMA optimize: <span class="text-gray-100">${relativeTime(data.last_optimize)}</span></div>
+                    <div>Incremental vacuum: <span class="text-gray-100">${relativeTime(data.last_incremental_vacuum)}</span></div>
+                    <div>Full vacuum: <span class="text-gray-100">${relativeTime(data.last_full_vacuum)}</span></div>
+                    <div>WAL checkpoint: <span class="text-gray-100">${relativeTime(data.last_wal_checkpoint)}</span></div>
+                </div>
+                <div>
+                    <div class="text-gray-400 text-xs uppercase tracking-wide mb-1">Database</div>
+                    <div>Size: <span class="text-gray-100">${formatBytes(dbBytes)}</span></div>
+                    <div>Reclaimable: <span class="text-gray-100">${formatBytes(reclaimableBytes)}</span> (${data.freelist_count || 0} pages)</div>
+                    <div>auto_vacuum: <span class="text-gray-100">${autoVacuumLabel(data.auto_vacuum)}</span></div>
+                    <div>Background interval: <span class="text-gray-100">${intervalHours}h</span></div>
+                </div>
+            </div>`;
+    }).catch(err => {
+        body.innerHTML = '<div class="text-red-400">Failed to load maintenance status: ' + err + '</div>';
+    });
+}
+
+async function confirmAndVacuum() {
+    let info;
+    try {
+        info = await fetch('/api/admin/vacuum-info').then(r => r.json());
+    } catch (err) {
+        await alertDialog('Failed to read database info: ' + err, 'Error', 'error');
+        return;
+    }
+    if (info.scan_in_flight) {
+        await alertDialog('A scan is currently running. Wait for it to finish before running VACUUM.', 'Scan in progress', 'warning');
+        return;
+    }
+    const reclaimableBytes = (info.reclaimable_kb || 0) * 1024;
+    const dbBytes = (info.database_kb || 0) * 1024;
+    const ok = await confirmDialog(
+        `Run VACUUM on the database?\n\nDatabase size: ${formatBytes(dbBytes)}\nReclaimable: ${formatBytes(reclaimableBytes)} (${info.freelist_count || 0} freelist pages)\n\nVACUUM rewrites the entire database file and may take a while on large databases.`,
+        'Confirm VACUUM');
+    if (!ok) return;
+    const r = await fetch('/api/admin/vacuum', { method: 'POST' });
+    if (r.ok) {
+        showToast('Database optimized', 'success');
+        loadMaintenanceStatus();
+    } else {
+        const body = await r.text();
+        showToast('VACUUM failed: ' + body, 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadMaintenanceStatus);
 </script>
 
 <style>

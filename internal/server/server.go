@@ -9,6 +9,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/mmenanno/media-usage-finder/internal/database"
 )
 
 // Run starts the HTTP server with graceful shutdown on port 8787
@@ -85,6 +87,8 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/admin/clear-scans", s.HandleAdminClearScans)
 	mux.HandleFunc("/api/admin/clear-usage", s.HandleAdminClearUsage)
 	mux.HandleFunc("/api/admin/vacuum", s.HandleAdminVacuum)
+	mux.HandleFunc("/api/admin/vacuum-info", s.HandleAdminVacuumInfo)
+	mux.HandleFunc("/api/admin/maintenance-status", s.HandleAdminMaintenanceStatus)
 	mux.HandleFunc("/api/admin/rebuild-fts", s.HandleAdminRebuildFTS)
 	mux.HandleFunc("/api/admin/clean-stale-scans", s.HandleAdminCleanStaleScans)
 	mux.HandleFunc("/api/admin/recalculate-orphaned", s.HandleAdminRecalculateOrphaned)
@@ -137,6 +141,12 @@ func (s *Server) Run() error {
 		log.Println("Server is ready to handle requests")
 		serverErrors <- server.ListenAndServe()
 	}()
+
+	// Background DB maintenance: periodic incremental_vacuum + PRAGMA optimize.
+	// Skips automatically while a scan is in flight (Scanner.IsBusy).
+	maintCtx, cancelMaint := context.WithCancel(context.Background())
+	defer cancelMaint()
+	go database.NewMaintenanceRunner(s.db, s.config.DBMaintenanceInterval, s.scanner.IsBusy).Run(maintCtx)
 
 	// Setup graceful shutdown
 	shutdown := make(chan os.Signal, 1)

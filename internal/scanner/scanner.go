@@ -63,6 +63,18 @@ func (s *Scanner) SetOnScanComplete(callback func()) {
 	s.onScanComplete = callback
 }
 
+// IsBusy reports whether the scanner currently has an in-flight scan. Used
+// by background maintenance to avoid running while a scan is active.
+func (s *Scanner) IsBusy() bool {
+	current, err := s.db.GetCurrentScan()
+	if err != nil {
+		// On error, assume busy — better to skip a maintenance tick than to
+		// race against a real scan we couldn't observe.
+		return true
+	}
+	return current != nil
+}
+
 // Cancel gracefully stops the current scan
 func (s *Scanner) Cancel() bool {
 	if s.cancel != nil {

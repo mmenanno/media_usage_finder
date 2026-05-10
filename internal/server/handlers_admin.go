@@ -314,4 +314,68 @@ func (s *Server) HandleAdminClearAuditLog(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// renderTemplate renders an HTML template
+// HandleAdminVacuumInfo returns freelist + database-size info so the UI can
+// preview how much space a VACUUM would reclaim before the user confirms.
+func (s *Server) HandleAdminVacuumInfo(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	info, err := s.db.GetFreelistInfo()
+	if err != nil {
+		log.Printf("Failed to get vacuum info: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to read database info", "vacuum_info_failed")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"freelist_count":  info.FreelistCount,
+		"page_size":       info.PageSize,
+		"reclaimable_kb":  info.ReclaimableKB,
+		"database_kb":     info.DatabaseKB,
+		"scan_in_flight":  s.scanner != nil && s.scanner.IsBusy(),
+	})
+}
+
+// HandleAdminMaintenanceStatus returns last-run timestamps for each
+// maintenance operation plus current freelist info — feeds the
+// "Maintenance" widget on the Advanced page.
+func (s *Server) HandleAdminMaintenanceStatus(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	status, err := s.db.GetMaintenanceStatus()
+	if err != nil {
+		log.Printf("Failed to get maintenance status: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to read maintenance status", "maintenance_status_failed")
+		return
+	}
+
+	toUnix := func(t *database.MaintenanceStatus) map[string]interface{} {
+		out := map[string]interface{}{}
+		if t.LastOptimize != nil {
+			out["last_optimize"] = t.LastOptimize.Unix()
+		}
+		if t.LastIncrementalVacuum != nil {
+			out["last_incremental_vacuum"] = t.LastIncrementalVacuum.Unix()
+		}
+		if t.LastFullVacuum != nil {
+			out["last_full_vacuum"] = t.LastFullVacuum.Unix()
+		}
+		if t.LastWALCheckpoint != nil {
+			out["last_wal_checkpoint"] = t.LastWALCheckpoint.Unix()
+		}
+		return out
+	}
+
+	resp := toUnix(status)
+	resp["auto_vacuum"] = int(status.AutoVacuum)
+	resp["freelist_count"] = status.Freelist.FreelistCount
+	resp["page_size"] = status.Freelist.PageSize
+	resp["reclaimable_kb"] = status.Freelist.ReclaimableKB
+	resp["database_kb"] = status.Freelist.DatabaseKB
+	resp["interval_seconds"] = int(s.config.DBMaintenanceInterval.Seconds())
+
+	respondJSON(w, http.StatusOK, resp)
+}

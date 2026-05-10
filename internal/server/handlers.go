@@ -82,9 +82,13 @@ func NewServer(db *database.DB, cfg *config.Config, version string) *Server {
 		log.Printf("To enable: configure 'disks' in config.yaml and mount disks in docker-compose.yml")
 	}
 
-	// Invalidate stats cache when scan completes
+	// On scan completion: invalidate stats cache and truncate the WAL so the
+	// write-ahead log doesn't grow unbounded across consecutive scans.
 	srv.scanner.SetOnScanComplete(func() {
 		srv.statsCache.Invalidate()
+		if err := srv.db.CheckpointWAL(); err != nil {
+			log.Printf("Warning: WAL checkpoint after scan failed: %v", err)
+		}
 	})
 
 	return srv

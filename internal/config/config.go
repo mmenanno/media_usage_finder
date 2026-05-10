@@ -29,6 +29,10 @@ type Config struct {
 	DBConnMaxLifetime time.Duration `yaml:"db_conn_max_lifetime"`
 	DBCacheSize       int           `yaml:"db_cache_size"` // SQLite cache size in KB (e.g., 1000000 = ~1GB)
 
+	// Background DB maintenance interval (PRAGMA optimize + incremental
+	// vacuum). 0 disables. Default: 24h.
+	DBMaintenanceInterval time.Duration `yaml:"db_maintenance_interval"`
+
 	LocalPathMappings   []PathMapping            `yaml:"local_path_mappings"`
 	ServicePathMappings map[string][]PathMapping `yaml:"service_path_mappings"`
 	ScanPaths           []string                 `yaml:"scan_paths"`
@@ -179,6 +183,7 @@ func Default() *Config {
 		DBMaxIdleConns:       5,
 		DBConnMaxLifetime:    5 * time.Minute,
 		DBCacheSize:          1000000, // 1GB SQLite cache
+		DBMaintenanceInterval: 24 * time.Hour,
 		LocalPathMappings: []PathMapping{
 			{Service: "/media", Local: "/mnt/user/data/media"},
 			{Service: "/downloads", Local: "/mnt/user/data/downloads/torrents"},

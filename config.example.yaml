@@ -78,6 +78,11 @@ db_max_idle_conns: 5
 db_conn_max_lifetime: 5m
 db_cache_size: 1000000  # 1GB cache for 128GB RAM systems
 
+# How often to run background DB maintenance (PRAGMA optimize +
+# incremental_vacuum). Skipped automatically while a scan is running.
+# Set to 0 to disable.
+db_maintenance_interval: 24h
+
 # Media-finder's own path mappings (service = media-finder's container path, local = host filesystem path)
 local_path_mappings:
   - service: /media

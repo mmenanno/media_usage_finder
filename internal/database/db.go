@@ -60,6 +60,14 @@ func NewWithConfig(dbPath string, cfg DBConfig) (*DB, error) {
 		}
 	}
 
+	// Request INCREMENTAL auto-vacuum. Only takes effect for a fresh database
+	// (no tables yet); on an existing DB SQLite ignores the change unless a
+	// full VACUUM follows. Issued before initSchema so new installs get it.
+	if _, err := conn.Exec(`PRAGMA auto_vacuum = INCREMENTAL`); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("failed to set auto_vacuum: %w", err)
+	}
+
 	db := &DB{conn: conn}
 
 	// Initialize schema
@@ -74,6 +82,19 @@ func NewWithConfig(dbPath string, cfg DBConfig) (*DB, error) {
 	if _, err := db.CleanStaleScansOnStartup(); err != nil {
 		// Log but don't fail startup
 		fmt.Printf("Warning: failed to clean orphaned scans on startup: %v\n", err)
+	}
+
+	// Run startup maintenance (PRAGMA optimize). Cheap and safe.
+	if err := db.OptimizeOnStartup(); err != nil {
+		// Log but don't fail startup
+		fmt.Printf("Warning: PRAGMA optimize on startup failed: %v\n", err)
+	}
+
+	// Warn if auto_vacuum isn't INCREMENTAL — existing DBs need a manual full
+	// VACUUM once to enable it. We don't VACUUM automatically because a full
+	// VACUUM rewrites the entire file and locks the DB.
+	if mode, err := db.GetAutoVacuumMode(); err == nil && mode != AutoVacuumIncremental {
+		fmt.Printf("Notice: auto_vacuum=%d (not INCREMENTAL). Run a manual VACUUM once from the Advanced page to enable incremental vacuum.\n", mode)
 	}
 
 	return db, nil

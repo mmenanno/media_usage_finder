@@ -253,6 +253,9 @@ func (db *DB) VacuumDatabase() error {
 		return fmt.Errorf("failed to analyze database: %w", err)
 	}
 
+	// Record timestamp so the Advanced page can show staleness
+	_ = db.MarkFullVacuum()
+
 	// Log the action
 	_, _ = db.conn.Exec(
 		`INSERT INTO audit_log (action, entity_type, entity_id, details) VALUES ('config_change', 'database', 0, 'Vacuumed and analyzed database')`,
