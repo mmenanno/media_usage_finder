@@ -70,24 +70,29 @@ func (s *Server) HandleIndex(w http.ResponseWriter, r *http.Request) {
 	s.renderTemplate(w, "dashboard.html", data)
 }
 
-// getStats retrieves stats from cache or calculates fresh
+// getStats returns stats via the SWR cache. Callers receive an
+// immediate response: a fresh value when the cache is hot, the most
+// recent stale value when a background refresh is in flight, or a
+// freshly-computed value on cold start / hard expiry. Errors are
+// logged; callers get nil only when no stale value exists either.
 func (s *Server) getStats() *stats.Stats {
-	// Try cache first
-	if cached := s.statsCache.Get(); cached != nil {
-		return cached
-	}
-
-	// Calculate fresh stats
-	calculator := stats.NewCalculator(s.db)
-	statistics, err := calculator.Calculate()
+	statistics, err := s.statsCache.Get(func() (*stats.Stats, error) {
+		return stats.NewCalculator(s.db).Calculate()
+	})
 	if err != nil {
-		log.Printf("Failed to calculate stats: %v", err)
-		return nil
+		log.Printf("Failed to calculate stats: %v (returning %s value)",
+			err, ifNil(statistics, "no", "stale"))
 	}
-
-	// Cache for next time
-	s.statsCache.Set(statistics)
 	return statistics
+}
+
+// ifNil returns whenNil if v is nil, otherwise whenNotNil. Tiny helper
+// for the log line above so we don't shadow the actual return value.
+func ifNil[T any](v *T, whenNil, whenNotNil string) string {
+	if v == nil {
+		return whenNil
+	}
+	return whenNotNil
 }
 
 // getDatabaseStats retrieves database stats from cache or calculates fresh
