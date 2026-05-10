@@ -76,8 +76,38 @@
             document.querySelectorAll('[data-width]').forEach(function(el) {
                 el.style.width = el.getAttribute('data-width') + '%';
             });
+
+            // Persist <details> open/closed state per widget so the
+            // operator's collapse choice survives reloads. Each
+            // collapsible widget carries data-widget-key.
+            document.querySelectorAll('details.widget-collapsible[data-widget-key]').forEach(function(el) {
+                const key = 'widget-open:' + el.dataset.widgetKey;
+                const saved = localStorage.getItem(key);
+                if (saved === 'closed') {
+                    el.removeAttribute('open');
+                } else if (saved === 'open') {
+                    el.setAttribute('open', '');
+                }
+                el.addEventListener('toggle', function() {
+                    localStorage.setItem(key, el.open ? 'open' : 'closed');
+                });
+            });
         });
     </script>
+    <style>
+        /* Keep the native disclosure triangle but tame its visual weight
+           on the dark theme. */
+        details.widget-collapsible > summary { list-style: none; }
+        details.widget-collapsible > summary::-webkit-details-marker { display: none; }
+        details.widget-collapsible > summary::before {
+            content: '▸';
+            display: inline-block;
+            margin-right: 0.5rem;
+            color: rgba(255,255,255,0.5);
+            transition: transform 0.15s ease;
+        }
+        details.widget-collapsible[open] > summary::before { transform: rotate(90deg); }
+    </style>
 
     <!-- Statistics Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

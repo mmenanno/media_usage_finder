@@ -19,11 +19,14 @@
         </div>
     </div>
 
-    <!-- Hash Scan Progress -->
-    <div class="bg-linear-to-br from-purple-900 to-gray-800 rounded-lg p-6 border border-purple-700">
-        <div class="flex justify-between items-center mb-4">
+    <!-- Hash Scan Progress (collapsible) -->
+    <details class="bg-linear-to-br from-purple-900 to-gray-800 rounded-lg border border-purple-700 widget-collapsible" data-widget-key="hash-card" open>
+        <summary class="cursor-pointer p-6 select-none flex justify-between items-center gap-4">
             <h3 class="text-xl font-semibold text-purple-100">Hash Scan (Duplicate Detection)</h3>
-            <div class="flex gap-2">
+            <span class="text-xs text-purple-300 opacity-75">click to expand/collapse</span>
+        </summary>
+        <div class="px-6 pb-6">
+            <div class="flex justify-end gap-2 mb-4 flex-wrap">
                 <button
                     hx-post="/api/hash/verify"
                     hx-swap="none"
@@ -63,18 +66,18 @@
                     Calculate Hashes
                 </button>
             </div>
-        </div>
-        <div
-            id="hash-progress-container"
-            hx-ext="sse"
-            sse-connect="/api/hash/events"
-            sse-swap="message">
-            <div class="flex items-center text-purple-300">
-                <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Loading hash scan status...</span>
+            <div
+                id="hash-progress-container"
+                hx-ext="sse"
+                sse-connect="/api/hash/events"
+                sse-swap="message">
+                <div class="flex items-center text-purple-300">
+                    <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Loading hash scan status...</span>
+                </div>
             </div>
         </div>
-    </div>
+    </details>
