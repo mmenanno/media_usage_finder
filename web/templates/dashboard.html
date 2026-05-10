@@ -48,32 +48,28 @@
 
     <!-- JavaScript to handle scan completion -->
     <script>
-        // Listen for the scanCompleted event from HTMX response headers
-        document.body.addEventListener('scanCompleted', function() {
-            // Stop the polling by removing the hx-trigger attribute
-            const progressContainer = document.getElementById('progress-container');
-            if (progressContainer) {
-                // Remove the polling trigger attribute entirely to stop updates
-                progressContainer.removeAttribute('hx-trigger');
-
-                // Also clear any pending HTMX timers on this element
-                if (window.htmx) {
-                    htmx.trigger(progressContainer, 'htmx:abort');
-                }
-            }
-
-            // Hide the resume button if it exists (scan completed successfully)
+        // Reusable completion handler — refreshes the page so stats and
+        // service breakdown reflect the just-finished scan.
+        function onScanCompleted() {
             const resumeButton = document.querySelector('[hx-post="/api/scan/resume"]');
             if (resumeButton && resumeButton.parentElement) {
                 resumeButton.parentElement.style.display = 'none';
             }
+            setTimeout(function() { window.location.reload(); }, 2000);
+        }
 
-            // Refresh stats and service breakdown after a short delay
-            // This allows the completion UI to be visible briefly before refresh
-            setTimeout(function() {
-                window.location.reload();
-            }, 2000); // 2 second delay to show completion state
-        });
+        // Legacy path: HTMX response sets HX-Trigger: scanCompleted on
+        // the old polling endpoint. Kept for any client still hitting it.
+        document.body.addEventListener('scanCompleted', onScanCompleted);
+
+        // SSE path: the new /api/scan/events stream emits
+        // `event: complete` when the scanner finishes. The htmx-sse
+        // extension dispatches that as an `htmx:sse:complete` event
+        // (named after the SSE event type) on the listening element.
+        const progressContainer = document.getElementById('progress-container');
+        if (progressContainer) {
+            progressContainer.addEventListener('htmx:sse:complete', onScanCompleted);
+        }
 
         // Set disk usage bar widths from data attributes
         document.addEventListener('DOMContentLoaded', function() {

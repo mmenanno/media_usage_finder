@@ -1,11 +1,14 @@
     <!-- Scan Progress -->
     <div class="bg-linear-to-br from-indigo-900 to-gray-800 rounded-lg p-6 border border-indigo-700">
         <h3 class="text-xl font-semibold mb-4 text-indigo-100">Scan Progress</h3>
+        <!-- SSE: server pushes the rendered HTML fragment on each tick.
+             The polling URL /api/scan/progress-html is kept as a route
+             but no longer hit by the dashboard. -->
         <div
             id="progress-container"
-            hx-get="/api/scan/progress-html"
-            hx-trigger="load, every 2s"
-            hx-swap="innerHTML">
+            hx-ext="sse"
+            sse-connect="/api/scan/events"
+            sse-swap="message">
             <div class="flex items-center text-indigo-300">
                 <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -63,9 +66,9 @@
         </div>
         <div
             id="hash-progress-container"
-            hx-get="/api/hash/progress-html"
-            hx-trigger="load, every 2s"
-            hx-swap="innerHTML">
+            hx-ext="sse"
+            sse-connect="/api/hash/events"
+            sse-swap="message">
             <div class="flex items-center text-purple-300">
                 <svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
