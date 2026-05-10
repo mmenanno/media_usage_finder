@@ -129,6 +129,7 @@ func (s *Server) LoadTemplates(_ string) error {
 	pagePartials := map[string][]string{
 		"dashboard.html": {
 			"partials/dashboard_progress.html",
+			"partials/dashboard_freshness.html",
 			"partials/dashboard_disks.html",
 			"partials/dashboard_services.html",
 			"partials/dashboard_manual_updates.html",

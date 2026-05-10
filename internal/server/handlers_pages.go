@@ -95,6 +95,48 @@ func ifNil[T any](v *T, whenNil, whenNotNil string) string {
 	return whenNotNil
 }
 
+// HandleFreshness returns a JSON snapshot of subsystem freshness:
+// most-recent filesystem scan, disk-location scan, per-service usage
+// update, and hash coverage. Consumed by the "Freshness" card on the
+// dashboard so operators can see at a glance which data is stale and
+// trigger the right refresh action.
+func (s *Server) HandleFreshness(w http.ResponseWriter, r *http.Request) {
+	if !requireMethod(w, r, http.MethodGet) {
+		return
+	}
+
+	snap, err := s.db.GetFreshness()
+	if err != nil {
+		log.Printf("Failed to get freshness snapshot: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to read freshness snapshot", "freshness_failed")
+		return
+	}
+
+	resp := map[string]interface{}{
+		"total_files":       snap.TotalFiles,
+		"hashed_files":      snap.HashedFiles,
+		"missing_hashes":    snap.MissingHashes,
+		"hash_coverage_pct": snap.HashCoveragePct,
+	}
+	if snap.LastFilesystemScan != nil {
+		resp["last_filesystem_scan"] = snap.LastFilesystemScan.Unix()
+	}
+	if snap.LastDiskScan != nil {
+		resp["last_disk_scan"] = snap.LastDiskScan.Unix()
+	}
+	per := map[string]interface{}{}
+	for service, t := range snap.LastUsagePerService {
+		if t == nil {
+			per[service] = nil
+		} else {
+			per[service] = t.Unix()
+		}
+	}
+	resp["last_usage_per_service"] = per
+
+	respondJSON(w, http.StatusOK, resp)
+}
+
 // getDatabaseStats retrieves database stats from cache or calculates fresh
 // Uses 60-second cache since database stats change infrequently
 func (s *Server) getDatabaseStats() *database.DatabaseStats {

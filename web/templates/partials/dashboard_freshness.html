@@ -1,0 +1,111 @@
+    <!-- Freshness: how recent each subsystem's data is. Loaded by
+         JS on page load and after dashboard refreshes. -->
+    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700" id="freshness-card">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h3 class="text-xl font-semibold text-white">Freshness</h3>
+            </div>
+            <button
+                type="button"
+                onclick="loadFreshness()"
+                class="text-sm text-gray-400 hover:text-gray-200">
+                Refresh
+            </button>
+        </div>
+        <div id="freshness-body" class="text-sm text-gray-300">
+            <div class="text-gray-500">Loading…</div>
+        </div>
+    </div>
+
+    <script>
+        // Render the Freshness card. Pulled out of the main dashboard
+        // JS because it's specific to this widget.
+        function freshnessRelativeTime(unix) {
+            if (!unix) return 'never';
+            const now = Math.floor(Date.now() / 1000);
+            const delta = now - unix;
+            if (delta < 60) return delta + 's ago';
+            if (delta < 3600) return Math.floor(delta / 60) + 'm ago';
+            if (delta < 86400) return Math.floor(delta / 3600) + 'h ago';
+            return Math.floor(delta / 86400) + 'd ago';
+        }
+
+        // Tier the relative time into a colored badge so stale data
+        // is visible at a glance. Returns a Tailwind text-color class.
+        function freshnessColor(unix, staleSeconds) {
+            if (!unix) return 'text-red-400';
+            const age = Math.floor(Date.now() / 1000) - unix;
+            if (age < staleSeconds) return 'text-green-400';
+            if (age < staleSeconds * 3) return 'text-yellow-400';
+            return 'text-red-400';
+        }
+
+        function freshnessRow(label, unix, staleSeconds, action) {
+            const cls = freshnessColor(unix, staleSeconds);
+            const time = freshnessRelativeTime(unix);
+            const actionHTML = action
+                ? `<button type="button" onclick="${action.onclick}" class="ml-auto text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">${action.label}</button>`
+                : '';
+            return `<div class="flex items-center gap-3 py-1">
+                <span class="text-gray-400 w-44 shrink-0">${label}</span>
+                <span class="${cls} font-medium">${time}</span>
+                ${actionHTML}
+            </div>`;
+        }
+
+        // Per-service freshness. Stale threshold: 7d. The action button
+        // hits the existing single-service-update endpoint.
+        function serviceFreshnessRow(service, unix) {
+            return freshnessRow(
+                'Service: ' + service,
+                unix,
+                7 * 86400,
+                {
+                    label: 'Update',
+                    onclick: `fetch('/api/scan/update-service?service=${service}', {method:'POST'}).then(()=>setTimeout(loadFreshness, 1500))`,
+                },
+            );
+        }
+
+        function loadFreshness() {
+            const body = document.getElementById('freshness-body');
+            if (!body) return;
+            fetch('/api/freshness').then(r => r.json()).then(data => {
+                let html = '';
+                html += freshnessRow('Filesystem index', data.last_filesystem_scan, 7 * 86400, {
+                    label: 'Run incremental scan',
+                    onclick: `fetch('/api/scan/start?incremental=true', {method:'POST'}).then(()=>setTimeout(loadFreshness, 1500))`,
+                });
+                html += freshnessRow('Disk locations', data.last_disk_scan, 14 * 86400, {
+                    label: 'Scan disks',
+                    onclick: `fetch('/api/scan/disk-locations', {method:'POST'}).then(()=>setTimeout(loadFreshness, 1500))`,
+                });
+
+                const services = Object.keys(data.last_usage_per_service || {}).sort();
+                services.forEach(service => {
+                    html += serviceFreshnessRow(service, data.last_usage_per_service[service]);
+                });
+
+                // Hash coverage row — color thresholds are about
+                // missing-files-percent, not time. >5% missing is amber.
+                const pct = data.hash_coverage_pct || 0;
+                let coverageColor = 'text-green-400';
+                if (pct < 95) coverageColor = 'text-yellow-400';
+                if (pct < 80) coverageColor = 'text-red-400';
+                html += `<div class="flex items-center gap-3 py-1 border-t border-gray-700 mt-2 pt-3">
+                    <span class="text-gray-400 w-44 shrink-0">Hash coverage</span>
+                    <span class="${coverageColor} font-medium">${pct.toFixed(1)}%</span>
+                    <span class="text-xs text-gray-500">(${data.missing_hashes} missing of ${data.total_files})</span>
+                </div>`;
+
+                body.innerHTML = html;
+            }).catch(err => {
+                body.innerHTML = '<div class="text-red-400">Failed to load freshness: ' + err + '</div>';
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', loadFreshness);
+    </script>

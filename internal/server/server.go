@@ -84,6 +84,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/plex/libraries", s.HandleGetPlexLibraries)
 	mux.HandleFunc("/api/config/test-path-mappings", s.HandleTestPathMappings)
 	mux.HandleFunc("/api/disks/detect", s.HandleDetectDisks)
+	mux.HandleFunc("/api/freshness", s.HandleFreshness)
 	mux.HandleFunc("/api/export", s.HandleExport)
 	mux.HandleFunc("/api/missing-files", s.HandleGetMissingFiles)
 	mux.HandleFunc("/api/missing-files/export", s.HandleExportMissingFiles)
