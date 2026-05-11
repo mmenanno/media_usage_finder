@@ -367,21 +367,18 @@ class BatchSelection {
         // Check if filesystem deletion is enabled (from global config)
         const deleteFromFilesystem = window.appConfig?.deleteFilesFromFilesystem || false;
 
-        // Build appropriate confirmation message
-        let confirmMessage;
-        let confirmTitle;
-        let confirmType = 'confirm';
-
-        if (deleteFromFilesystem) {
-            confirmMessage = `<strong>Warning:</strong> You are about to permanently delete <strong>${this.selectedFiles.size} files</strong> from the filesystem.\n\nThis will remove the actual files from disk and <strong>cannot be undone</strong>.\n\nAre you absolutely sure?`;
-            confirmTitle = 'Delete Files From Filesystem';
-            confirmType = 'warning';
-        } else {
-            confirmMessage = `You are about to remove ${this.selectedFiles.size} files from the database.\n\nThe actual files will remain on disk. You can re-scan to add them back.\n\nContinue?`;
-            confirmTitle = 'Remove From Database';
-        }
-
-        const confirmed = await window.confirmDialog(confirmMessage, confirmTitle, confirmType);
+        // Use the standardized bulk-destructive prompt so the typed
+        // "DELETE" guard kicks in for >100 selections — consistent
+        // with what other pages will use as bulk actions roll out
+        // (ticket 011).
+        const confirmed = await window.confirmBulkDestructive({
+            verb: deleteFromFilesystem ? 'Delete' : 'Remove',
+            noun: deleteFromFilesystem ? 'files from the filesystem' : 'files from the database',
+            count: this.selectedFiles.size,
+            consequence: deleteFromFilesystem
+                ? 'This permanently removes the files from disk and cannot be undone.'
+                : 'The actual files remain on disk; you can re-scan to add them back.',
+        });
 
         if (!confirmed) {
             return;

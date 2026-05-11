@@ -251,3 +251,47 @@ window.alertDialog = (message, title, type) => {
     return Promise.resolve(alert(message));
 };
 
+// confirmBulkDestructive — standardized confirmation for bulk
+// destructive actions. Centralizes copy and behavior so every page
+// asks the same way:
+//
+//   • Always shows the count and the destructive verb in the prompt.
+//   • Once `count` exceeds `typeThreshold` (default 100), requires
+//     the user to type the literal word "DELETE" before the Confirm
+//     button enables — guards against fat-finger mass deletes.
+//
+// Usage:
+//   const ok = await confirmBulkDestructive({
+//       verb: 'Delete',
+//       noun: 'files',
+//       count: 1234,
+//       consequence: 'This permanently removes the files from disk and clears the database row.',
+//   });
+//   if (!ok) return;
+//
+// Returns: Promise<boolean>.
+window.confirmBulkDestructive = async ({
+    verb,
+    noun,
+    count,
+    consequence = '',
+    typeThreshold = 100,
+} = {}) => {
+    const headline = `${verb} ${count.toLocaleString()} ${noun}?`;
+    let body = headline;
+    if (consequence) body += '\n\n' + consequence;
+
+    if (count <= typeThreshold) {
+        // Below the threshold: the standard confirm dialog is enough.
+        return window.confirmDialog(body, `Confirm ${verb}`);
+    }
+
+    // Above threshold: prompt requiring the user to type "DELETE".
+    // Falls back to native prompt() — modal dialogs don't support
+    // text input today; building one is out of scope here.
+    const typed = window.prompt(
+        `${body}\n\nThis action affects ${count.toLocaleString()} items. Type DELETE to confirm:`,
+        '');
+    return typed === 'DELETE';
+};
+
