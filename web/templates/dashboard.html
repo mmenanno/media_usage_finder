@@ -95,18 +95,27 @@
         });
     </script>
     <style>
-        /* Keep the native disclosure triangle but tame its visual weight
-           on the dark theme. */
+        /* Hide the native disclosure marker — we render our own chevron
+           inline with the title. The chevron rotates 90deg when open. */
         details.widget-collapsible > summary { list-style: none; }
         details.widget-collapsible > summary::-webkit-details-marker { display: none; }
-        details.widget-collapsible > summary::before {
-            content: '▸';
+        details.widget-collapsible > summary > h3::before {
+            content: '';
             display: inline-block;
-            margin-right: 0.5rem;
-            color: rgba(255,255,255,0.5);
+            width: 0;
+            height: 0;
+            margin-right: 0.6rem;
+            vertical-align: middle;
+            border-top: 5px solid transparent;
+            border-bottom: 5px solid transparent;
+            border-left: 7px solid currentColor;
+            opacity: 0.55;
             transition: transform 0.15s ease;
+            transform-origin: 30% 50%;
         }
-        details.widget-collapsible[open] > summary::before { transform: rotate(90deg); }
+        details.widget-collapsible[open] > summary > h3::before {
+            transform: rotate(90deg);
+        }
     </style>
 
     <!-- Statistics Grid -->

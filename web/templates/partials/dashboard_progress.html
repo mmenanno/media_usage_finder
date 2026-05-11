@@ -21,11 +21,10 @@
 
     <!-- Hash Scan Progress (collapsible) -->
     <details class="bg-linear-to-br from-purple-900 to-gray-800 rounded-lg border border-purple-700 widget-collapsible" data-widget-key="hash-card" open>
-        <summary class="cursor-pointer p-6 select-none flex justify-between items-center gap-4">
-            <h3 class="text-xl font-semibold text-purple-100">Hash Scan (Duplicate Detection)</h3>
-            <span class="text-xs text-purple-300 opacity-75">click to expand/collapse</span>
+        <summary class="cursor-pointer px-6 py-4 select-none hover:bg-white/5 rounded-t-lg transition-colors">
+            <h3 class="text-xl font-semibold text-purple-100 inline-flex items-center">Hash Scan (Duplicate Detection)</h3>
         </summary>
-        <div class="px-6 pb-6">
+        <div class="px-6 pb-6 pt-2">
             <div class="flex justify-end gap-2 mb-4 flex-wrap">
                 <button
                     hx-post="/api/hash/verify"
