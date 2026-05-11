@@ -166,6 +166,26 @@ CREATE INDEX IF NOT EXISTS idx_missing_files_scan_id ON service_missing_files(sc
 CREATE INDEX IF NOT EXISTS idx_missing_files_service ON service_missing_files(service);
 CREATE INDEX IF NOT EXISTS idx_missing_files_size ON service_missing_files(size DESC);
 CREATE INDEX IF NOT EXISTS idx_missing_files_scan_service ON service_missing_files(scan_id, service);
+
+-- Saved file-browser views (ticket 010). Each row captures a set of
+-- filter parameters from the /files page so the operator can recall a
+-- common query with one click. ` + "`filters`" + ` is a JSON object whose
+-- keys are filter names (services, extensions, devices, search,
+-- orphaned, hardlink, order, direction, service_filter_mode).
+CREATE TABLE IF NOT EXISTS saved_views (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	name TEXT NOT NULL UNIQUE,
+	icon TEXT DEFAULT '',
+	description TEXT DEFAULT '',
+	filters TEXT NOT NULL,
+	sort_order INTEGER NOT NULL DEFAULT 0,
+	is_system INTEGER NOT NULL DEFAULT 0,
+	created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+	last_used INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_views_sort ON saved_views(sort_order, name);
 `
 
 // GetSchema returns the database schema

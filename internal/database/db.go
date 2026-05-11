@@ -90,6 +90,11 @@ func NewWithConfig(dbPath string, cfg DBConfig) (*DB, error) {
 		fmt.Printf("Warning: PRAGMA optimize on startup failed: %v\n", err)
 	}
 
+	// Seed built-in saved views (idempotent — INSERT OR IGNORE).
+	if err := db.SeedDefaultSavedViews(); err != nil {
+		fmt.Printf("Warning: seed default saved views failed: %v\n", err)
+	}
+
 	// Warn if auto_vacuum isn't INCREMENTAL — existing DBs need a manual full
 	// VACUUM once to enable it. We don't VACUUM automatically because a full
 	// VACUUM rewrites the entire file and locks the DB.

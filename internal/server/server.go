@@ -85,6 +85,11 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/config/test-path-mappings", s.HandleTestPathMappings)
 	mux.HandleFunc("/api/disks/detect", s.HandleDetectDisks)
 	mux.HandleFunc("/api/freshness", s.HandleFreshness)
+
+	// Saved file-browser views (ticket 010). Collection at /api/views,
+	// individual rows under /api/views/{id} (with optional /touch suffix).
+	mux.HandleFunc("/api/views", s.HandleListViewsOrCreate)
+	mux.HandleFunc("/api/views/", s.HandleViewByID)
 	mux.HandleFunc("/api/export", s.HandleExport)
 	mux.HandleFunc("/api/missing-files", s.HandleGetMissingFiles)
 	mux.HandleFunc("/api/missing-files/export", s.HandleExportMissingFiles)

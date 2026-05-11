@@ -23,6 +23,28 @@
         </div>
     </div>
 
+    <!-- Saved views (ticket 010). Loaded on page load via /api/views;
+         clicking a chip applies the saved filter set by navigating to
+         /files with the captured query string. The chip strip is
+         intentionally above the filter form so it reads as
+         "common queries first, fine-tuning second". -->
+    <div class="bg-gray-800 rounded-lg p-4" id="saved-views-card">
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+                </svg>
+                <h3 class="text-sm font-semibold text-gray-200">Saved views</h3>
+            </div>
+            <button type="button" id="save-current-view-btn" class="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded">
+                + Save current
+            </button>
+        </div>
+        <div id="saved-views-chips" class="flex flex-wrap gap-2">
+            <span class="text-xs text-gray-500">Loading…</span>
+        </div>
+    </div>
+
     <!-- Search and Filters -->
     <div class="bg-gray-800 rounded-lg p-6">
         <form hx-get="/files" hx-target="#files-table" hx-select="#files-table, #files-total-display" hx-push-url="true" class="space-y-4" autocomplete="off">
@@ -1246,6 +1268,117 @@
             if (evt.detail.target.id === 'files-table') {
                 window.injectFileIcons();
             }
+        });
+    </script>
+
+    <!-- Saved views (ticket 010) — chip strip + save-current dialog. -->
+    <script>
+        // Map of system view names → simple inline-SVG icons. Keeps the
+        // chip strip lightweight without pulling a full icon library.
+        const SAVED_VIEW_ICONS = {
+            trash: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>',
+            link: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>',
+            'file-text': '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>',
+        };
+
+        // Filter keys we'll capture when "Save current" is clicked.
+        // Pagination (page) is intentionally excluded — saved views
+        // always start at page 1.
+        const SAVABLE_FILTER_KEYS = [
+            'search', 'orphaned', 'hardlink', 'services', 'service_filter_mode',
+            'extensions', 'devices', 'order', 'direction',
+        ];
+
+        function buildViewURL(filters) {
+            const params = new URLSearchParams();
+            for (const [k, v] of Object.entries(filters)) {
+                if (v !== '' && v != null) params.set(k, v);
+            }
+            const qs = params.toString();
+            return qs ? '/files?' + qs : '/files';
+        }
+
+        function renderSavedViewChips(views) {
+            const host = document.getElementById('saved-views-chips');
+            if (!host) return;
+            if (!views.length) {
+                host.innerHTML = '<span class="text-xs text-gray-500">No saved views yet — click "+ Save current" to add one.</span>';
+                return;
+            }
+            host.innerHTML = views.map(v => {
+                const icon = SAVED_VIEW_ICONS[v.icon] || '';
+                const url = buildViewURL(v.filters || {});
+                const description = v.description ? ' - ' + v.description : '';
+                const lockBadge = v.is_system
+                    ? '<span class="ml-1 text-[10px] uppercase tracking-wider text-gray-500">system</span>'
+                    : '';
+                return `
+                    <a href="${url}"
+                       title="${(v.name + description).replace(/"/g, '&quot;')}"
+                       data-view-id="${v.id}"
+                       class="saved-view-chip group inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-700 hover:bg-blue-600 rounded text-xs text-gray-200 transition-colors">
+                        ${icon}
+                        <span>${v.name}</span>
+                        ${lockBadge}
+                    </a>
+                `;
+            }).join('');
+
+            // Touch the view (update last_used) when clicked. Fire and
+            // forget — failure here doesn't block navigation.
+            host.querySelectorAll('.saved-view-chip').forEach(el => {
+                el.addEventListener('click', () => {
+                    const id = el.dataset.viewId;
+                    fetch('/api/views/' + id + '/touch', { method: 'POST' }).catch(() => {});
+                });
+            });
+        }
+
+        function loadSavedViews() {
+            fetch('/api/views').then(r => r.json()).then(data => {
+                renderSavedViewChips(data.views || []);
+            }).catch(err => {
+                document.getElementById('saved-views-chips').innerHTML =
+                    '<span class="text-xs text-red-400">Failed to load views: ' + err + '</span>';
+            });
+        }
+
+        async function saveCurrentView() {
+            // Snapshot the current URL's filter params (ignore page).
+            const url = new URL(window.location.href);
+            const filters = {};
+            for (const key of SAVABLE_FILTER_KEYS) {
+                const v = url.searchParams.get(key);
+                if (v != null && v !== '') filters[key] = v;
+            }
+            if (Object.keys(filters).length === 0) {
+                await alertDialog(
+                    'No active filters to save. Apply at least one filter or search term, then try again.',
+                    'Nothing to save', 'info');
+                return;
+            }
+            // Cheap inline prompt — full edit dialog can come in a follow-up.
+            const name = window.prompt('Name this view:', '');
+            if (!name) return;
+
+            const resp = await fetch('/api/views', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim(), filters }),
+            });
+            if (resp.ok) {
+                showToast('View saved', 'success');
+                loadSavedViews();
+            } else {
+                const body = await resp.json().catch(() => ({}));
+                showToast('Save failed: ' + (body.error || resp.statusText), 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSavedViews();
+            const btn = document.getElementById('save-current-view-btn');
+            if (btn) btn.addEventListener('click', saveCurrentView);
         });
     </script>
 </div>
