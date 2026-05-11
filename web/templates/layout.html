@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} - Media Usage Finder</title>
     <link rel="icon" type="image/png" href="/static/logo.png">
-    <link href="/static/css/styles.css" rel="stylesheet">
-    <link href="/static/css/accessibility.css" rel="stylesheet">
+    <!-- Cache-bust CSS by app version so a new build is never masked by a
+         stale browser cache. The query string is ignored by the server
+         (static file serving doesn't read it) but forces a fresh GET. -->
+    <link href="/static/css/styles.css?v={{.Version}}" rel="stylesheet">
+    <link href="/static/css/accessibility.css?v={{.Version}}" rel="stylesheet">
 
     <!-- Service brand colors for JavaScript -->
     <script>
