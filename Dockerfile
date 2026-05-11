@@ -25,18 +25,19 @@ RUN --mount=type=cache,target=/go/pkg/mod,sharing=locked \
     --mount=type=cache,target=/root/.cache/go-build,sharing=locked \
     go mod download
 
-# 2) CSS step — depends only on the input stylesheet + Tailwind config
-#    (if any). Reads no Go source, so an unrelated Go change won't bust
-#    this layer.
-COPY web/static/css ./web/static/css
+# 2) Web assets needed by the Tailwind CSS build. input.css uses
+#    `@source "../../../web/templates"` and `@source "../../../web/static/js"`,
+#    so both directories must exist in the image before `build:css`
+#    runs — otherwise Tailwind sees no class usage and only emits the
+#    handful of utilities literally referenced in input.css.
+COPY web/static ./web/static
+COPY web/templates ./web/templates
 RUN npm run build:css
 
-# 3) Source for the Go build. Avoid `COPY . .` so changes to README,
-#    Dockerfile, etc. don't invalidate the build layer.
+# 3) Remaining Go source. Templates/static are already in place from
+#    the previous step.
 COPY cmd ./cmd
 COPY internal ./internal
-COPY web/templates ./web/templates
-COPY web/static ./web/static
 COPY web/web.go ./web/web.go
 COPY VERSION ./
 
