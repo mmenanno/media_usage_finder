@@ -204,6 +204,20 @@ button.htmx-request {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Skip rendering off-screen rows (ticket 012). `content-visibility:
+   auto` lets the browser bypass layout/paint for elements outside
+   the viewport, which is the cheap-but-large win on long tables.
+   `contain-intrinsic-size` reserves space so the scrollbar geometry
+   stays stable while rows are unrendered. The intrinsic-size value
+   is an estimate; the browser uses the real height once a row is
+   rendered. Find-in-page still works in Chrome/Firefox. */
+#files-table tbody tr,
+#cross-disk-groups > *,
+#same-disk-groups > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 80px;
+}
+
 /* Progress bar animation */
 @keyframes progress {
   0% {
