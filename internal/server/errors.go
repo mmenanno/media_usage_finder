@@ -66,6 +66,41 @@ func respondSuccess(w http.ResponseWriter, message string, data map[string]inter
 	respondJSON(w, http.StatusOK, response)
 }
 
+// Toast type constants — used by setToast / respondWithToast. Keep in
+// sync with the styling map in web/static/js/notifications.js
+// (success/error/warning/info → green/red/amber/blue).
+const (
+	ToastSuccess = "success"
+	ToastError   = "error"
+	ToastWarning = "warning"
+	ToastInfo    = "info"
+)
+
+// setToast sets the X-Toast-Message and X-Toast-Type response headers
+// that web/static/js/notifications.js reads after every HTMX request.
+// Use this in handlers that mutate state and want a brief
+// confirmation (or warning) to surface in the UI without rendering a
+// new HTML fragment.
+//
+// Note: only HTMX-issued requests pick these up automatically. Plain
+// `fetch` callers must read the headers themselves (see the saved-views
+// JS for an example that calls window.showToast directly instead).
+func setToast(w http.ResponseWriter, message, toastType string) {
+	if toastType == "" {
+		toastType = ToastInfo
+	}
+	w.Header().Set("X-Toast-Message", message)
+	w.Header().Set("X-Toast-Type", toastType)
+}
+
+// respondWithToast is the common shorthand for "set a success toast,
+// then return a small JSON success payload" — folds two lines of
+// boilerplate into one call.
+func respondWithToast(w http.ResponseWriter, message, toastType string, data map[string]interface{}) {
+	setToast(w, message, toastType)
+	respondSuccess(w, message, data)
+}
+
 // requireMethod checks if the request method matches the expected method
 func requireMethod(w http.ResponseWriter, r *http.Request, method string) bool {
 	if r.Method != method {
